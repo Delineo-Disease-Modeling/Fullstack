@@ -1,0 +1,89 @@
+div.teamheader {
+  width: 100%;
+  text-align: center;
+  margin: auto;
+  padding: 100px;
+  padding-bottom: 60px;
+}
+
+header.teamheader {
+  font-weight: 500;
+  font-size: 32px;
+  padding-bottom: 10px;
+}
+
+p.teamheader {
+  font-weight: 100;
+  line-height: 20px;
+}
+
+div.team {
+  padding-left: 15%;
+  padding-right: 15%;
+  padding-bottom: 60px;
+  column-gap: 20px;
+  row-gap: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+div.member {
+  margin: auto;
+  text-align: center;
+}
+
+img.member {
+  margin: auto;
+  padding: 5px;
+  width: 100%;
+  height: 100%;
+  max-width: 150px;
+  max-height: 150px;
+  border-radius: 15%;
+
+  filter: drop-shadow(2px 0 0 #70B4D4) 
+        drop-shadow(0 2px 0 #70B4D4)
+        drop-shadow(-2px 0 0 #70B4D4) 
+        drop-shadow(0 -2px 0 #70B4D4);
+}
+
+h1.name {
+  margin: auto;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 5px;
+  width: 100%;
+  max-width: 150px;
+}
+
+h2.role {
+  margin: auto;
+  font-weight: lighter;
+  font-size: 12px;
+  width: 100%;
+  max-width: 150px;
+  padding-bottom: 10px;
+}
+
+i.socials {
+  margin: auto;
+  padding-left: 5px;
+  padding-right: 5px;
+  transition: 200ms;
+}
+
+i.socials:hover {
+  filter: brightness(80%);
+}
+
+a.email {
+  text-decoration: none;
+  font-weight: 500;
+  transition: 200ms;
+}
+
+a.email:active {
+  filter: brightness(80%);
+}
