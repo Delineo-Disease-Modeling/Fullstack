@@ -11,8 +11,8 @@ export default function Home() {
         <Shapes />
         <div className='left'>
           <h1 className='title'>Delineo Project</h1>
-          <h2 className='title'>Small-down disease simulation</h2>
-          <NavLink to='/app'>
+          <h2 className='title'>Small-town disease simulation</h2>
+          <NavLink to='/simulator'>
             <button className='app'>Start</button>
           </NavLink>
         </div>

@@ -1,7 +1,7 @@
 footer {
   left: 0;
   bottom: 0;
-  background-color: #5D576B;
+  background-color: #222629;
   width: 100%;
   padding: 40px;
   text-align: center;
@@ -10,7 +10,7 @@ footer {
 button {
   border: 2px solid #F0F0F0;
   border-radius: 25px;
-  background-color: #5D576B;
+  background-color: #222629;
   width: 120px;
   padding: 12px;
   color: #F0F0F0;
@@ -23,7 +23,7 @@ button {
 button:hover {
   transform: scale(1.05);
   background-color: #F0F0F0;
-  color: #5D576B;
+  color: #222629;
   cursor: pointer;
 }
 
