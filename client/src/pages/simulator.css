@@ -1,6 +1,6 @@
 div.simulator {
   width: 100vw;
-  height: calc(100vh - 30px);
+  min-height: calc(100vh - 30px);
 }
 
 div.container {
