@@ -28,8 +28,18 @@ export default function ModelMap() {
     });
   }, []);
 
+  const handleMapZoom = (event) => {
+    const currentZoom = event.target.getZoom();
+    const iconVisible = currentZoom >= 10 && currentZoom <= 15; // Adjust the zoom level as needed
+
+    // Update the icon's visibility
+    if (iconFacility.options.iconSize) {
+      iconFacility.options.iconSize = iconVisible ? [60, 75] : [0, 0];
+    }
+  };
+
   return (
-    <MapContainer center={position} zoom={13} className="mapcontainer" whenCreated={setMap}>
+    <MapContainer center={position} zoom={13} className="mapcontainer" whenCreated={setMap} onZoomend={handleMapZoom}>
       <TileLayer
         attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
