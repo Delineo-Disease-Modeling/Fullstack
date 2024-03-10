@@ -1,6 +1,20 @@
-div.settings {
+div.simset_settings {
   width: 100%;
-  max-height: 90%;
+  height: 100%;
+
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+
+  margin: 10vw;
+
+  column-gap: 30px;
+  row-gap: 30px;
+}
+
+div.simset_params {
+  width: 100%;
 
   display: flex;
   justify-content: space-around;
@@ -9,4 +23,65 @@ div.settings {
 
   column-gap: 30px;
   row-gap: 30px;
+}
+
+input[type="range"] {
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #5D576B;
+  width: 300px;
+  height: 5px;
+  border-radius: 5px;
+  outline: 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #70B4D4;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: 2px solid #5D576B;
+  cursor: pointer;
+  transition: .3s ease-in-out;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  filter: brightness(80%);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+}
+
+div.simset_dropdown {
+  width: 100%;
+
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+div.simset_dropdown_label {
+  width: 100%;
+  padding-bottom: 15px;
+  text-align: center;
+}
+
+select.simset_dropdown {
+  width: 150px;
+  font: Poppins;
+  padding: 5px;
+  background-color: #fff;
+  border: 2px solid #5D576B;
+  border-radius: 15px;
+  cursor: pointer;
+}
+
+div.simset_slider_label {
+  text-align: center;
+  padding-bottom: 15px;
 }
