@@ -7,9 +7,7 @@ import OutputGraphs from '../components/outputgraphs.js';
 
 import './simulator.css';
 
-var sim_data = null;
-
-function sendSimulatorData({ location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
+function sendSimulatorData(setSimData, { location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
   const data = {
     location: location,
     matrices: null,
@@ -23,7 +21,7 @@ function sendSimulatorData({ location, days, pmask, pvaccine, capacity, lockdown
 
   axios.post("http://127.0.0.1:5000/simulation/", data)
     .then((res) => {
-      sim_data = res.data;
+      setSimData(res.data);
       console.log(res.data);
     })
     .catch((error) => {
@@ -33,17 +31,22 @@ function sendSimulatorData({ location, days, pmask, pvaccine, capacity, lockdown
 
 export default function Simulator() {
   const [ showSim, setShowSim ] = useState(false);          // Show simulator, or show settings?
+  const [ simData, setSimData ] = useState(null);           // Simulator output data
 
   return (
     <div>
       <div className='sim_container'>
         {!showSim && 
           <div className='sim_settings'>
-            <SimSettings sendData={sendSimulatorData} showSim={setShowSim}/>
+            <SimSettings sendData={(dict) => { sendSimulatorData(setSimData, dict); }} showSim={setShowSim}/>
           </div>
         }
 
-        {showSim && 
+        {showSim && !simData &&
+          <div>Loading...</div>
+        }
+
+        {showSim && simData &&
           <div className='sim_output'>
             <ModelMap />
             <OutputGraphs />
