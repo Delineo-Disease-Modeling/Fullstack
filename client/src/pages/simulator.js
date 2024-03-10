@@ -8,25 +8,33 @@ import OutputGraphs from '../components/outputgraphs.js';
 import './simulator.css';
 
 function sendSimulatorData(setSimData, { location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
-  const data = {
-    location: location,
-    matrices: null,
-    days: days,
-    mask: pmask,
-    vaccine: pvaccine,
-    capacity: capacity,
-    selfiso: selfiso,
-    lockdown: lockdown,
-  };
+  // Uncomment if you want to work with the simulator
+  // const data = {
+  //   location: location,
+  //   matrices: null,
+  //   days: days,
+  //   mask: pmask,
+  //   vaccine: pvaccine,
+  //   capacity: capacity,
+  //   selfiso: selfiso,
+  //   lockdown: lockdown,
+  // };
 
-  axios.post("http://127.0.0.1:5000/simulation/", data)
-    .then((res) => {
-      setSimData(res.data);
-      console.log(res.data);
+  // axios.post("http://127.0.0.1:5000/simulation/", data)
+  //   .then((res) => {
+  //     setSimData(res.data);
+  //     console.log(res.data);
+  //   })
+  //   .catch((error) => {
+  //     console.log(error.response);
+  //   });
+
+  fetch('data/infectivity.json').then((res) => {
+    res.json().then((data) => {
+      setSimData(data);
+      console.log(data);
     })
-    .catch((error) => {
-      console.log(error.response);
-    });
+  })
 }
 
 export default function Simulator() {
