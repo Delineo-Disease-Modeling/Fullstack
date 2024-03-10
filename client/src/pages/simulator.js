@@ -48,8 +48,8 @@ export default function Simulator() {
 
         {showSim && simData &&
           <div className='sim_output'>
-            <ModelMap />
-            <OutputGraphs />
+            <ModelMap sim_data={simData} />
+            <OutputGraphs sim_data={simData} />
           </div>
         }
       </div>

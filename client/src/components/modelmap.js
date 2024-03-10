@@ -15,7 +15,7 @@ const iconFacility = new L.Icon({
   iconAnchor: [30, 75], // Half of icon's width and full height
 });
 
-export default function ModelMap() {
+export default function ModelMap({ sim_data }) {
   const [map, setMap] = useState(null);
 
   React.useEffect(() => {
