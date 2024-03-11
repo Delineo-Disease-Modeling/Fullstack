@@ -1,4 +1,4 @@
-div.shapes {
+div.home_shapes {
   position: absolute;
   overflow: hidden;
   width: 100%;
@@ -6,7 +6,7 @@ div.shapes {
   z-index: -1;
 }
 
-span.shape {
+span.home_shape {
   position: absolute;
   background-color: #F0F0F090;
   border-radius: 50px;

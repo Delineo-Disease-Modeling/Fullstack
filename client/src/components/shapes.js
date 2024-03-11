@@ -18,7 +18,7 @@ function Shape(key) {
   };
 
   return (
-    <span className='shape' key={key} style={shapeStyle}></span>
+    <span className='home_shape' key={key} style={shapeStyle}></span>
   );
 }
 
@@ -35,7 +35,7 @@ export default function Shapes() {
   }, []);
 
   return (
-    <div className='shapes'>
+    <div className='home_shapes'>
       {shapes}
     </div>
   );
