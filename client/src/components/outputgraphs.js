@@ -24,7 +24,7 @@ function generateRandomColor() {
   return '#' + Math.floor(Math.random() * 16777215).toString(16);
 }
 
-export default function OutputGraphs() {
+export default function OutputGraphs({ sim_data }) {
   const [data, setData] = useState(null)
   const [ageData, setData1] = useState(null)
   const [selectedChart, setSelectedChart] = useState('line');
