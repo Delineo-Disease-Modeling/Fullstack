@@ -4,6 +4,7 @@ import { AreaChart,Area, PieChart, Pie, Cell, BarChart, Bar, LineChart,
   Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 import './outputgraphs.css';
+import CytoScape from './cyto.js'
 
 class CustomizedAxisTick extends PureComponent {
   render() {
@@ -99,6 +100,7 @@ const areaData = []
                   <option value="area">Area Chart</option>
                   <option value="bar">Bar Chart</option>
                   <option value="pie">Pie Chart</option>
+                  <option value="cytoscape">Cytoscape</option>
                 </select>
                 {selectedChart && <p>You selected: {selectedChart}</p>}
               </div>
@@ -188,6 +190,12 @@ const areaData = []
             <h6 style={styles.centerText}>Time(minutes)</h6>
             </div>
             }
+            {selectedChart === "cytoscape" &&
+          <div>
+              <CytoScape />
+            </div>
+            }
           </div>
+
   );
 }
