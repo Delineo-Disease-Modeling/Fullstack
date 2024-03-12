@@ -1,5 +1,5 @@
 import { useState } from 'react';
-//import axios from 'axios';
+import axios from 'axios';
 
 import SimSettings from '../components/simsettings.js';
 import ModelMap from '../components/modelmap.js';
@@ -7,7 +7,18 @@ import OutputGraphs from '../components/outputgraphs.js';
 
 import './simulator.css';
 
-function sendSimulatorData(setSimData, { location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
+function makePostRequest(data, setSimData) {
+  axios.post("http://127.0.0.1:5000/simulation/", data)
+    .then((res) => {
+      setSimData(res.data);
+      console.log(res.data);
+    })
+    .catch((error) => {
+      console.log(error.response);
+    });
+}
+
+function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
   // Uncomment if you want to work with the simulator
   // const data = {
   //   location: location,
@@ -20,14 +31,16 @@ function sendSimulatorData(setSimData, { location, days, pmask, pvaccine, capaci
   //   lockdown: lockdown,
   // };
 
-  // axios.post("http://127.0.0.1:5000/simulation/", data)
-  //   .then((res) => {
-  //     setSimData(res.data);
-  //     console.log(res.data);
-  //   })
-  //   .catch((error) => {
-  //     console.log(error.response);
-  //   });
+  // if (!matrices) {
+  //   makePostRequest(data, setSimData);
+  // } else {
+  //   matrices[0].text().then((res) => {
+  //     data.matrices = res;
+  //     makePostRequest(data, setSimData);
+  //   }).catch((error) => {
+  //     console.log(error);
+  //   });  
+  // }
 
   fetch('data/infectivity.json').then((res) => {
     res.json().then((data) => {
