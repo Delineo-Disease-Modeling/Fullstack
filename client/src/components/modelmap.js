@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import facility from '../assets/facility.svg';
 import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
 
+const { Overlay } = LayersControl;
 const position = [36.562036, -96.160775];
 
 // Define custom icon
@@ -17,6 +18,7 @@ const iconFacility = new L.Icon({
 
 export default function ModelMap({ sim_data }) {
   const [map, setMap] = useState(null);
+  const [facilityVisible, setFacilityVisible] = useState(true);
 
   React.useEffect(() => {
     const L = require('leaflet');
@@ -34,19 +36,25 @@ export default function ModelMap({ sim_data }) {
 
     // Update the icon's visibility
     if (iconFacility.options.iconSize) {
-      iconFacility.options.iconSize = iconVisible ? [60, 75] : [0, 0];
+      iconFacility.options.iconSize = iconVisible && facilityVisible ? [60, 75] : [0, 0];
     }
   };
 
   return (
     <MapContainer center={position} zoom={13} className="mapcontainer" whenCreated={setMap} onZoomend={handleMapZoom}>
-      <TileLayer
-        attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <Marker position={position} icon={iconFacility} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
-        <Popup>This building is brown.</Popup>
-      </Marker>
+      <LayersControl position="topright">
+        <LayersControl.BaseLayer checked name="Map">
+          <TileLayer
+            attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+        <Overlay checked name="Facility">
+          <Marker position={position} icon={iconFacility} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
+            <Popup>This building is brown.</Popup>
+          </Marker>
+        </Overlay>
+      </LayersControl>
     </MapContainer>
   );
 }
