@@ -6,19 +6,18 @@ import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
 
 const { Overlay } = LayersControl;
-const position = [36.562036, -96.160775];
 
 // Define custom icon
-const iconFacility = new L.Icon({
+const customIcon = new L.Icon({
   iconUrl: facility,
   iconRetinaUrl: facility,
-  iconSize: [60, 75],
-  iconAnchor: [30, 75], // Half of icon's width and full height
+  iconSize: [36, 45],
+  iconAnchor: [18, 45], // Half of icon's width and full height
 });
 
 export default function ModelMap({ sim_data }) {
   const [map, setMap] = useState(null);
-  const [facilityVisible, setFacilityVisible] = useState(true);
+  const [publicFacilities, setPublicFacilities] = useState([]);
 
   React.useEffect(() => {
     const L = require('leaflet');
@@ -30,18 +29,34 @@ export default function ModelMap({ sim_data }) {
     });
   }, []);
 
-  const handleMapZoom = (event) => {
-    const currentZoom = event.target.getZoom();
-    const iconVisible = currentZoom >= 10 && currentZoom <= 15; // Adjust the zoom level as needed
-
-    // Update the icon's visibility
-    if (iconFacility.options.iconSize) {
-      iconFacility.options.iconSize = iconVisible && facilityVisible ? [60, 75] : [0, 0];
-    }
+  // Function to create markers for public facilities
+  const createFacilityMarker = (position, name) => {
+    const marker = (
+      <Marker position={position} icon={customIcon} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
+        <Popup>{name}</Popup>
+      </Marker>
+    );
+    return { marker, name };
   };
 
+  // Function to update the group of public facilities
+  const updatePublicFacilities = () => {
+    const facilities = [
+      createFacilityMarker([36.562036, -96.160775], "American Heritage Bank"),
+      createFacilityMarker([36.562417, -96.161487], "Ascension Health"),
+      createFacilityMarker([36.562665, -96.158863], "Assembly of God Church"),
+      createFacilityMarker([36.545544, -96.165471], "Baptist Church"),
+    ];
+    setPublicFacilities(facilities);
+  };
+
+  // Call the function to update public facilities when the component mounts
+  React.useEffect(() => {
+    updatePublicFacilities();
+  }, []);
+
   return (
-    <MapContainer center={position} zoom={13} className="mapcontainer" whenCreated={setMap} onZoomend={handleMapZoom}>
+    <MapContainer center={[36.562036, -96.160775]} zoom={13} className="mapcontainer" whenCreated={setMap}>
       <LayersControl position="topright">
         <LayersControl.BaseLayer checked name="Map">
           <TileLayer
@@ -49,10 +64,13 @@ export default function ModelMap({ sim_data }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
         </LayersControl.BaseLayer>
-        <Overlay checked name="Facility">
-          <Marker position={position} icon={iconFacility} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
-            <Popup>This building is brown.</Popup>
-          </Marker>
+        <Overlay checked name="Public Facilities">
+          {/* Render the markers for public facilities */}
+          {publicFacilities.map(({ marker, name }) => (
+            <LayersControl.Overlay key={name} name={name}>
+              {marker}
+            </LayersControl.Overlay>
+          ))}
         </Overlay>
       </LayersControl>
     </MapContainer>
