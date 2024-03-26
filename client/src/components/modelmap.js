@@ -72,7 +72,7 @@ export default function ModelMap({ sim_data }) {
         <Overlay checked name="Public Facilities">
           {/* Render the markers for public facilities */}
           {publicFacilities.map(({ marker, name }) => (
-            <LayersControl.Overlay key={name} name={name}>
+            <LayersControl.Overlay checked key={name} name={name}>
               {marker}
             </LayersControl.Overlay>
           ))}
