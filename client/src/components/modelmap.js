@@ -41,17 +41,22 @@ export default function ModelMap({ sim_data }) {
 
   // Function to update the group of public facilities
   const updatePublicFacilities = () => {
-    const facilities = [
-      createFacilityMarker([36.562036, -96.160775], "American Heritage Bank"),
-      createFacilityMarker([36.562417, -96.161487], "Ascension Health"),
-      createFacilityMarker([36.562665, -96.158863], "Assembly of God Church"),
-      createFacilityMarker([36.545544, -96.165471], "Baptist Church"),
-    ];
-    setPublicFacilities(facilities);
+    var facilities = [];
+
+    fetch('data/papdata.json').then((res) => {
+      res.json().then((papdata) => {
+        for (const data of Object.values(papdata['places'])) {
+          facilities.push(createFacilityMarker([data.latitude, data.longitude], data.label));
+        }
+
+        setPublicFacilities(facilities);
+      });
+    });
   };
 
   // Call the function to update public facilities when the component mounts
   React.useEffect(() => {
+
     updatePublicFacilities();
   }, []);
 
