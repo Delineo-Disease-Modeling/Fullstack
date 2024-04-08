@@ -42,8 +42,8 @@ export default function OutputGraphs({ sim_data }) {
 const areaData = []
   useEffect(() => {
     async function fetchJSON() {
-      let r = await fetch('data/infectivity.json')
-      let a = await fetch('data/papdata.json')
+      let r = await fetch('data/barnsdall/infectivity.json')
+      let a = await fetch('data/barnsdall/papdata.json')
       r = await r.json()
       a = await a.json()
       console.log(a)

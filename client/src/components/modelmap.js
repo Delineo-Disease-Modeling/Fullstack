@@ -18,6 +18,7 @@ const customIcon = new L.Icon({
 export default function ModelMap({ sim_data }) {
   const [map, setMap] = useState(null);
   const [publicFacilities, setPublicFacilities] = useState([]);
+  const [zoomLevel, setZoomLevel] = useState(13); // State for zoom level
 
   React.useEffect(() => {
     const L = require('leaflet');
@@ -56,28 +57,43 @@ export default function ModelMap({ sim_data }) {
 
   // Call the function to update public facilities when the component mounts
   React.useEffect(() => {
-
     updatePublicFacilities();
   }, []);
 
   return (
-    <MapContainer center={[36.562036, -96.160775]} zoom={13} className="mapcontainer" whenCreated={setMap}>
-      <LayersControl position="topright">
-        <LayersControl.BaseLayer checked name="Map">
-          <TileLayer
-            attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </LayersControl.BaseLayer>
-        <Overlay checked name="Public Facilities">
-          {/* Render the markers for public facilities */}
-          {publicFacilities.map(({ marker, name }) => (
-            <LayersControl.Overlay checked key={name} name={name}>
-              {marker}
-            </LayersControl.Overlay>
-          ))}
-        </Overlay>
-      </LayersControl>
-    </MapContainer>
+    <div>
+      {/* Map Container */}
+      <MapContainer center={[36.562036, -96.160775]} zoom={zoomLevel} className="mapcontainer" whenCreated={setMap}>
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Map">
+            <TileLayer
+              attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+          <Overlay checked name="Public Facilities">
+            {/* Render the markers for public facilities */}
+            {publicFacilities.map(({ marker, name }) => (
+              <LayersControl.Overlay checked key={name} name={name}>
+                {marker}
+              </LayersControl.Overlay>
+            ))}
+          </Overlay>
+        </LayersControl>
+      </MapContainer>
+
+      {/* Slider Component */}
+      <div style={{ width: '100%', marginTop: '20px' }}>
+        <input 
+          type="range" 
+          min={1} 
+          max={18} 
+          value={zoomLevel} 
+          onChange={(e) => setZoomLevel(parseInt(e.target.value))}
+          style={{ width: '100%' }}
+        />
+      </div>
+    </div>
   );
+
 }
