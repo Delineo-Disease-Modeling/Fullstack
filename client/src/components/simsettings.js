@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import MatrixSelector from './matrixselector';
 
 import './simsettings.css';
 
@@ -56,7 +57,9 @@ export default function SimSettings({ sendData, showSim }) {
   const [ capacity, setCapacity ] = useState(1.0);          // Capacity percentages
   const [ lockdown, setLockdown ] = useState(0.0);          // Lockdown probability
   const [ selfiso, setSelfiso ] = useState(0.5);            // Self-isolation probability
-  const [ matrices, setMatrices ] = useState(null);           // Uploaded file matrices
+
+  const [ matrices, setMatrices ] = useState(null);                 // To-be-sent file matrices
+  const [ customFiles, setCustomFiles ] = useState(null);           // Uploaded file matrices
 
   return (
     <div className='simset_settings'>
@@ -104,10 +107,10 @@ export default function SimSettings({ sendData, showSim }) {
           callback={setSelfiso}
           def={50}
         />
+        <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/>
         <SimFile 
           label={'Custom Matrix File(s)'}
-          value={matrices}
-          callback={setMatrices}
+          callback={setCustomFiles}
         />
       </div>
       

@@ -40,8 +40,9 @@ export default function ModelMap({ sim_data }) {
     return { marker, name };
   };
 
-  // Function to update the group of public facilities
-  const updatePublicFacilities = () => {
+
+  // Call the function to update public facilities when the component mounts
+  React.useEffect(() => {
     var facilities = [];
 
     fetch('data/barnsdall/papdata.json').then((res) => {
@@ -53,11 +54,6 @@ export default function ModelMap({ sim_data }) {
         setPublicFacilities(facilities);
       });
     });
-  };
-
-  // Call the function to update public facilities when the component mounts
-  React.useEffect(() => {
-    updatePublicFacilities();
   }, []);
 
   return (

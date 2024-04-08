@@ -1,0 +1,18 @@
+div.mselect_container {
+  width: 400px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+div.mselect_label {
+  width: 100%;
+  padding-bottom: 15px;
+  text-align: center;
+}
+
+select.mselect_select {
+  width: 300px;
+  margin: auto;
+}
