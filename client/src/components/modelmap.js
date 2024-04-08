@@ -18,7 +18,7 @@ const customIcon = new L.Icon({
 export default function ModelMap({ sim_data }) {
   const [map, setMap] = useState(null);
   const [publicFacilities, setPublicFacilities] = useState([]);
-  const [zoomLevel, setZoomLevel] = useState(13); // State for zoom level
+  const [levelSlider, setZoomLevel] = useState(13); // State for zoom level and map slider
 
   React.useEffect(() => {
     const L = require('leaflet');
@@ -63,7 +63,7 @@ export default function ModelMap({ sim_data }) {
   return (
     <div>
       {/* Map Container */}
-      <MapContainer center={[36.562036, -96.160775]} zoom={zoomLevel} className="mapcontainer" whenCreated={setMap}>
+      <MapContainer center={[36.562036, -96.160775]} zoom={levelSlider} className="mapcontainer" whenCreated={setMap}>
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Map">
             <TileLayer
@@ -86,12 +86,15 @@ export default function ModelMap({ sim_data }) {
       <div style={{ width: '100%', marginTop: '20px' }}>
         <input 
           type="range" 
-          min={1} 
-          max={18} 
-          value={zoomLevel} 
+          min={0} 
+          max={1666} 
+          value={levelSlider} 
           onChange={(e) => setZoomLevel(parseInt(e.target.value))}
           style={{ width: '100%' }}
         />
+        <div style={{ textAlign: 'center', marginTop: '12px' }}>
+          {levelSlider} Hours
+        </div>
       </div>
     </div>
   );
