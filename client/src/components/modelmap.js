@@ -43,7 +43,7 @@ export default function ModelMap({ sim_data }) {
   const updatePublicFacilities = () => {
     var facilities = [];
 
-    fetch('data/papdata.json').then((res) => {
+    fetch('data/barnsdall/papdata.json').then((res) => {
       res.json().then((papdata) => {
         for (const data of Object.values(papdata['places'])) {
           facilities.push(createFacilityMarker([data.latitude, data.longitude], data.label));

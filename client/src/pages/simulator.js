@@ -42,7 +42,7 @@ function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvacci
   //   });  
   // }
 
-  fetch('data/infectivity.json').then((res) => {
+  fetch('data/barnsdall/infectivity.json').then((res) => {
     res.json().then((data) => {
       setSimData(data);
       console.log(data);
