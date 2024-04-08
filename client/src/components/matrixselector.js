@@ -63,9 +63,9 @@ export default function MatrixSelector({ customFiles, setMatrices }) {
         Disease Matrices
       </div>
       <select 
-        className='mselect_select' size={3} multiple 
+        className='mselect_select' size={6} multiple
         onChange={(e) => createFileList(e.target.selectedOptions, defaultMatrices, customFiles, setMatrices)}>
-        {matrix_files.map(x => 'data/'+x).map(x => <option value={x} key={x}>{x}</option>)}
+        {matrix_files.map(x => 'data/'+x).map(x => <option selected value={x} key={x}>{x}</option>)}
         <CustomMatrices customFiles={customFiles}/>
       </select>
     </div>
