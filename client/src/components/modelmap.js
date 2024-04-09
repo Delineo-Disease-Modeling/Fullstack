@@ -105,8 +105,15 @@ export default function ModelMap({ sim_data }) {
           type="number" 
           min={0} 
           max={1666} 
-          value={levelSlider} 
-          onChange={(e) => setZoomLevel(parseInt(e.target.value))}
+          value={levelSlider}
+          onChange={(e) => {
+            const value = parseInt(e.target.value);
+            if (value > 1666) {
+              alert('Error: Number exceeds maximum value');
+            } else {
+              setZoomLevel(value);
+            }
+          }} 
           style={{ width: '10%' }}
         />
       </div>
