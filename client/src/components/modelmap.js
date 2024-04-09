@@ -92,6 +92,18 @@ export default function ModelMap({ sim_data }) {
           {levelSlider} Hours
         </div>
       </div>
+
+      {/* Input Box */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
+        <input 
+          type="number" 
+          min={0} 
+          max={1666} 
+          value={levelSlider} 
+          onChange={(e) => setZoomLevel(parseInt(e.target.value))}
+          style={{ width: '10%' }}
+        />
+      </div>
     </div>
   );
 
