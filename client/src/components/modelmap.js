@@ -18,6 +18,8 @@ const customIcon = new L.Icon({
 export default function ModelMap({ sim_data }) {
   const [map, setMap] = useState(null);
   const [publicFacilities, setPublicFacilities] = useState([]);
+  const [facilityMap, setFacilityMap] = useState(new Map()); // Map to store facility number and object
+
   const [levelSlider, setZoomLevel] = useState(13); // State for zoom level and map slider
 
   React.useEffect(() => {
@@ -31,27 +33,31 @@ export default function ModelMap({ sim_data }) {
   }, []);
 
   // Function to create markers for public facilities
-  const createFacilityMarker = (position, name) => {
+  const createFacilityMarker = (position, name, number) => {
     const marker = (
-      <Marker position={position} icon={customIcon} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
+      <Marker key={number} position={position} icon={customIcon} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
         <Popup>{name}</Popup>
       </Marker>
     );
     return { marker, name };
   };
 
-
   // Call the function to update public facilities when the component mounts
   React.useEffect(() => {
     var facilities = [];
+    const facilityMap = new Map();
 
     fetch('data/barnsdall/papdata.json').then((res) => {
       res.json().then((papdata) => {
-        for (const data of Object.values(papdata['places'])) {
-          facilities.push(createFacilityMarker([data.latitude, data.longitude], data.label));
+        for (const [index, data] of Object.entries(papdata['places'])) {
+          const number = parseInt(index) + 1;
+          const facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number);
+          facilities.push(facilityObject);
+          facilityMap.set(number, facilityObject); // Store facility number and object in the map
         }
 
         setPublicFacilities(facilities);
+        setFacilityMap(facilityMap); // Set the facility map state
       });
     });
   }, []);
@@ -106,5 +112,4 @@ export default function ModelMap({ sim_data }) {
       </div>
     </div>
   );
-
 }
