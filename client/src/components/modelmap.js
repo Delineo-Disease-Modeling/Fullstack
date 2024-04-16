@@ -54,12 +54,12 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, s
       for (const [index, data] of Object.entries(papdata['places'])) {
         const number = parseInt(index) + 1;
 
-        var facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
+        var facilityObject = null;
         var peopleAtFacility = patterns[curtime.toString()]?.['places']?.[number.toString()];
         var numInfected = 0.0;
 
         if (peopleAtFacility) {
-          console.log(peopleAtFacility);
+          peopleAtFacility = Object.keys(peopleAtFacility);
           var curData = sim_data[curtime];
 
           if (curData) {
@@ -76,17 +76,23 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, s
             }
           }
 
-          console.log(numInfected);
+          console.log(`${number}: ${numInfected / peopleAtFacility.length}`);
 
-          if (numInfected / 3.0 > 0.5) {
+          if (numInfected / peopleAtFacility.length > 0.5) {
             facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, redFacilityIcon);
-          } else if (numInfected / 3.0 > 0.0) {
+          } else if (numInfected / peopleAtFacility.length > 0.0) {
             facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, orangeFacilityIcon);
+          } else {
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
           }
+        } else {
+          facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
         }
 
-        facilities.push(facilityObject);
-        facilityMap.set(number, facilityObject); // Store facility number and object in the map
+        if (facilityObject) {
+          facilities.push(facilityObject);
+          facilityMap.set(number, facilityObject); // Store facility number and object in the map  
+        }
       }
 
       setPublicFacilities(facilities);
@@ -101,7 +107,7 @@ export default function ModelMap({ sim_data }) {
   const [facilityMap, setFacilityMap] = useState(new Map()); // Map to store facility number and object
   const [patterns, setPatterns] = useState({});
 
-  const [timestamp, setTimestamp] = useState(13); // State for zoom level and map slider
+  const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
   React.useEffect(() => {
     const L = require('leaflet');
@@ -115,10 +121,10 @@ export default function ModelMap({ sim_data }) {
     fetch('data/barnsdall/patterns.json').then((res) => {
       res.json().then((data) => {
         setPatterns(data);
-        updateFacilityIcons(0, patterns, sim_data, setPublicFacilities, setFacilityMap);
+        updateFacilityIcons(0, data, sim_data, setPublicFacilities, setFacilityMap);
       })
     })
-  }, [patterns, sim_data]);
+  }, []);
 
   return (
     <div>
@@ -147,7 +153,7 @@ export default function ModelMap({ sim_data }) {
         <input 
           type="range" 
           min={1} 
-          max={1666} 
+          max={99} 
           value={timestamp} 
           onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities, setFacilityMap); }}
           style={{ width: '100%' }}
@@ -162,7 +168,7 @@ export default function ModelMap({ sim_data }) {
         <input 
           type="number" 
           min={1} 
-          max={1666} 
+          max={99} 
           value={timestamp} 
           onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities, setFacilityMap);}}
           style={{ width: '10%' }}
