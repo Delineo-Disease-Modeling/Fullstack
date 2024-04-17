@@ -8,7 +8,6 @@ import facility from '../assets/facility.svg';
 import orangefacility from '../assets/orangefacility.svg';
 import redfacility from '../assets/redfacility.svg';
 
-
 const { Overlay } = LayersControl;
 
 // Define custom icon
@@ -56,29 +55,28 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, s
 
         var facilityObject = null;
         var peopleAtFacility = patterns[curtime.toString()]?.['places']?.[number.toString()];
-        var numInfected = 0.0;
 
         if (peopleAtFacility) {
-          peopleAtFacility = Object.keys(peopleAtFacility);
+          var numInfected = 0.0;
           var curData = sim_data[curtime];
 
           if (curData) {
             for (const id of Object.keys(curData['delta'])) {
-              if (peopleAtFacility.find(x => x === id)) {
+              if (peopleAtFacility.indexOf(id) !== -1) {
+                console.log(`d${number}: ${id}`);
                 numInfected += 1.0;
               }
             }
 
             for (const id of Object.keys(curData['omicron'])) {
-              if (peopleAtFacility.find(x => x === id)) {
+              if (peopleAtFacility.indexOf(id) !== -1) {
+                console.log(`o${number}: ${id}`);
                 numInfected += 1.0;
               }
             }
           }
 
-          console.log(`${number}: ${numInfected / peopleAtFacility.length}`);
-
-          if (numInfected / peopleAtFacility.length > 0.5) {
+          if (numInfected / peopleAtFacility.length > 0.1) {
             facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, redFacilityIcon);
           } else if (numInfected / peopleAtFacility.length > 0.0) {
             facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, orangeFacilityIcon);
@@ -102,7 +100,6 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, s
 }
 
 export default function ModelMap({ sim_data }) {
-  const [map, setMap] = useState(null);
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [facilityMap, setFacilityMap] = useState(new Map()); // Map to store facility number and object
   const [patterns, setPatterns] = useState({});
@@ -121,7 +118,7 @@ export default function ModelMap({ sim_data }) {
     fetch('data/barnsdall/patterns.json').then((res) => {
       res.json().then((data) => {
         setPatterns(data);
-        updateFacilityIcons(0, data, sim_data, setPublicFacilities, setFacilityMap);
+        updateFacilityIcons(1, data, sim_data, setPublicFacilities);
       })
     })
   }, []);
@@ -129,7 +126,7 @@ export default function ModelMap({ sim_data }) {
   return (
     <div>
       {/* Map Container */}
-      <MapContainer center={[36.562036, -96.160775]} zoom={13} className="mapcontainer" whenCreated={setMap}>
+      <MapContainer center={[36.562036, -96.160775]} zoom={13} className="mapcontainer">
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Map">
             <TileLayer
@@ -155,7 +152,7 @@ export default function ModelMap({ sim_data }) {
           min={1} 
           max={99} 
           value={timestamp} 
-          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities, setFacilityMap); }}
+          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities); }}
           style={{ width: '100%' }}
         />
         <div style={{ textAlign: 'center', marginTop: '12px' }}>
@@ -170,7 +167,7 @@ export default function ModelMap({ sim_data }) {
           min={1} 
           max={99} 
           value={timestamp} 
-          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities, setFacilityMap);}}
+          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities);}}
           style={{ width: '10%' }}
         />
       </div>
