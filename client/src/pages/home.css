@@ -50,7 +50,7 @@ button.app:hover {
   cursor: pointer;
 }
 
-butt.app:active {
+button.app:active {
   filter: brightness(80%);
 }
 

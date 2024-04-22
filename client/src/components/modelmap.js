@@ -12,8 +12,8 @@ const { Overlay } = LayersControl;
 
 // Define custom icon
 const facilityIcon = new L.Icon({
-  iconUrl: facility,
   iconRetinaUrl: facility,
+  iconUrl: facility,
   iconSize: [36, 45],
   iconAnchor: [18, 45], // Half of icon's width and full height
 });
@@ -33,10 +33,10 @@ const orangeFacilityIcon = new L.Icon({
 });
 
 // Function to create markers for public facilities
-function createFacilityMarker(position, name, number, icon) {
+function createFacilityMarker(position, name, number, label, icon) {
   const marker = (
-    <Marker key={number} position={position} icon={icon} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
-      <Popup>{name}</Popup>
+    <Marker key={number} position={position} icon={icon} style={{fill: "red"}}zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
+      <Popup>{name}<br></br>{label}</Popup>
     </Marker>
   );
   return { marker, name };
@@ -44,7 +44,6 @@ function createFacilityMarker(position, name, number, icon) {
 
 function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
   var facilities = [];
-  const facilityMap = new Map();
 
   curtime = curtime * 60;
 
@@ -74,25 +73,25 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
             }
           }
 
+          var label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
+
           if (numInfected / peopleAtFacility.length > 0.1) {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, redFacilityIcon);
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, redFacilityIcon);
           } else if (numInfected / peopleAtFacility.length > 0.0) {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, orangeFacilityIcon);
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, orangeFacilityIcon);
           } else {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, facilityIcon);
           }
         } else {
-          facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
+          facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, '', facilityIcon);
         }
 
         if (facilityObject) {
           facilities.push(facilityObject);
-          facilityMap.set(number, facilityObject); // Store facility number and object in the map  
         }
       }
 
       setPublicFacilities(facilities);
-      //setFacilityMap(facilityMap); // Set the facility map state
     });
   });
 }
