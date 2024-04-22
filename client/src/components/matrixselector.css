@@ -24,6 +24,7 @@ select.mselect_selectmatrix {
 
 div.mselect_varadder {
   width: 300px;
+  height: 35px;
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -32,14 +33,14 @@ div.mselect_varadder {
 
 button.mselect_button {
   border: none;
-  border-radius: 25px;
+  border-radius: 10px;
   width: 50px;
   height: 20px;
   background-color: #222629;
   color: #F0F0F0;
   text-decoration: none;
   text-align: center;
-  line-height:4px;
+  line-height:2px;
   font-size: 14px;
   font-family: 'Poppins';
   transition: 200ms ease-in-out;
