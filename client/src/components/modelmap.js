@@ -33,10 +33,10 @@ const orangeFacilityIcon = new L.Icon({
 });
 
 // Function to create markers for public facilities
-function createFacilityMarker(position, name, number, icon) {
+function createFacilityMarker(position, name, number, label, icon) {
   const marker = (
     <Marker key={number} position={position} icon={icon} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
-      <Popup>{name}</Popup>
+      <Popup>{name}<br></br>{label}</Popup>
     </Marker>
   );
   return { marker, name };
@@ -74,15 +74,17 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
             }
           }
 
+          var label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
+
           if (numInfected / peopleAtFacility.length > 0.1) {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, redFacilityIcon);
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, redFacilityIcon);
           } else if (numInfected / peopleAtFacility.length > 0.0) {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, orangeFacilityIcon);
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, orangeFacilityIcon);
           } else {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
+            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, facilityIcon);
           }
         } else {
-          facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, facilityIcon);
+          facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, '', facilityIcon);
         }
 
         if (facilityObject) {
