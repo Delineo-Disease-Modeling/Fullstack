@@ -42,7 +42,7 @@ function createFacilityMarker(position, name, number, icon) {
   return { marker, name };
 };
 
-function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, setFacilityMap) {
+function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
   var facilities = [];
   const facilityMap = new Map();
 
@@ -63,14 +63,12 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, s
           if (curData) {
             for (const id of Object.keys(curData['delta'])) {
               if (peopleAtFacility.indexOf(id) !== -1) {
-                console.log(`d${number}: ${id}`);
                 numInfected += 1.0;
               }
             }
 
             for (const id of Object.keys(curData['omicron'])) {
               if (peopleAtFacility.indexOf(id) !== -1) {
-                console.log(`o${number}: ${id}`);
                 numInfected += 1.0;
               }
             }
@@ -94,15 +92,15 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities, s
       }
 
       setPublicFacilities(facilities);
-      setFacilityMap(facilityMap); // Set the facility map state
+      //setFacilityMap(facilityMap); // Set the facility map state
     });
   });
 }
 
 export default function ModelMap({ sim_data }) {
-  const [publicFacilities, setPublicFacilities] = useState([]);
-  const [facilityMap, setFacilityMap] = useState(new Map()); // Map to store facility number and object
-  const [patterns, setPatterns] = useState({});
+  const [ publicFacilities, setPublicFacilities ] = useState([]);
+  const [ patterns, setPatterns ] = useState({});
+  const [ maxHours, setMaxHours ] = useState(1);
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
@@ -117,6 +115,8 @@ export default function ModelMap({ sim_data }) {
 
     fetch('data/barnsdall/patterns.json').then((res) => {
       res.json().then((data) => {
+        console.log(Math.max(...Object.keys(data)))
+        setMaxHours(Math.max(...Object.keys(data)) / 60);
         setPatterns(data);
         updateFacilityIcons(1, data, sim_data, setPublicFacilities);
       })
@@ -150,7 +150,7 @@ export default function ModelMap({ sim_data }) {
         <input 
           type="range" 
           min={1} 
-          max={99} 
+          max={maxHours} 
           value={timestamp} 
           onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities); }}
           style={{ width: '100%' }}
@@ -165,7 +165,7 @@ export default function ModelMap({ sim_data }) {
         <input 
           type="number" 
           min={1} 
-          max={99} 
+          max={maxHours} 
           value={timestamp} 
           onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities);}}
           style={{ width: '10%' }}
