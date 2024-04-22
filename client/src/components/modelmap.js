@@ -12,8 +12,8 @@ const { Overlay } = LayersControl;
 
 // Define custom icon
 const facilityIcon = new L.Icon({
-  iconUrl: facility,
   iconRetinaUrl: facility,
+  iconUrl: facility,
   iconSize: [36, 45],
   iconAnchor: [18, 45], // Half of icon's width and full height
 });
@@ -35,7 +35,7 @@ const orangeFacilityIcon = new L.Icon({
 // Function to create markers for public facilities
 function createFacilityMarker(position, name, number, label, icon) {
   const marker = (
-    <Marker key={number} position={position} icon={icon} zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
+    <Marker key={number} position={position} icon={icon} style={{fill: "red"}}zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
       <Popup>{name}<br></br>{label}</Popup>
     </Marker>
   );
@@ -44,7 +44,6 @@ function createFacilityMarker(position, name, number, label, icon) {
 
 function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
   var facilities = [];
-  const facilityMap = new Map();
 
   curtime = curtime * 60;
 
@@ -89,12 +88,10 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
 
         if (facilityObject) {
           facilities.push(facilityObject);
-          facilityMap.set(number, facilityObject); // Store facility number and object in the map  
         }
       }
 
       setPublicFacilities(facilities);
-      //setFacilityMap(facilityMap); // Set the facility map state
     });
   });
 }
