@@ -10,10 +10,11 @@ header.teamheader {
   font-weight: 500;
   font-size: 32px;
   padding-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 p.teamheader {
-  font-weight: 100;
+  font-weight: 100px;
   line-height: 20px;
 }
 
@@ -30,8 +31,10 @@ div.team {
 }
 
 div.member {
-  margin: auto;
+  margin: 10px;
   text-align: center;
+  width: 200px;
+  transition: transform 0.3s;
 }
 
 img.member {
