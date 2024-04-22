@@ -3,7 +3,7 @@ div.teamheader {
   text-align: center;
   margin: auto;
   padding: 100px;
-  padding-bottom: 60px;
+  padding-bottom: 20px;
 }
 
 header.teamheader {
@@ -16,6 +16,14 @@ header.teamheader {
 p.teamheader {
   font-weight: 100px;
   line-height: 20px;
+}
+
+div.PIheader {
+  width: 100%;
+  text-align: center;
+  margin: auto;
+  padding: 100px;
+  padding-bottom: 60px;
 }
 
 div.team {

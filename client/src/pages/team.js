@@ -4,8 +4,12 @@ import 'animate.css';
 import './team.css';
 
 const teamData = {
+  professors: [
+    { name: "Dr. Dahbura", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+  ],
+
   fullstackTeam: [
-    { name: "Lixing Wu", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Lixing Wu", role: "Role", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/1ixin9-wu/" },
     { name: "Mahmoud Said", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
     { name: "Allen Gong", role: "Role", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/allen-gong27/" },
     { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
@@ -49,6 +53,13 @@ export default function Team() {
         <header className='teamheader'>Core Team</header>
         <p className='teamheader'>The Delineo Project</p>
       </div>
+      
+      <div className='PIheader' data-aos='fade-up' data-aos-once='true'>
+        <header className="PIheader">Principal Investigator</header>
+        <img className='member' src='images/logo.png' alt='drake'></img>
+          <h1 className='name'>Professor Anton Dahbura</h1> 
+      </div>
+      
       {renderTeamSection(teamData.fullstackTeam, "Full-Stack Team")}
       {renderTeamSection(teamData.algorithmsTeam, "Algorithms Team")}
       {renderTeamSection(teamData.simulationsTeam, "Simulations Team")}
