@@ -7,57 +7,113 @@ const matrix_files = [
   'default1.csv', 'default2.csv'
 ];
 
-// UPDATE THIS ANYTIME YOU WANT TO ADD A NEW DEFAULT VARIANT
-const variant_list = [
+const default_variants = [
   'delta', 'omicron'
 ]
 
-function CustomVariants({ customVariants }) {
-  if (!customVariants) {
+function CustomVariants({ matrixDict }) {
+  if (!matrixDict) {
     return null;
   }
 
-  return Array.from(customVariants).map(variant => {
-    return <option selected value={variant} key={variant}>{variant}</option>
+  var selected = true;
+  var variant_arr = [];
+
+  Object.keys(matrixDict).forEach(variant => {
+    variant_arr.push(<option selected={selected} value={variant} key={variant}>{variant}</option>);
+    selected = false;
   });
+
+  return variant_arr;
 }
 
 function CustomMatrices({ customFiles }) {
-  if (!customFiles) {
-    return null;
+  var matrix_arr = [];
+
+  matrix_files.forEach(file => {
+    matrix_arr.push(<option value={file} key={file}>{file}</option>);
+  });
+
+  if (customFiles) {
+    Array.from(customFiles).forEach(file => {
+      matrix_arr.push(<option value={file.name} key={file.name}>{file.name}</option>);
+    });
   }
 
-  return Array.from(customFiles).map(file => {
-    return <option value={file.name} key={file.name}>{file.name}</option>
-  });
+  return matrix_arr;
 }
 
-function createFileList(selected, defaultMatrices, customFiles, setMatrices) {
-  setMatrices(null);
+function updateSelectedMatrix(cur_variant, selected, matrix_dict, set_matrix_dict, def_matrices, custom_files, set_matrices) {
+  var updated_dict = {};
+  matrix_dict[cur_variant] = selected;
+  Object.assign(updated_dict, matrix_dict);
+  set_matrix_dict(updated_dict);
 
-  async function updateFileList() {
-    var filelist = []
+  updateOutputDict(set_matrices, matrix_dict, def_matrices, custom_files);
+}
 
-    for (const option of Object.values(selected)) {
-      if (option.value.startsWith('data/')) {
-        // Default matrix values, load from variable
-        filelist.push(defaultMatrices[option.value.substring(5)]);
+function updateOutputDict(set_matrices, matrix_dict, def_matrices, custom_files) {
+  async function asyncHandler() {
+    var updated_dict = {};
+
+    for (const [variant, filename] of Object.entries(matrix_dict)) {
+      if (matrix_files.includes(filename)) {
+        updated_dict[variant] = def_matrices[filename];
       } else {
-        const found = Array.from(customFiles).find(file => file.name === option.value);
-        filelist.push(await found.text());
+        const found = Array.from(custom_files).find(file => file.name === filename);
+        updated_dict[variant] = await found.text();
       }
     }
-  
-    setMatrices(filelist)
+
+    set_matrices(updated_dict);
   }
 
-  updateFileList();
+  asyncHandler();
+}
+
+function addVariant(variant, matrix_dict, set_matrix_dict, set_matrices, def_matrices, custom_files) {
+  if (!variant.length) {
+    return;
+  }
+
+  if (variant in matrix_dict) {
+    return;
+  }
+
+  matrix_dict[variant] = Object.keys(def_matrices)[0];
+
+  // need to create new object so as to trigger proper re-render
+  var new_dict = {}
+  Object.assign(new_dict, matrix_dict);
+  set_matrix_dict(new_dict);
+
+  updateOutputDict(set_matrices, new_dict, def_matrices, custom_files);
+}
+
+function removeVariant(variant, matrix_dict, set_matrix_dict, set_matrices, def_matrices, custom_files) {
+  if (!variant.length) {
+    return;
+  }
+
+  if (Object.keys(matrix_dict).length === 1) {
+    return;
+  }
+
+  delete matrix_dict[variant];
+
+  // need to create new object so as to trigger proper re-render
+  var new_dict = {}
+  Object.assign(new_dict, matrix_dict);
+  set_matrix_dict(new_dict);
+
+  updateOutputDict(set_matrices, new_dict, def_matrices, custom_files);
 }
 
 export default function MatrixSelector({ customFiles, setMatrices }) {
-  const [defaultMatrices, setDefaultMatrices] = useState({});
-  const [variants, setVariants] = useState([]);
-  const [curVariant, setCurVariant] = useState(null);
+  const [ matrixDict, setMatrixDict ] = useState({}); // Keys are variants, values are [filename, matrix]
+  const [ curVariant, setCurVariant ] = useState('');
+  const [ curName, setCurName ] = useState('');
+  const [ defaultMatrices, setDefaultMatrices ] = useState({});
 
   useEffect(() => {
     async function loadMatrices() {
@@ -69,11 +125,20 @@ export default function MatrixSelector({ customFiles, setMatrices }) {
       }
 
       setDefaultMatrices(matrix_dict);
+
+      var var_dict = {};
+
+      for (var i = 0; i < Object.keys(matrix_dict).length; i++) {
+        var_dict[default_variants[i]] = Object.keys(matrix_dict)[i];
+      }
+
+      setMatrixDict(var_dict);
+      setCurVariant(Object.keys(var_dict)[0]);
+      updateOutputDict(setMatrices, var_dict, matrix_dict, []);
     }
 
-    setVariants(variant_list);
     loadMatrices();
-  }, [setDefaultMatrices, setVariants]);
+  }, [ setMatrices ]);
 
   return (
     <div className='mselect_container'>
@@ -84,22 +149,28 @@ export default function MatrixSelector({ customFiles, setMatrices }) {
       <div>
         <select
           className='mselect_selectvariant' size={6}
-          onChange={(e) => setCurVariant(Object.values(e.target.selectedOptions)[0].value)}>
-          <CustomVariants customVariants={variants}/>
+          onChange={e => { 
+            const selected = Object.values(e.target.selectedOptions)[0].value;
+            setCurVariant(selected);
+            
+            var element = document.getElementById('mselect_selectmatrix');
+            element.value = matrixDict[selected] ?? matrix_files[0];
+          }}>
+          <CustomVariants matrixDict={matrixDict}/>
         </select>
 
         <select 
-          className='mselect_selectmatrix' size={6}
-          onChange={(e) => createFileList(e.target.selectedOptions, defaultMatrices, customFiles, setMatrices)}>
-          {matrix_files.map(x => 'data/'+x).map(x => <option selected value={x} key={x}>{x}</option>)}
+          className='mselect_selectmatrix' size={6} id='mselect_selectmatrix'
+          onChange={e => updateSelectedMatrix(curVariant, Object.values(e.target.selectedOptions)[0].value, matrixDict, setMatrixDict, defaultMatrices, customFiles, setMatrices)}
+          defaultValue={matrix_files[0]}>
           <CustomMatrices customFiles={customFiles}/>
         </select>
       </div>
 
       <div className='mselect_varadder'>
-        <input></input>
-        <button className='mselect_button'>+</button>
-        <button className='mselect_button'>-</button>
+        <input maxLength={20} onChange={e => setCurName(e.target.value)}></input>
+        <button className='mselect_button' onClick={_ => addVariant(curName, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>+</button>
+        <button className='mselect_button' onClick={_ => removeVariant(curVariant, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>-</button>
       </div>
     </div>
   )
