@@ -44,7 +44,7 @@ function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvacci
       setSimData(data);
       console.log(data);
     })
-  })
+  });
 }
 
 export default function Simulator() {

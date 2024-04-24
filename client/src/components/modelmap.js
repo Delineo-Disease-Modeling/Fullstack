@@ -60,15 +60,11 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
           var curData = sim_data[curtime];
 
           if (curData) {
-            for (const id of Object.keys(curData['delta'])) {
-              if (peopleAtFacility.indexOf(id) !== -1) {
-                numInfected += 1.0;
-              }
-            }
-
-            for (const id of Object.keys(curData['omicron'])) {
-              if (peopleAtFacility.indexOf(id) !== -1) {
-                numInfected += 1.0;
+            for (const variant of Object.keys(curData)) {
+              for (const id of Object.keys(curData[variant])) {
+                if (peopleAtFacility.indexOf(id) !== -1) {
+                  numInfected += 1.0;
+                }
               }
             }
           }
