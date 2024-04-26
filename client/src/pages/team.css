@@ -8,7 +8,7 @@ div.teamheader {
 
 header.teamheader {
   font-weight: 500;
-  font-size: 32px;
+  font-size: 50px;
   padding-bottom: 10px;
   margin-bottom: 20px;
 }
@@ -16,6 +16,7 @@ header.teamheader {
 p.teamheader {
   font-weight: 100px;
   line-height: 20px;
+  font-size: 30px;
 }
 
 div.PIheader {
@@ -24,6 +25,13 @@ div.PIheader {
   margin: auto;
   padding: 100px;
   padding-bottom: 60px;
+}
+
+header.PIheader {
+  font-weight: 500;
+  font-size: 50px;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 div.team {

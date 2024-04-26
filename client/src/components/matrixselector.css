@@ -15,11 +15,13 @@ div.mselect_label {
 select.mselect_selectvariant {
   width: 100px;
   margin: auto;
+  overflow-y: auto;
 }
 
 select.mselect_selectmatrix {
   width: 300px;
   margin: auto;
+  overflow-y: auto;
 }
 
 div.mselect_varadder {
