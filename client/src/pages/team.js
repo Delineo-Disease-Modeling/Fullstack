@@ -12,21 +12,33 @@ const teamData = {
     { name: "Lixing Wu", role: "Role", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/1ixin9-wu/" },
     { name: "Mahmoud Said", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
     { name: "Allen Gong", role: "Role", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/allen-gong27/" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Jeffrey Yao", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Matthew Yu", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Zoe Xie", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   algorithmsTeam: [
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Jin Hong Moon", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Keeyan Mukherjee", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Ryan Lu", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Scott Klosen", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Shayan Hossain", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Siva Indukuri", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   simulationsTeam: [
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Name", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Alisa Yang", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Jason Mihalopoulos", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Michelle Wang", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Neil Patel", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+  ],
+
+  pastAlumn: [
+    { name: "User 6", role: "Role"},
+    { name: "User 7", role: "Role"},
+    { name: "User 8", role: "Role"},
+    { name: "User 9", role: "Role"},
+    { name: "User 10", role: "Role"},
   ]
 }
 export default function Team() {
@@ -35,7 +47,7 @@ export default function Team() {
       <header className='teamheader'>{teamName}</header>
       {team.map(member => (
         <div className='member' key={member.name}>
-          <img className='member' src='images/logo.png' alt='drake'></img>
+          <img className='member' src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`} alt={member.name}></img>
           <h1 className='name'>{member.name}</h1>
           <h2 className='role'>{member.role}</h2>
           <div className='socials'>
@@ -63,6 +75,7 @@ export default function Team() {
       {renderTeamSection(teamData.fullstackTeam, "Full-Stack Team")}
       {renderTeamSection(teamData.algorithmsTeam, "Algorithms Team")}
       {renderTeamSection(teamData.simulationsTeam, "Simulations Team")}
+      {renderTeamSection(teamData.pastAlumn, "Past Alumni")}
 
       <div className='teamheader' data-aos='fade-up' data-aos-once='true'>
         <header className='teamheader'>Join Delineo</header>
