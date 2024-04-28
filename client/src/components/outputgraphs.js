@@ -162,9 +162,9 @@ const ageCountsArray = Object.keys(ageCounts).map((ageRange) => {
                 {selectedChart && <p>You selected: {selectedChart}</p>}
               </div>
             {selectedChart === "line"&&
-            (<div>
+            (<div >
                <h6 style={styles.centerText}>infectiousness Over Time</h6>
-            <LineChart width={window.innerWidth}height={window.innerHeight}data={rdata}  margin={{
+            <LineChart width={window.innerWidth*0.6}height={window.innerHeight*0.6}data={rdata}  margin={{
                 top: 5,
                 right: 30,
                 left: 20,
@@ -183,10 +183,10 @@ const ageCountsArray = Object.keys(ageCounts).map((ageRange) => {
             </div>
             )}
             {selectedChart === "bar" &&
-            <div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh',width: '60vw'  }}>
               <h6 style={styles.centerText}>Diseases Info</h6>
               <BarChart
-                width={window.innerWidth}height={window.innerHeight}
+                width={window.innerWidth*0.6}height={window.innerHeight*0.6}
                 data={InfectInfoData}
                 margin={{
                   top: 5,
@@ -209,7 +209,7 @@ const ageCountsArray = Object.keys(ageCounts).map((ageRange) => {
               </BarChart>
             </div>}
             {selectedChart === "pie1" &&
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh',width: '60vw' }}>
             <h6 style={styles.centerText}>age of infected person</h6>
             <PieChart width={400} height={400}>
                 <Pie data={ageData} dataKey="count" nameKey="age" cx="50%" cy="50%" outerRadius={150}>
@@ -224,7 +224,7 @@ const ageCountsArray = Object.keys(ageCounts).map((ageRange) => {
               </PieChart>
               </div>
             }{selectedChart === "pie2" &&
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh',width: '60vw' }}>
             <h6 style={styles.centerText}>Infection Gender</h6>
               <PieChart width={400} height={400}>
                 <Pie data={genderData}  cx="50%" cy="50%" dataKey="count" nameKey="gender"  outerRadius={150}>
@@ -240,7 +240,7 @@ const ageCountsArray = Object.keys(ageCounts).map((ageRange) => {
               </div>
             }
               {selectedChart === "area" &&
-          <div>
+          <div >
             <h6 style={styles.centerText}>infectiousness Over Time</h6>
             <AreaChart
               width={window.innerWidth-200}
