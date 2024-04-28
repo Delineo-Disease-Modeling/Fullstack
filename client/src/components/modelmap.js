@@ -126,8 +126,7 @@ export default function ModelMap({ sim_data }) {
           <LayersControl.BaseLayer checked name="Map">
             <TileLayer
               attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-              //url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              url="https://server.arcgisonline.com/arcgis/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}.png"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
           </LayersControl.BaseLayer>
           <Overlay checked name="Public Facilities">

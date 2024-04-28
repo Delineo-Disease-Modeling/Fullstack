@@ -1,32 +1,20 @@
 import React, { useEffect, useState, PureComponent } from 'react';
-
+import InfectedMap from './infectedmap.js';
 import { AreaChart,Area, PieChart, Pie, Cell, BarChart, Bar, LineChart,
   Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 import './outputgraphs.css';
 
-class CustomizedAxisTick extends PureComponent {
-  render() {
-    const { x, y, stroke, payload } = this.props;
 
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text x={0} y={0} dy={16} textAnchor="end" fill="#666" transform="rotate(-35)">
-          {payload.value}
-        </text>
-      </g>
-    );
-  }
-}
 
-function generateRandomColor() {
-  return '#' + Math.floor(Math.random() * 16777215).toString(16);
-}
 
 export default function OutputGraphs({ sim_data }) {
   const [data, setData] = useState(null)
   const [ageData, setData1] = useState(null)
+  const [genderData, setGenderData] = useState(null)
   const [selectedChart, setSelectedChart] = useState('line');
+  const [placesData, setPlacesData] = useState(null);
+  const [InfectInfoData, setInfectInfoData] = useState(null);
   const styles = {
     centerText: {
       textAlign: 'center',
@@ -34,8 +22,9 @@ export default function OutputGraphs({ sim_data }) {
       fontWeight: 'bold',
     },
   };
-    const COLORS = Array.from({ length: 80 }, () => generateRandomColor());
-
+  const COLORS = ["#8884d8"
+  ,"#82ca9d","#FFCC00","#66FF33"];//Array.from({ length: 80 }, () => generateRandomColor());
+COLORS.push()
   const handleChange = (e) => {
     setSelectedChart(e.target.value);
   };
@@ -46,27 +35,95 @@ const areaData = []
       let a = await fetch('data/barnsdall/papdata.json')
       r = await r.json()
       a = await a.json()
-      console.log(a)
+      let diseases  = ["delta","omicron"];
+
+    //diseases.push("alpha", "beta");
+      const InfectionState ={"day":1,
+      "susceptible": diseases[0],
+      "INFECTED": 1,
+      "INFECTIOUS": 2,
+      "SYMPTOMATIC": 4,
+      "HOSPITALIZED": 8,
+      "RECOVERED": 16,
+      "REMOVED": 32
+      };
+
+      // A function that generates random values ​​close to a given value
+      function generateCloseRandomValue(value) {
+          const minValue = Math.max(0, value - 5);
+          const maxValue = Math.min(32, value + 5);
+          let returnValue = Math.floor(Math.random() * (maxValue - minValue + 1)) + minValue;
+          return returnValue<=0?1:returnValue;
+      }
+
+      // Randomly generate 7 arrays of JSON format data
+      const dataInjectInfo = [];
+      dataInjectInfo.push(InfectionState)
+      for (let i = 2; i < 3; i++) {
+          const jsonData = {"day":i,
+          "susceptible":diseases[i-1],// generateCloseRandomValue(InfectionState.susceptible),
+          "INFECTED": generateCloseRandomValue(InfectionState.INFECTED),
+          "INFECTIOUS": generateCloseRandomValue(InfectionState.INFECTIOUS),
+          "SYMPTOMATIC": generateCloseRandomValue(InfectionState.SYMPTOMATIC),
+          "HOSPITALIZED": generateCloseRandomValue(InfectionState.HOSPITALIZED),
+          "RECOVERED": generateCloseRandomValue(InfectionState.RECOVERED),
+          "REMOVED": generateCloseRandomValue(InfectionState.REMOVED)
+        };
+          dataInjectInfo.push(jsonData);
+      }
+      setInfectInfoData(dataInjectInfo);
+
+
+      setPlacesData(a.places);
       areaData.length = 0
       for (let index = 0; index <= 3477; index++) {
         const element = a.people[index.toString()];
         areaData.push(element);
       }
       setData(r)
-     
-    const ageCounts = areaData.reduce((acc, curr) => {
-      const age = curr.age;
-      if (acc[age]) {
-        acc[age] += 1;
-      } else {
-        acc[age] = 1;
-      }
-      return acc;
-    }, {});
     
-    const ageCountsArray = Object.keys(ageCounts).map((age) => {
-      return { age: parseInt(age)+" years old", count: ageCounts[age] };
-    });
+    
+const ageRanges = {
+  "0-20": 0,
+  "21-40": 0,
+  "41-60": 0,
+  "61-80": 0
+};
+
+const ageCounts = Object.values(areaData).reduce((acc, curr) => {
+  const age = curr.age;
+  if (age >= 0 && age <= 20) {
+    acc["0-20"] += 1;
+  } else if (age > 20 && age <= 40) {
+    acc["21-40"] += 1;
+  } else if (age > 40 && age <= 60) {
+    acc["41-60"] += 1;
+  } else if (age > 60 && age <= 80) {
+    acc["61-80"] += 1;
+  }
+  return acc;
+}, ageRanges);
+
+
+let maleCount = 0;
+let femaleCount = 0;
+
+for (const key in areaData) {
+    if (areaData[key].sex === 1) {
+        maleCount++;
+    } else {
+        femaleCount++;
+    }
+}
+
+setGenderData([{"gender":"male","count":maleCount},{"gender":"female","count":femaleCount}])
+  
+const ageCountsArray = Object.keys(ageCounts).map((ageRange) => {
+  const ageRangeArray = ageRange.split("-");
+  const minAge = ageRangeArray[0];
+  const maxAge = ageRangeArray[1];
+  return { age: `${minAge}-${maxAge} years old`, count: ageCounts[ageRange] };
+});
 
     setData1(ageCountsArray);/*
     for (let index = 0; index < ageCountsArray.length; index++) {
@@ -76,7 +133,6 @@ const areaData = []
     }
 
     fetchJSON()
-    console.log(areaData);
   }, []);
 
   const rdata = []
@@ -84,28 +140,31 @@ const areaData = []
     let infectAmt = {}
     infectAmt["name"] = key
     for(let value in data[key])
-      infectAmt[value] = data[key][value].length
-    //for (let value in key.value)
-    
-    rdata.push(infectAmt)
-  }
+    {
+      const total = Object.values( data[key][value]).reduce((acc, curr) => acc + curr, 0);
+      infectAmt[value] =total;
+    }  //for (let value in key.value)
 
+    rdata.push(infectAmt)
+
+  }
   return (
     <div>
           <div>
                 <label>Select Chart Type:</label>
                 <select value={selectedChart} onChange={handleChange}>
-                  <option value="line">Line Chart</option>
-                  <option value="area">Area Chart</option>
-                  <option value="bar">Bar Chart</option>
-                  <option value="pie">Pie Chart</option>
+                  <option value="line">Infectiousness Over Time</option>
+                  <option value="bar">Diseases Info</option>
+                  <option value="pie1">Age Of Infected </option>
+                  <option value="pie2">Infection Gender</option>
+                  <option value="map">Distribution Of Infected Population</option>
                 </select>
                 {selectedChart && <p>You selected: {selectedChart}</p>}
               </div>
             {selectedChart === "line"&&
             (<div>
                <h6 style={styles.centerText}>infectiousness Over Time</h6>
-            <LineChart width={1500}height={600}data={rdata}  margin={{
+            <LineChart width={window.innerWidth}height={window.innerHeight}data={rdata}  margin={{
                 top: 5,
                 right: 30,
                 left: 20,
@@ -113,11 +172,11 @@ const areaData = []
               }}>
              
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" dataKey="name" tickCount={20 } tick={<CustomizedAxisTick />}/>
+              <XAxis type="number" dataKey="name" tickCount={20 } />
               <YAxis label={{ value: 'Total Infectiousness', angle: -90, position: 'insideLeft' }} />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="delta" stroke="#8884d8" fill="#8884d8" dot={false}/>
+              <Line type="monotone" dataKey="delta" stroke="#8884d8" fill="#8884d8" dot={false} />
               <Line type="monotone" dataKey="omicron" stroke="#82ca9d"  fill="#82ca9d" dot={false} />
             </LineChart>
             <h6 style={styles.centerText}>Time(minutes)</h6>
@@ -125,11 +184,10 @@ const areaData = []
             )}
             {selectedChart === "bar" &&
             <div>
-              <h6 style={styles.centerText}>infectiousness Over Time</h6>
+              <h6 style={styles.centerText}>Diseases Info</h6>
               <BarChart
-                width={1500}
-                height={600}
-                data={rdata}
+                width={window.innerWidth}height={window.innerHeight}
+                data={InfectInfoData}
                 margin={{
                   top: 5,
                   right: 30,
@@ -138,23 +196,41 @@ const areaData = []
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" label={{ value: 'Time(minutes)', position: 'insideBottom', offset: -10 }}/>
-                <YAxis label={{ value: 'Total Infectiousness', angle: -90, position: 'insideLeft' }}/>
+                <XAxis dataKey="susceptible" label={{ value: 'Diseases', position: 'insideBottom', offsetX: 25 }}/>
+                <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="delta" stackId="a" fill="#8884d8" />
-          <Bar dataKey="omicron" stackId="a" fill="#82ca9d" />
+              <Bar dataKey="INFECTED" stackId="a" fill="#FF6633" />
+              <Bar dataKey="INFECTIOUS" stackId="a" fill="#82ca9d" />
+              <Bar dataKey="SYMPTOMATIC " stackId="a" fill="#FFCC00" />
+              <Bar dataKey="HOSPITALIZED" stackId="a" fill="#66FF33" />
+              <Bar dataKey="RECOVERED " stackId="a" fill="#00CC99" />
+              <Bar dataKey="REMOVED" stackId="a" fill="#8884d8" />
               </BarChart>
             </div>}
-            {selectedChart === "pie" &&
-            <div>
+            {selectedChart === "pie1" &&
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
             <h6 style={styles.centerText}>age of infected person</h6>
-         
-              <PieChart width={1500} height={600}>
-                <Pie data={ageData} dataKey="count" nameKey="age" cx="50%" cy="50%" outerRadius={300}>
+            <PieChart width={400} height={400}>
+                <Pie data={ageData} dataKey="count" nameKey="age" cx="50%" cy="50%" outerRadius={150}>
                   {
                     ageData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]}  label={{ position: 'bottom' }} />
+                    ))
+                  }
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+              </div>
+            }{selectedChart === "pie2" &&
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+            <h6 style={styles.centerText}>Infection Gender</h6>
+              <PieChart width={400} height={400}>
+                <Pie data={genderData}  cx="50%" cy="50%" dataKey="count" nameKey="gender"  outerRadius={150}>
+                  {
+                    ageData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]}  label={{ position: 'bottom' }} />
                     ))
                   }
                 </Pie>
@@ -167,8 +243,8 @@ const areaData = []
           <div>
             <h6 style={styles.centerText}>infectiousness Over Time</h6>
             <AreaChart
-              width={1500}
-              height={600}
+              width={window.innerWidth-200}
+              height={window.innerHeight/2}
               data={rdata}
               margin={{
                 top: 0,
@@ -188,6 +264,13 @@ const areaData = []
             <h6 style={styles.centerText}>Time(minutes)</h6>
             </div>
             }
+
+        {selectedChart === "map" &&
+          <div>
+          <h6 style={styles.centerText}>Distribution Of Infected Population</h6>
+          <InfectedMap  infectedLatitude={ 36.561075}  infectedLongitude={-96.16224} mapZoom = {233} infectedInfo = {placesData}/>
+          </div>
+        }
           </div>
   );
 }
