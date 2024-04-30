@@ -8,7 +8,7 @@ function SimLocation({value, callback}) {
   return (
     <div className='simset_dropdown'>
     <div className='simset_dropdown_label'>Convenience Zone</div>
-    <select className='simset_dropdown' name='location' onChange={(e) => callback(e.value)}>
+    <select className='simset_dropdown' name='location' onChange={(e) => callback(e.target.value)}>
       <option value='barnsdall'>Barnsdall, OK</option>
       <option value='hagerstown'>Hagerstown, MD</option>
     </select>
@@ -50,7 +50,7 @@ function SimFile({label, value, callback}) {
 }
 
 export default function SimSettings({ sendData, showSim }) {
-  const [ location, setLocation ] = useState('Barnsdall');  // Area to simulate
+  const [ location, setLocation ] = useState('barnsdall');  // Area to simulate
   const [ days, setDays ] = useState(50);                   // How long to run the simulation
   const [ pmask, setPmask ] = useState(0.4);                // Percent masking
   const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated

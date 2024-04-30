@@ -5,10 +5,7 @@ import { AreaChart,Area, PieChart, Pie, Cell, BarChart, Bar, LineChart,
 
 import './outputgraphs.css';
 
-
-
-
-export default function OutputGraphs({ sim_data }) {
+export default function OutputGraphs({ sim_data, location }) {
   const [data, setData] = useState(null)
   const [ageData, setData1] = useState(null)
   const [genderData, setGenderData] = useState(null)
@@ -17,7 +14,6 @@ export default function OutputGraphs({ sim_data }) {
   const [InfectInfoData, setInfectInfoData] = useState(null);
   const styles = {
     centerText: {
-      textAlign: 'center',
       textAlign: 'center',
       fontWeight: 'bold',
     },
@@ -31,8 +27,8 @@ COLORS.push()
 const areaData = []
   useEffect(() => {
     async function fetchJSON() {
-      let r = await fetch('data/barnsdall/infectivity.json')
-      let a = await fetch('data/barnsdall/papdata.json')
+      let r = await fetch(`data/${location}/infectivity.json`)
+      let a = await fetch(`data/${location}/papdata.json`)
       r = await r.json()
       a = await a.json()
       let diseases  = ["delta","omicron"];
@@ -75,8 +71,9 @@ const areaData = []
 
 
       setPlacesData(a.places);
-      areaData.length = 0
-      for (let index = 0; index <= 3477; index++) {
+      const min_idx = Math.min(...Object.keys(a.people).map(x => parseInt(x)));
+      const max_idx = Math.max(...Object.keys(a.people).map(x => parseInt(x)));
+      for (let index = min_idx; index <= max_idx; index++) {
         const element = a.people[index.toString()];
         areaData.push(element);
       }

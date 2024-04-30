@@ -42,12 +42,12 @@ function createFacilityMarker(position, name, number, label, icon) {
   return { marker, name };
 };
 
-function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
+function updateFacilityIcons(curtime, location, patterns, sim_data, setPublicFacilities) {
   var facilities = [];
 
   curtime = curtime * 60;
 
-  fetch('data/barnsdall/papdata.json').then((res) => {
+  fetch(`data/${location}/papdata.json`).then((res) => {
     res.json().then((papdata) => {
       for (const [index, data] of Object.entries(papdata['places'])) {
         const number = parseInt(index) + 1;
@@ -92,7 +92,7 @@ function updateFacilityIcons(curtime, patterns, sim_data, setPublicFacilities) {
   });
 }
 
-export default function ModelMap({ sim_data }) {
+export default function ModelMap({ sim_data, location }) {
   const [ publicFacilities, setPublicFacilities ] = useState([]);
   const [ patterns, setPatterns ] = useState({});
   const [ maxHours, setMaxHours ] = useState(1);
@@ -108,12 +108,11 @@ export default function ModelMap({ sim_data }) {
       shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
     });
 
-    fetch('data/barnsdall/patterns.json').then((res) => {
+    fetch(`data/${location}/patterns.json`).then((res) => {
       res.json().then((data) => {
-        console.log(Math.max(...Object.keys(data)))
         setMaxHours(Math.max(...Object.keys(data)) / 60);
         setPatterns(data);
-        updateFacilityIcons(1, data, sim_data, setPublicFacilities);
+        updateFacilityIcons(1, location, data, sim_data, setPublicFacilities);
       })
     })
   }, []);
@@ -131,8 +130,8 @@ export default function ModelMap({ sim_data }) {
           </LayersControl.BaseLayer>
           <Overlay checked name="Public Facilities">
             {/* Render the markers for public facilities */}
-            {publicFacilities.map(({ marker, name }) => (
-              <LayersControl.Overlay checked key={name} name={name}>
+            {publicFacilities.slice(0, 100).map(({ marker, name }) => (
+              <LayersControl.Overlay checked key={`${name}${Math.random()}`} name={name}>
                 {marker}
               </LayersControl.Overlay>
             ))}
@@ -147,7 +146,7 @@ export default function ModelMap({ sim_data }) {
           min={1} 
           max={maxHours} 
           value={timestamp} 
-          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities); }}
+          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, location, patterns, sim_data, setPublicFacilities); }}
           style={{ width: '100%' }}
         />
         <div style={{ textAlign: 'center', marginTop: '12px' }}>
@@ -162,7 +161,7 @@ export default function ModelMap({ sim_data }) {
           min={1} 
           max={maxHours} 
           value={timestamp} 
-          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, patterns, sim_data, setPublicFacilities);}}
+          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, location, patterns, sim_data, setPublicFacilities);}}
           style={{ width: '10%' }}
         />
       </div>

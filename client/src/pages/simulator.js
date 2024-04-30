@@ -50,13 +50,14 @@ function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvacci
 export default function Simulator() {
   const [ showSim, setShowSim ] = useState(false);          // Show simulator, or show settings?
   const [ simData, setSimData ] = useState(null);           // Simulator output data
+  const [ location, setLocation ] = useState('barnsdall');
 
   return (
     <div>
       <div className='sim_container'>
         {!showSim && 
           <div className='sim_settings'>
-            <SimSettings sendData={(dict) => { sendSimulatorData(setSimData, dict); }} showSim={setShowSim}/>
+            <SimSettings sendData={(dict) => { sendSimulatorData(setSimData, dict); setLocation(dict['location']); }} showSim={setShowSim}/>
           </div>
         }
 
@@ -66,8 +67,8 @@ export default function Simulator() {
 
         {showSim && simData &&
           <div className='sim_output'>
-            <ModelMap sim_data={simData} />
-            <OutputGraphs sim_data={simData} />
+            <ModelMap sim_data={simData} location={location} />
+            <OutputGraphs sim_data={simData} location={location} />
           </div>
         }
       </div>
