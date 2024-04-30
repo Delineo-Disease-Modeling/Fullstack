@@ -1,59 +1,79 @@
 import React, { useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, LayersControl } from 'react-leaflet';
+import { MapContainer, Marker, TileLayer, Popup, LayersControl } from 'react-leaflet';
+import MarkerClusterGroup from "react-leaflet-cluster";
 import L from 'leaflet';
+
 import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
 
-import facility from '../assets/facility.svg';
-import orangefacility from '../assets/orangefacility.svg';
-import redfacility from '../assets/redfacility.svg';
+const {Overlay} = LayersControl;
 
-const { Overlay } = LayersControl;
-
-// Define custom icon
-const facilityIcon = new L.Icon({
-  iconRetinaUrl: facility,
-  iconUrl: facility,
-  iconSize: [36, 45],
-  iconAnchor: [18, 45], // Half of icon's width and full height
+const g_facility_icon = new L.Icon({
+  iconUrl: require("../assets/facility.svg").default,
+  iconSize: new L.Point(40, 47)
 });
 
-const redFacilityIcon = new L.Icon({
-  iconUrl: redfacility,
-  iconRetinaUrl: redfacility,
-  iconSize: [36, 45],
-  iconAnchor: [18, 45], // Half of icon's width and full height
+const o_facility_icon = new L.Icon({
+  iconUrl: require("../assets/orangefacility.svg").default,
+  iconSize: new L.Point(40, 47)
 });
 
-const orangeFacilityIcon = new L.Icon({
-  iconUrl: orangefacility,
-  iconRetinaUrl: orangefacility,
-  iconSize: [36, 45],
-  iconAnchor: [18, 45], // Half of icon's width and full height
+const r_facility_icon = new L.Icon({
+  iconUrl: require("../assets/redfacility.svg").default,
+  iconSize: new L.Point(40, 47)
+});
+
+const g_household_icon = new L.Icon({
+  iconUrl: require("../assets/household.svg").default,
+  iconSize: new L.Point(40, 47)
+});
+
+const o_household_icon = new L.Icon({
+  iconUrl: require("../assets/orangehousehold.svg").default,
+  iconSize: new L.Point(40, 47)
+});
+
+const r_household_icon = new L.Icon({
+  iconUrl: require("../assets/redhousehold.svg").default,
+  iconSize: new L.Point(40, 47)
 });
 
 // Function to create markers for public facilities
-function createFacilityMarker(position, name, number, label, icon) {
-  const marker = (
-    <Marker key={number} position={position} icon={icon} style={{fill: "red"}}zoomPanOptions={{ minZoom: 10, maxZoom: 18 }}>
-      <Popup>{name}<br></br>{label}</Popup>
-    </Marker>
-  );
-  return { marker, name };
+function createFacilityMarker(position, name, label, icon) {
+  return [ icon, name, label, position ];
 };
 
-function updateFacilityIcons(curtime, location, patterns, sim_data, setPublicFacilities) {
+const map_centers = {
+  'barnsdall': [36.562036, -96.160775],
+  'hagerstown': [39.64168, -77.718986]
+}
+
+var household_locs = {};
+
+function updateIcons(curtime, type, location, patterns, sim_data, callback) {
   var facilities = [];
 
-  curtime = curtime * 60;
+  curtime = (curtime * 60).toString();
 
   fetch(`data/${location}/papdata.json`).then((res) => {
     res.json().then((papdata) => {
-      for (const [index, data] of Object.entries(papdata['places'])) {
-        const number = parseInt(index) + 1;
+      for (const [index, data] of Object.entries(papdata[type])) {
+        if (type === 'homes') {
+          data.label = `Home #${index}`;
 
-        var facilityObject = null;
-        var peopleAtFacility = patterns[curtime.toString()]?.['places']?.[number.toString()];
+          if (!(index in household_locs)) {
+            household_locs[index] = [ 
+              map_centers[location][0] + (Math.random() * 0.06 - 0.03), 
+              map_centers[location][1] + (Math.random() * 0.06 - 0.03) 
+            ];
+          }
+
+          data['latitude'] = household_locs[index][0];
+          data['longitude'] = household_locs[index][1];  
+        }
+
+        var new_marker = null;
+        var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
         if (peopleAtFacility) {
           var numInfected = 0.0;
@@ -69,50 +89,47 @@ function updateFacilityIcons(curtime, location, patterns, sim_data, setPublicFac
             }
           }
 
+          var icon = type === 'homes' ? g_household_icon : g_facility_icon;
           var label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
 
           if (numInfected / peopleAtFacility.length > 0.1) {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, redFacilityIcon);
+            icon = type === 'homes' ? r_household_icon : r_facility_icon;
           } else if (numInfected / peopleAtFacility.length > 0.0) {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, orangeFacilityIcon);
-          } else {
-            facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, label_text, facilityIcon);
+            icon = type === 'homes' ? o_household_icon : o_facility_icon;
           }
+
+          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon)
         } else {
-          facilityObject = createFacilityMarker([data.latitude, data.longitude], data.label, number, '', facilityIcon);
+          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, '', type === 'homes' ? g_household_icon : g_facility_icon);
         }
 
-        if (facilityObject) {
-          facilities.push(facilityObject);
+        if (new_marker?.length) {
+          facilities.push(new_marker);
         }
       }
 
-      setPublicFacilities(facilities);
+      callback(facilities);
     });
   });
 }
 
 export default function ModelMap({ sim_data, location }) {
   const [ publicFacilities, setPublicFacilities ] = useState([]);
+  const [ households, setHouseholds ] = useState([]);
   const [ patterns, setPatterns ] = useState({});
   const [ maxHours, setMaxHours ] = useState(1);
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
   React.useEffect(() => {
-    const L = require('leaflet');
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-      iconUrl: require('leaflet/dist/images/marker-icon.png'),
-      shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
-    });
+    household_locs = {};
 
     fetch(`data/${location}/patterns.json`).then((res) => {
       res.json().then((data) => {
         setMaxHours(Math.max(...Object.keys(data)) / 60);
         setPatterns(data);
-        updateFacilityIcons(1, location, data, sim_data, setPublicFacilities);
+        updateIcons(1, 'places', location, data, sim_data, setPublicFacilities);
+        updateIcons(1, 'homes', location, data, sim_data, setHouseholds);
       })
     })
   }, []);
@@ -120,23 +137,75 @@ export default function ModelMap({ sim_data, location }) {
   return (
     <div>
       {/* Map Container */}
-      <MapContainer center={[36.562036, -96.160775]} zoom={13} className="mapcontainer">
-        <LayersControl position="topright">
+      <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} className="mapcontainer">
+        <TileLayer
+          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+
+        <MarkerClusterGroup chunkedLoading>
+          {publicFacilities.map((addr, index) => (
+            <Marker
+              icon={addr[0]}
+              key={index}
+              position={addr[3]}
+              title={addr[1]}
+            >
+              <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+            </Marker>
+          ))}
+
+          {households.map((addr, index) => (
+            <Marker
+              icon={addr[0]}
+              key={index}
+              position={addr[3]}
+              title={addr[1]}
+            >
+              <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+            </Marker>
+          ))}
+        </MarkerClusterGroup>
+
+
+        {/* <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Map">
             <TileLayer
               attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
           </LayersControl.BaseLayer>
-          <Overlay checked name="Public Facilities">
-            {/* Render the markers for public facilities */}
-            {publicFacilities.slice(0, 100).map(({ marker, name }) => (
-              <LayersControl.Overlay checked key={`${name}${Math.random()}`} name={name}>
-                {marker}
-              </LayersControl.Overlay>
-            ))}
+
+          <Overlay checked name="Facilities">
+            <MarkerClusterGroup chunkedLoading>
+              {publicFacilities.map((addr, index) => (
+                <Marker
+                  icon={addr[0]}
+                  key={index}
+                  position={addr[3]}
+                  title={addr[1]}
+                >
+                  <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+                </Marker>
+              ))}
+            </MarkerClusterGroup>
           </Overlay>
-        </LayersControl>
+
+          <Overlay checked name="Households">
+            <MarkerClusterGroup chunkedLoading>
+              {households.map((addr, index) => (
+                <Marker
+                  icon={addr[0]}
+                  key={index}
+                  position={addr[3]}
+                  title={addr[1]}
+                >
+                  <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+                </Marker>
+              ))}
+            </MarkerClusterGroup>
+          </Overlay>
+        </LayersControl> */}
       </MapContainer>
 
       {/* Slider Component */}
@@ -146,7 +215,10 @@ export default function ModelMap({ sim_data, location }) {
           min={1} 
           max={maxHours} 
           value={timestamp} 
-          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, location, patterns, sim_data, setPublicFacilities); }}
+          onChange={(e) => {
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, patterns, sim_data, setPublicFacilities);
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, patterns, sim_data, setHouseholds);
+          }}
           style={{ width: '100%' }}
         />
         <div style={{ textAlign: 'center', marginTop: '12px' }}>
@@ -161,7 +233,10 @@ export default function ModelMap({ sim_data, location }) {
           min={1} 
           max={maxHours} 
           value={timestamp} 
-          onChange={(e) => { setTimestamp(parseInt(e.target.value)); updateFacilityIcons(timestamp, location, patterns, sim_data, setPublicFacilities);}}
+          onChange={(e) => { 
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, patterns, sim_data, setPublicFacilities);
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, patterns, sim_data, setHouseholds);
+          }}
           style={{ width: '10%' }}
         />
       </div>
