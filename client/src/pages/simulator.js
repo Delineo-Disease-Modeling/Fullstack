@@ -20,31 +20,31 @@ function makePostRequest(data, setSimData) {
 
 function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
   // Uncomment if you want to work with the simulator
-  // const data = {
-  //   location: location,
-  //   matrices: null,
-  //   days: days,
-  //   mask: pmask,
-  //   vaccine: pvaccine,
-  //   capacity: capacity,
-  //   selfiso: selfiso,
-  //   lockdown: lockdown,
-  // };
+  const data = {
+    location: location,
+    matrices: null,
+    days: days,
+    mask: pmask,
+    vaccine: pvaccine,
+    capacity: capacity,
+    selfiso: selfiso,
+    lockdown: lockdown,
+  };
 
-  // if (!matrices) {
-  //   makePostRequest(data, setSimData);
-  // } else {
-  //   data.matrices = matrices;
-  //   makePostRequest(data, setSimData);
-  // }
+  if (!matrices) {
+    makePostRequest(data, setSimData);
+  } else {
+    data.matrices = matrices;
+    makePostRequest(data, setSimData);
+  }
 
   //Uncomment for private testing
-  fetch('data/barnsdall/infectivity.json').then((res) => {
-    res.json().then((data) => {
-      setSimData(data);
-      console.log(data);
-    })
-  });
+  // fetch('data/barnsdall/infectivity.json').then((res) => {
+  //   res.json().then((data) => {
+  //     setSimData(data);
+  //     console.log(data);
+  //   })
+  // });
 }
 
 export default function Simulator() {

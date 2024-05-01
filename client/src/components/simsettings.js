@@ -69,14 +69,14 @@ export default function SimSettings({ sendData, showSim }) {
           callback={setLocation}
         />
 
-        <SimParameter
+        {/* <SimParameter
           label={'Length (Days)'}
           value={days}
           callback={setDays}
           min={14}
           max={180}
           percent={false}
-        />
+        /> */}
         <SimParameter
           label={'Percent Masking'}
           value={pmask}

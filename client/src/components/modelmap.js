@@ -39,8 +39,8 @@ const r_household_icon = new L.Icon({
 });
 
 // Function to create markers for public facilities
-function createFacilityMarker(position, name, label, icon) {
-  return [ icon, name, label, position ];
+function createFacilityMarker(position, name, label, icon, proportion) {
+  return [ icon, name, label, position, proportion ];
 };
 
 const map_centers = {
@@ -48,10 +48,26 @@ const map_centers = {
   'hagerstown': [39.64168, -77.718986]
 }
 
+const createClusterCustomIcon = function (cluster) {
+  var colored = cluster.getAllChildMarkers().some(x => x.options.proportion > 0.0);
+
+  // return new L.DivIcon({ 
+  //   html: `<div><span>${cluster.getChildCount()}</span></div>`, 
+  //   className: 'marker-cluster ' + colored ? 'marker-cluster-medium' : 'marker-cluster-small', 
+  //   iconSize: new L.Point(40, 40, true) 
+  // });
+
+  return L.divIcon({
+    html: `<span class="marker-cluster">${cluster.getChildCount()}</span>`,
+    className: colored ? 'marker-cluster-medium marker-cluster' : 'marker-cluster-small marker-cluster',
+    iconSize: L.point(40, 40, true)
+  });
+}
+
 var household_locs = {};
 
 function updateIcons(curtime, type, location, patterns, sim_data, callback) {
-  var facilities = [];
+  var new_icons = [];
 
   curtime = (curtime * 60).toString();
 
@@ -75,6 +91,9 @@ function updateIcons(curtime, type, location, patterns, sim_data, callback) {
         var new_marker = null;
         var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
+        var icon = type === 'homes' ? g_household_icon : g_facility_icon;
+        var label_text = `Pop:Inf: 0:0`;
+
         if (peopleAtFacility) {
           var numInfected = 0.0;
           var curData = sim_data[curtime];
@@ -89,8 +108,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, callback) {
             }
           }
 
-          var icon = type === 'homes' ? g_household_icon : g_facility_icon;
-          var label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
+          label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
 
           if (numInfected / peopleAtFacility.length > 0.1) {
             icon = type === 'homes' ? r_household_icon : r_facility_icon;
@@ -98,19 +116,100 @@ function updateIcons(curtime, type, location, patterns, sim_data, callback) {
             icon = type === 'homes' ? o_household_icon : o_facility_icon;
           }
 
-          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon)
+          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
         } else {
-          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, '', type === 'homes' ? g_household_icon : g_facility_icon);
+          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, 0.0);
         }
 
         if (new_marker?.length) {
-          facilities.push(new_marker);
+          new_icons.push(new_marker);
         }
       }
 
-      callback(facilities);
+      callback(new_icons);
     });
   });
+}
+
+function ClusteredMap({ location, timestamp, publicFacilities, households }) {
+  return (
+    <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} className="mapcontainer">
+      <TileLayer
+        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      <MarkerClusterGroup
+        chunkedLoading
+        iconCreateFunction={createClusterCustomIcon}
+        maxClusterRadius={150}
+        key={Date.now()}
+      >
+        {publicFacilities.map((addr, index) => (
+          <Marker
+            icon={addr[0]}
+            key={index}
+            position={addr[3]}
+            title={addr[1]}
+            proportion={addr[4]}
+          >
+            <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+          </Marker>
+        ))}
+
+        {households.map((addr, index) => (
+          <Marker
+            icon={addr[0]}
+            key={index}
+            position={addr[3]}
+            title={addr[1]}
+            proportion={addr[4]}
+          >
+            <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+          </Marker>
+        ))}
+      </MarkerClusterGroup>
+
+      {/* <LayersControl position="topright">
+        <LayersControl.BaseLayer checked name="Map">
+          <TileLayer
+            attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+
+        <Overlay checked name="Facilities">
+          <MarkerClusterGroup chunkedLoading>
+            {publicFacilities.map((addr, index) => (
+              <Marker
+                icon={addr[0]}
+                key={index}
+                position={addr[3]}
+                title={addr[1]}
+              >
+                <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
+        </Overlay>
+
+        <Overlay checked name="Households">
+          <MarkerClusterGroup chunkedLoading>
+            {households.map((addr, index) => (
+              <Marker
+                icon={addr[0]}
+                key={index}
+                position={addr[3]}
+                title={addr[1]}
+              >
+                <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
+        </Overlay>
+      </LayersControl> */}
+    </MapContainer>
+  );
 }
 
 export default function ModelMap({ sim_data, location }) {
@@ -137,76 +236,7 @@ export default function ModelMap({ sim_data, location }) {
   return (
     <div>
       {/* Map Container */}
-      <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} className="mapcontainer">
-        <TileLayer
-          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        <MarkerClusterGroup chunkedLoading>
-          {publicFacilities.map((addr, index) => (
-            <Marker
-              icon={addr[0]}
-              key={index}
-              position={addr[3]}
-              title={addr[1]}
-            >
-              <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
-            </Marker>
-          ))}
-
-          {households.map((addr, index) => (
-            <Marker
-              icon={addr[0]}
-              key={index}
-              position={addr[3]}
-              title={addr[1]}
-            >
-              <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
-            </Marker>
-          ))}
-        </MarkerClusterGroup>
-
-
-        {/* <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Map">
-            <TileLayer
-              attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-          </LayersControl.BaseLayer>
-
-          <Overlay checked name="Facilities">
-            <MarkerClusterGroup chunkedLoading>
-              {publicFacilities.map((addr, index) => (
-                <Marker
-                  icon={addr[0]}
-                  key={index}
-                  position={addr[3]}
-                  title={addr[1]}
-                >
-                  <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
-                </Marker>
-              ))}
-            </MarkerClusterGroup>
-          </Overlay>
-
-          <Overlay checked name="Households">
-            <MarkerClusterGroup chunkedLoading>
-              {households.map((addr, index) => (
-                <Marker
-                  icon={addr[0]}
-                  key={index}
-                  position={addr[3]}
-                  title={addr[1]}
-                >
-                  <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
-                </Marker>
-              ))}
-            </MarkerClusterGroup>
-          </Overlay>
-        </LayersControl> */}
-      </MapContainer>
+      <ClusteredMap location={location} timestamp={timestamp} publicFacilities={publicFacilities} households={households} />
 
       {/* Slider Component */}
       <div style={{ width: '100%', marginTop: '20px' }}>
