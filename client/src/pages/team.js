@@ -5,7 +5,7 @@ import './team.css';
 
 const teamData = {
   professors: [
-    { name: "Dr. Dahbura", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Professor Anton Dahbura", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   fullstackTeam: [
@@ -66,12 +66,7 @@ export default function Team() {
         <p className='teamheader'>The Delineo Project</p>
       </div>
       
-      <div className='PIheader' data-aos='fade-up' data-aos-once='true'>
-        <header className="PIheader">Principal Investigator</header>
-        <img className='member' src='images/logo.png' alt='drake'></img>
-          <h1 className='name'>Professor Anton Dahbura</h1> 
-      </div>
-      
+      {renderTeamSection(teamData.professors, "Professors")}
       {renderTeamSection(teamData.fullstackTeam, "Full-Stack Team")}
       {renderTeamSection(teamData.algorithmsTeam, "Algorithms Team")}
       {renderTeamSection(teamData.simulationsTeam, "Simulations Team")}
