@@ -18,7 +18,7 @@ function makePostRequest(data, setSimData) {
     });
 }
 
-function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
+function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
   // Uncomment if you want to work with the simulator
   // const data = {
   //   location: location,
@@ -45,10 +45,26 @@ function sendSimulatorData(setSimData, { matrices, location, days, pmask, pvacci
       console.log(data);
     })
   });
+
+  fetch('data/barnsdall/patterns.json').then((res) => {
+    res.json().then((data) => {
+      setMovePatterns(data);
+      console.log(data);
+    })
+  });
+
+  fetch('data/barnsdall/papdata.json').then((res) => {
+    res.json().then((data) => {
+      setPapData(data);
+      console.log(data);
+    })
+  });
 }
 
 export default function Simulator() {
   const [ showSim, setShowSim ] = useState(false);          // Show simulator, or show settings?
+  const [ papData, setPapData ] = useState(null);       
+  const [ movePatterns, setMovePatterns ] = useState(null);          
   const [ simData, setSimData ] = useState(null);           // Simulator output data
   const [ location, setLocation ] = useState('barnsdall');
 
@@ -57,7 +73,7 @@ export default function Simulator() {
       <div className='sim_container'>
         {!showSim && 
           <div className='sim_settings'>
-            <SimSettings sendData={(dict) => { sendSimulatorData(setSimData, dict); setLocation(dict['location']); }} showSim={setShowSim}/>
+            <SimSettings sendData={(dict) => { sendSimulatorData(setSimData, setMovePatterns, setPapData, dict); setLocation(dict['location']); }} showSim={setShowSim}/>
           </div>
         }
 
@@ -67,8 +83,8 @@ export default function Simulator() {
 
         {showSim && simData &&
           <div className='sim_output'>
-            <ModelMap sim_data={simData} location={location} />
-            <OutputGraphs sim_data={simData} location={location} />
+            <ModelMap sim_data={simData} move_patterns={movePatterns} pap_data={papData} location={location} />
+            <OutputGraphs sim_data={simData} move_patterns={movePatterns} pap_data={papData} location={location} />
           </div>
         }
       </div>

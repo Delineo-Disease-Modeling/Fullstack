@@ -212,7 +212,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
   );
 }
 
-export default function ModelMap({ sim_data, location }) {
+export default function ModelMap({ sim_data, move_patterns, pap_data, location }) {
   const [ publicFacilities, setPublicFacilities ] = useState([]);
   const [ households, setHouseholds ] = useState([]);
   const [ patterns, setPatterns ] = useState({});

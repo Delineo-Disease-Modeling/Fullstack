@@ -5,7 +5,7 @@ import { AreaChart,Area, PieChart, Pie, Cell, BarChart, Bar, LineChart,
 
 import './outputgraphs.css';
 
-export default function OutputGraphs({ sim_data, location }) {
+export default function OutputGraphs({ sim_data, move_patterns, pap_data, location }) {
   const [data, setData] = useState(null)
   const [ageData, setData1] = useState(null)
   const [genderData, setGenderData] = useState(null)
