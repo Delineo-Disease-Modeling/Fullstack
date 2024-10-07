@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapContainer, Marker, TileLayer, Popup, LayersControl } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import L from 'leaflet';
 
 import 'leaflet/dist/leaflet.css';
@@ -39,8 +40,8 @@ const r_household_icon = new L.Icon({
 });
 
 // Function to create markers for public facilities
-function createFacilityMarker(position, name, label, icon, proportion) {
-  return [ icon, name, label, position, proportion ];
+function createFacilityMarker(position, name, label, icon, proportion, graphData) {
+  return [ icon, name, label, position, proportion, graphData ];
 };
 
 const map_centers = {
@@ -91,6 +92,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 
     var icon = type === 'homes' ? g_household_icon : g_facility_icon;
     var label_text = `Pop:Inf: 0:0`;
+    var graphData = [];
 
     if (peopleAtFacility) {
       var numInfected = 0.0;
@@ -112,6 +114,11 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
         icon = type === 'homes' ? r_household_icon : r_facility_icon;
       } else if (numInfected / peopleAtFacility.length > 0.0) {
         icon = type === 'homes' ? o_household_icon : o_facility_icon;
+      }
+
+      for (const time in patterns) { // move_patterns data
+        const timeData = patterns[time]?.[type]?.[index];
+        graphData.push({time: time, people: timeData ? timeData.length : 0});
       }
 
       new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
@@ -149,7 +156,26 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
             title={addr[1]}
             proportion={addr[4]}
           >
-            <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+            <Popup>
+              <div>
+                <h4>{addr[1]}</h4>
+                <p>{addr[2]}</p>
+                {/* Recharts LineChart using the graph data from move_patterns */}
+                <LineChart
+                  width={300}
+                  height={200}
+                  data={addr[5]} // This is the time-series data for the graph
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid stroke="#ccc" />
+                  <XAxis dataKey="time" label={{ value: 'Time', position: 'insideBottomRight', offset: 0 }} />
+                  <YAxis label={{ value: 'People', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="people" stroke="#8884d8" />
+                </LineChart>
+              </div>
+            </Popup>
           </Marker>
         ))}
 
@@ -161,7 +187,26 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
             title={addr[1]}
             proportion={addr[4]}
           >
-            <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
+            <Popup>
+              <div>
+                <h4>{addr[1]}</h4>
+                <p>{addr[2]}</p>
+                {/* Similar graph for households */}
+                <LineChart
+                  width={300}
+                  height={200}
+                  data={addr[5]}
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid stroke="#ccc" />
+                  <XAxis dataKey="time" label={{ value: 'Time', position: 'insideBottomRight', offset: 0 }} />
+                  <YAxis label={{ value: 'People', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="people" stroke="#82ca9d" />
+                </LineChart>
+              </div>
+            </Popup>
           </Marker>
         ))}
       </MarkerClusterGroup>
