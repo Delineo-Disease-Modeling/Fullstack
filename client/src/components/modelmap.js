@@ -66,69 +66,65 @@ const createClusterCustomIcon = function (cluster) {
 
 var household_locs = {};
 
-function updateIcons(curtime, type, location, patterns, sim_data, callback) {
+function updateIcons(curtime, type, location, patterns, sim_data, pap_data, callback) {
   var new_icons = [];
 
   curtime = (curtime * 60).toString();
 
-  fetch(`data/${location}/papdata.json`).then((res) => {
-    res.json().then((papdata) => {
-      for (const [index, data] of Object.entries(papdata[type])) {
-        if (type === 'homes') {
-          data.label = `Home #${index}`;
+  for (const [index, data] of Object.entries(pap_data[type])) {
+    if (type === 'homes') {
+      data.label = `Home #${index}`;
 
-          if (!(index in household_locs)) {
-            household_locs[index] = [ 
-              map_centers[location][0] + (Math.random() * 0.06 - 0.03), 
-              map_centers[location][1] + (Math.random() * 0.06 - 0.03) 
-            ];
-          }
+      if (!(index in household_locs)) {
+        household_locs[index] = [ 
+          map_centers[location][0] + (Math.random() * 0.06 - 0.03), 
+          map_centers[location][1] + (Math.random() * 0.06 - 0.03) 
+        ];
+      }
 
-          data['latitude'] = household_locs[index][0];
-          data['longitude'] = household_locs[index][1];  
-        }
+      data['latitude'] = household_locs[index][0];
+      data['longitude'] = household_locs[index][1];  
+    }
 
-        var new_marker = null;
-        var peopleAtFacility = patterns[curtime]?.[type]?.[index];
+    var new_marker = null;
+    var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
-        var icon = type === 'homes' ? g_household_icon : g_facility_icon;
-        var label_text = `Pop:Inf: 0:0`;
+    var icon = type === 'homes' ? g_household_icon : g_facility_icon;
+    var label_text = `Pop:Inf: 0:0`;
 
-        if (peopleAtFacility) {
-          var numInfected = 0.0;
-          var curData = sim_data[curtime];
+    if (peopleAtFacility) {
+      var numInfected = 0.0;
+      var curData = sim_data[curtime];
 
-          if (curData) {
-            for (const variant of Object.keys(curData)) {
-              for (const id of Object.keys(curData[variant])) {
-                if (peopleAtFacility.indexOf(id) !== -1) {
-                  numInfected += 1.0;
-                }
-              }
+      if (curData) {
+        for (const variant of Object.keys(curData)) {
+          for (const id of Object.keys(curData[variant])) {
+            if (peopleAtFacility.indexOf(id) !== -1) {
+              numInfected += 1.0;
             }
           }
-
-          label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
-
-          if (numInfected / peopleAtFacility.length > 0.1) {
-            icon = type === 'homes' ? r_household_icon : r_facility_icon;
-          } else if (numInfected / peopleAtFacility.length > 0.0) {
-            icon = type === 'homes' ? o_household_icon : o_facility_icon;
-          }
-
-          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
-        } else {
-          new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, 0.0);
-        }
-
-        if (new_marker?.length) {
-          new_icons.push(new_marker);
         }
       }
 
-      callback(new_icons);
-    });
-  });
+      label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
+
+      if (numInfected / peopleAtFacility.length > 0.1) {
+        icon = type === 'homes' ? r_household_icon : r_facility_icon;
+      } else if (numInfected / peopleAtFacility.length > 0.0) {
+        icon = type === 'homes' ? o_household_icon : o_facility_icon;
+      }
+
+      new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
+    } else {
+      new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, 0.0);
+    }
+
+    if (new_marker?.length) {
+      new_icons.push(new_marker);
+    }
+  }
+
+  callback(new_icons);
 }
 
 function ClusteredMap({ location, timestamp, publicFacilities, households }) {
@@ -215,7 +211,6 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
 export default function ModelMap({ sim_data, move_patterns, pap_data, location }) {
   const [ publicFacilities, setPublicFacilities ] = useState([]);
   const [ households, setHouseholds ] = useState([]);
-  const [ patterns, setPatterns ] = useState({});
   const [ maxHours, setMaxHours ] = useState(1);
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
@@ -223,14 +218,9 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
   React.useEffect(() => {
     household_locs = {};
 
-    fetch(`data/${location}/patterns.json`).then((res) => {
-      res.json().then((data) => {
-        setMaxHours(Math.max(...Object.keys(data)) / 60);
-        setPatterns(data);
-        updateIcons(1, 'places', location, data, sim_data, setPublicFacilities);
-        updateIcons(1, 'homes', location, data, sim_data, setHouseholds);
-      })
-    })
+    setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
+    updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+    updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
   }, []);
 
   return (
@@ -246,8 +236,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
           max={maxHours} 
           value={timestamp} 
           onChange={(e) => {
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, patterns, sim_data, setPublicFacilities);
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, patterns, sim_data, setHouseholds);
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
           style={{ width: '100%' }}
         />
@@ -264,8 +254,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
           max={maxHours} 
           value={timestamp} 
           onChange={(e) => { 
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, patterns, sim_data, setPublicFacilities);
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, patterns, sim_data, setHouseholds);
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
           style={{ width: '10%' }}
         />

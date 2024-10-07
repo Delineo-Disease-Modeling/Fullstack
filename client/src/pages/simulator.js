@@ -39,12 +39,6 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
   // }
 
   //Uncomment for private testing
-  fetch('data/barnsdall/infectivity.json').then((res) => {
-    res.json().then((data) => {
-      setSimData(data);
-      console.log(data);
-    })
-  });
 
   fetch('data/barnsdall/patterns.json').then((res) => {
     res.json().then((data) => {
@@ -56,6 +50,13 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
   fetch('data/barnsdall/papdata.json').then((res) => {
     res.json().then((data) => {
       setPapData(data);
+      console.log(data);
+    })
+  });
+
+  fetch('data/barnsdall/infectivity.json').then((res) => {
+    res.json().then((data) => {
+      setSimData(data);
       console.log(data);
     })
   });
@@ -77,11 +78,11 @@ export default function Simulator() {
           </div>
         }
 
-        {showSim && !simData &&
+        {showSim && !simData && !movePatterns && !papData &&
           <div>Loading...</div>
         }
 
-        {showSim && simData &&
+        {showSim && simData && movePatterns && papData && 
           <div className='sim_output'>
             <ModelMap sim_data={simData} move_patterns={movePatterns} pap_data={papData} location={location} />
             <OutputGraphs sim_data={simData} move_patterns={movePatterns} pap_data={papData} location={location} />
