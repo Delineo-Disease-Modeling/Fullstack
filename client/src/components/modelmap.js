@@ -40,8 +40,8 @@ const r_household_icon = new L.Icon({
 });
 
 // Function to create markers for public facilities
-function createFacilityMarker(position, name, label, icon, proportion, graphData) {
-  return [ icon, name, label, position, proportion, graphData ];
+function createFacilityMarker(id, position, name, label, icon, proportion) {
+  return [ icon, name, label, position, proportion, id ];
 };
 
 const map_centers = {
@@ -92,7 +92,6 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 
     var icon = type === 'homes' ? g_household_icon : g_facility_icon;
     var label_text = `Pop:Inf: 0:0`;
-    var graphData = [];
 
     if (peopleAtFacility) {
       var numInfected = 0.0;
@@ -116,14 +115,9 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
         icon = type === 'homes' ? o_household_icon : o_facility_icon;
       }
 
-      for (const time in patterns) { // move_patterns data
-        const timeData = patterns[time]?.[type]?.[index];
-        graphData.push({time: time, people: timeData ? timeData.length : 0});
-      }
-
-      new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
+      new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
     } else {
-      new_marker = createFacilityMarker([data.latitude, data.longitude], data.label, label_text, icon, 0.0);
+      new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, 0.0);
     }
 
     if (new_marker?.length) {
@@ -134,7 +128,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
-function ClusteredMap({ location, timestamp, publicFacilities, households }) {
+function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns }) {
   return (
     <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} className="mapcontainer">
       <TileLayer
@@ -164,7 +158,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
                 <LineChart
                   width={300}
                   height={200}
-                  data={addr[5]} // This is the time-series data for the graph
+                  data={loc_patterns['places'][addr[5]]} // This is the time-series data for the graph
                   margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid stroke="#ccc" />
@@ -172,7 +166,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
                   <YAxis label={{ value: 'People', angle: -90, position: 'insideLeft' }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="people" stroke="#8884d8" />
+                  <Line type="monotone" dataKey="num" stroke="#8884d8" />
                 </LineChart>
               </div>
             </Popup>
@@ -195,7 +189,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
                 <LineChart
                   width={300}
                   height={200}
-                  data={addr[5]}
+                  data={loc_patterns['homes'][addr[5]]}
                   margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid stroke="#ccc" />
@@ -203,7 +197,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households }) {
                   <YAxis label={{ value: 'People', angle: -90, position: 'insideLeft' }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="people" stroke="#82ca9d" />
+                  <Line type="monotone" dataKey="num" stroke="#8884d8" />
                 </LineChart>
               </div>
             </Popup>
@@ -257,6 +251,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
   const [ publicFacilities, setPublicFacilities ] = useState([]);
   const [ households, setHouseholds ] = useState([]);
   const [ maxHours, setMaxHours ] = useState(1);
+  const [ locPatterns, setLocPatterns ] = useState({});
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
@@ -266,12 +261,29 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
     setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
     updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
     updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+
+    let loc_patterns = { 'homes': {}, 'places': {} };
+
+    ['homes', 'places'].forEach((label) => {
+      for (const time of Object.keys(move_patterns)) {
+        for (const obj_id of Object.keys(move_patterns[time][label])) {
+          if (!loc_patterns[label][obj_id]) {
+            loc_patterns[label][obj_id] = [];
+          }
+
+          loc_patterns[label][obj_id].push({'num': move_patterns[time][label][obj_id].length});
+        }
+      }
+    });
+
+    setLocPatterns(loc_patterns);
+    console.log(loc_patterns);
   }, []);
 
   return (
     <div>
       {/* Map Container */}
-      <ClusteredMap location={location} timestamp={timestamp} publicFacilities={publicFacilities} households={households} />
+      <ClusteredMap location={location} timestamp={timestamp} publicFacilities={publicFacilities} households={households} loc_patterns={locPatterns} />
 
       {/* Slider Component */}
       <div style={{ width: '100%', marginTop: '20px' }}>
