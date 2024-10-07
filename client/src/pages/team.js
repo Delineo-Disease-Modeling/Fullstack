@@ -5,32 +5,32 @@ import './team.css';
 
 const teamData = {
   professors: [
-    { name: "Professor Anton Dahbura", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Professor Anton Dahbura",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   fullstackTeam: [
-    { name: "Lixing Wu", role: "Role", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/1ixin9-wu/" },
-    { name: "Mahmoud Said", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Allen Gong", role: "Role", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/allen-gong27/" },
-    { name: "Jeffrey Yao", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Matthew Yu", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Zoe Xie", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Lixing Wu", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/1ixin9-wu/" },
+    { name: "Mahmoud Said", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Allen Gong",  github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/allen-gong27/" },
+    { name: "Jeffrey Yao", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Matthew Yu", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Zoe Xie", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   algorithmsTeam: [
-    { name: "Jin Hong Moon", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Keeyan Mukherjee", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Ryan Lu", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Scott Klosen", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Shayan Hossain", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Siva Indukuri", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Jin Hong Moon",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Keeyan Mukherjee", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Ryan Lu",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Scott Klosen",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Shayan Hossain",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Siva Indukuri",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   simulationsTeam: [
-    { name: "Alisa Yang", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Jason Mihalopoulos", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Michelle Wang", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Neil Patel", role: "Role", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Alisa Yang",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Jason Mihalopoulos",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Michelle Wang",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Neil Patel",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
   ],
 
   pastAlumn: [

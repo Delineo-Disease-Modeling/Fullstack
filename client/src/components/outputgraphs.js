@@ -67,6 +67,22 @@ const areaData = []
         };
           dataInjectInfo.push(jsonData);
       }
+
+//       const sim_data = r.sim_data; // Assuming sim_data is the key in the JSON response
+//       sim_data.forEach((data, index) => {
+//       const jsonData = {
+//       "day": index + 1,
+//       "susceptible": data.susceptible,
+//       "INFECTED": data.infected,
+//       "INFECTIOUS": data.infectious,
+//       "SYMPTOMATIC": data.symptomatic,
+//       "HOSPITALIZED": data.hospitalized,
+//       "RECOVERED": data.recovered,
+//       "REMOVED": data.removed
+//       };
+//   dataInjectInfo.push(jsonData);
+// });
+
       setInfectInfoData(dataInjectInfo);
 
 
