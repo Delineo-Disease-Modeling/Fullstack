@@ -296,8 +296,9 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
           max={maxHours} 
           value={timestamp} 
           onChange={(e) => {
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+            setTimestamp(parseInt(e.target.value)); 
+            updateIcons(parseInt(e.target.value), 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+            updateIcons(parseInt(e.target.value), 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
           style={{ width: '100%' }}
         />
@@ -314,8 +315,9 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
           max={maxHours} 
           value={timestamp} 
           onChange={(e) => { 
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-            setTimestamp(parseInt(e.target.value)); updateIcons(timestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+            setTimestamp(parseInt(e.target.value)); 
+            updateIcons(parseInt(e.target.value), 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+            updateIcons(parseInt(e.target.value), 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
           style={{ width: '10%' }}
         />
