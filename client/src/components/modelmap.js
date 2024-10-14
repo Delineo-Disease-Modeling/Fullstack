@@ -9,6 +9,31 @@ import './modelmap.css';
 
 const { Overlay } = LayersControl;
 
+icon_lookup = {
+  "Depository Credit Intermediation": "🏦",
+  "Restaurants and Other Eating Places": "🍽️",
+  "Offices of Physicians": "🏥",
+  "Religious Organizations": "⛪",
+  "Personal Care Services": "🏢",
+  "Child Day Care Services": "🏫",
+  "Death Care Services": "🪦",
+  "Elementary and Secondary Schools": "🏫",
+  "Florists": "💐",
+  "Museums, Historical Sites, and Similar Institutions": "🏛️",
+  "Grocery Stores": "🛒",
+  "Nursing Care Facilities (Skilled Nursing Facilities)": "🏥",
+  "Justice, Public Order, and Safety Activities": "🚔",
+  "Administration of Economic Programs": "🏛️",
+  "General Merchandise Stores, including Warehouse Clubs and Supercenters": "🏬",
+  "Gasoline Stations": "⛽",
+  "Agencies, Brokerages, and Other Insurance Related Activities": "🏢",
+  "Automotive Repair and Maintenance": "🚗",
+  "Specialty Food Stores": "🏪",
+  "Coating, Engraving, Heat Treating, and Allied Activities": "🏢",
+  "Building Material and Supplies Dealers": "🏢",
+  "Postal Service": "📬"
+}
+
 const g_facility_icon = new L.Icon({
   iconUrl: require("../assets/facility.svg").default,
   iconSize: new L.Point(40, 47)
