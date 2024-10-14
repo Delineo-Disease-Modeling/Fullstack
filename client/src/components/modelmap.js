@@ -9,7 +9,7 @@ import './modelmap.css';
 
 const { Overlay } = LayersControl;
 
-icon_lookup = {
+const icon_lookup = {
   "Depository Credit Intermediation": "🏦",
   "Restaurants and Other Eating Places": "🍽️",
   "Offices of Physicians": "🏥",
@@ -31,38 +31,19 @@ icon_lookup = {
   "Specialty Food Stores": "🏪",
   "Coating, Engraving, Heat Treating, and Allied Activities": "🏢",
   "Building Material and Supplies Dealers": "🏢",
-  "Postal Service": "📬"
+  "Postal Service": "📬",
+  "Home": "🏠" 
 }
 
-const g_facility_icon = new L.Icon({
-  iconUrl: require("../assets/facility.svg").default,
-  iconSize: new L.Point(40, 47)
-});
-
-const o_facility_icon = new L.Icon({
-  iconUrl: require("../assets/orangefacility.svg").default,
-  iconSize: new L.Point(40, 47)
-});
-
-const r_facility_icon = new L.Icon({
-  iconUrl: require("../assets/redfacility.svg").default,
-  iconSize: new L.Point(40, 47)
-});
-
-const g_household_icon = new L.Icon({
-  iconUrl: require("../assets/household.svg").default,
-  iconSize: new L.Point(40, 47)
-});
-
-const o_household_icon = new L.Icon({
-  iconUrl: require("../assets/orangehousehold.svg").default,
-  iconSize: new L.Point(40, 47)
-});
-
-const r_household_icon = new L.Icon({
-  iconUrl: require("../assets/redhousehold.svg").default,
-  iconSize: new L.Point(40, 47)
-});
+const marker_icon = (category, color) => { 
+  return new L.divIcon({
+    html: `
+    <div style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${color};width:30px;height:30px">
+      <div style="font-size:25px;text-align:center;">${icon_lookup[category]}</div>
+    </div>
+    `
+  })
+}
 
 // Function to create markers for public facilities
 function createFacilityMarker(id, position, name, label, icon, proportion) {
@@ -115,7 +96,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
     var new_marker = null;
     var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
-    var icon = type === 'homes' ? g_household_icon : g_facility_icon;
+    var icon = type === 'homes' ? marker_icon("Home", 'green') : marker_icon(pap_data[type][index]['top_category'], 'green');
     var label_text = `Pop:Inf: 0:0`;
 
     if (peopleAtFacility) {
@@ -135,10 +116,10 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
       label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
 
       if (numInfected / peopleAtFacility.length > 0.1) {
-        icon = type === 'homes' ? r_household_icon : r_facility_icon;
+        icon = type === 'homes' ? marker_icon("Home", 'red') : marker_icon(pap_data[type][index]['top_category'], 'red');
       } else if (numInfected / peopleAtFacility.length > 0.0) {
-        icon = type === 'homes' ? o_household_icon : o_facility_icon;
-      }
+        icon = type === 'homes' ? marker_icon("Home", 'red') : marker_icon(pap_data[type][index]['top_category'], 'orange');
+      }  
 
       new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
     } else {
