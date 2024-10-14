@@ -266,12 +266,15 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
 
     ['homes', 'places'].forEach((label) => {
       for (const time of Object.keys(move_patterns)) {
-        for (const obj_id of Object.keys(move_patterns[time][label])) {
+        for (const obj_id of Object.keys(pap_data[label])) {
           if (!loc_patterns[label][obj_id]) {
             loc_patterns[label][obj_id] = [];
           }
-
-          loc_patterns[label][obj_id].push({'num': move_patterns[time][label][obj_id].length});
+          if (!move_patterns[time][label][obj_id]) {
+            loc_patterns[label][obj_id].push({'num': 0});
+          } else {
+            loc_patterns[label][obj_id].push({'num': move_patterns[time][label][obj_id].length});
+          }
         }
       }
     });
