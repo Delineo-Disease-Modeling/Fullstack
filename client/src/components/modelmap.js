@@ -163,10 +163,11 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
                 >
                   <CartesianGrid stroke="#ccc" />
                   <XAxis dataKey="time" label={{ value: 'Time', position: 'insideBottomRight', offset: 0 }} />
-                  <YAxis label={{ value: 'People', angle: -90, position: 'insideLeft' }} />
+                  <YAxis label={{ value: 'Number', angle: -90, position: 'insideLeft', offset: 0 }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="num" stroke="#8884d8" />
+                  <Line type="monotone" dataKey="num_people" stroke="#8884d8" />
+                  <Line type="monotone" dataKey="num_infected"  stroke="#82ca9d" />
                 </LineChart>
               </div>
             </Popup>
@@ -194,10 +195,11 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
                 >
                   <CartesianGrid stroke="#ccc" />
                   <XAxis dataKey="time" label={{ value: 'Time', position: 'insideBottomRight', offset: 0 }} />
-                  <YAxis label={{ value: 'People', angle: -90, position: 'insideLeft' }} />
+                  <YAxis label={{ value: 'Number', angle: -90, position: 'insideLeft', offset: 0 }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="num" stroke="#8884d8" />
+                  <Line type="monotone" dataKey="num_people" stroke="#8884d8" />
+                  <Line type="monotone" dataKey="num_infected" stroke="#82ca9d" />
                 </LineChart>
               </div>
             </Popup>
@@ -271,9 +273,19 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
             loc_patterns[label][obj_id] = [];
           }
           if (!move_patterns[time][label][obj_id]) {
-            loc_patterns[label][obj_id].push({'num': 0});
+            loc_patterns[label][obj_id].push({'num_people': 0});
+            loc_patterns[label][obj_id].push({'num_infected': 0});
           } else {
-            loc_patterns[label][obj_id].push({'num': move_patterns[time][label][obj_id].length});
+            let num_infected = 0;
+            for (const variant of Object.keys(sim_data[time])) {
+              for (const id of Object.keys(sim_data[time][variant])) {
+                if (move_patterns[time][label][obj_id].indexOf(id) !== -1) {
+                  num_infected += 1;
+                }
+              }
+            }
+            loc_patterns[label][obj_id].push({'num_people': move_patterns[time][label][obj_id].length});
+            loc_patterns[label][obj_id].push({'num_infected': num_infected});
           }
         }
       }
