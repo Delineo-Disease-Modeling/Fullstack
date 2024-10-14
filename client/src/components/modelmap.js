@@ -7,7 +7,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
 
-const {Overlay} = LayersControl;
+const { Overlay } = LayersControl;
 
 const g_facility_icon = new L.Icon({
   iconUrl: require("../assets/facility.svg").default,
@@ -41,7 +41,7 @@ const r_household_icon = new L.Icon({
 
 // Function to create markers for public facilities
 function createFacilityMarker(id, position, name, label, icon, proportion) {
-  return [ icon, name, label, position, proportion, id ];
+  return [icon, name, label, position, proportion, id];
 };
 
 const map_centers = {
@@ -77,14 +77,14 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
       data.label = `Home #${index}`;
 
       if (!(index in household_locs)) {
-        household_locs[index] = [ 
-          map_centers[location][0] + (Math.random() * 0.06 - 0.03), 
-          map_centers[location][1] + (Math.random() * 0.06 - 0.03) 
+        household_locs[index] = [
+          map_centers[location][0] + (Math.random() * 0.06 - 0.03),
+          map_centers[location][1] + (Math.random() * 0.06 - 0.03)
         ];
       }
 
       data['latitude'] = household_locs[index][0];
-      data['longitude'] = household_locs[index][1];  
+      data['longitude'] = household_locs[index][1];
     }
 
     var new_marker = null;
@@ -167,7 +167,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
                   <Tooltip />
                   <Legend />
                   <Line type="monotone" dataKey="num_people" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="num_infected"  stroke="#82ca9d" />
+                  <Line type="monotone" dataKey="num_infected" stroke="#82ca9d" />
                 </LineChart>
               </div>
             </Popup>
@@ -250,10 +250,10 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
 }
 
 export default function ModelMap({ sim_data, move_patterns, pap_data, location }) {
-  const [ publicFacilities, setPublicFacilities ] = useState([]);
-  const [ households, setHouseholds ] = useState([]);
-  const [ maxHours, setMaxHours ] = useState(1);
-  const [ locPatterns, setLocPatterns ] = useState({});
+  const [publicFacilities, setPublicFacilities] = useState([]);
+  const [households, setHouseholds] = useState([]);
+  const [maxHours, setMaxHours] = useState(1);
+  const [locPatterns, setLocPatterns] = useState({});
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
@@ -273,8 +273,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
             loc_patterns[label][obj_id] = [];
           }
           if (!move_patterns[time][label][obj_id]) {
-            loc_patterns[label][obj_id].push({'num_people': 0});
-            loc_patterns[label][obj_id].push({'num_infected': 0});
+            loc_patterns[label][obj_id].push({ 'num_people': 0 });
+            loc_patterns[label][obj_id].push({ 'num_infected': 0 });
           } else {
             let num_infected = 0;
             for (const variant of Object.keys(sim_data[time])) {
@@ -284,8 +284,11 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
                 }
               }
             }
-            loc_patterns[label][obj_id].push({'num_people': move_patterns[time][label][obj_id].length});
-            loc_patterns[label][obj_id].push({'num_infected': num_infected});
+            loc_patterns[label][obj_id].push({
+              'time': parseInt(time) / 60,
+              'num_people': move_patterns[time][label][obj_id].length,
+              'num_infected': num_infected
+            });
           }
         }
       }
@@ -302,13 +305,13 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
 
       {/* Slider Component */}
       <div style={{ width: '100%', marginTop: '20px' }}>
-        <input 
-          type="range" 
-          min={1} 
-          max={maxHours} 
-          value={timestamp} 
+        <input
+          type="range"
+          min={1}
+          max={maxHours}
+          value={timestamp}
           onChange={(e) => {
-            setTimestamp(parseInt(e.target.value)); 
+            setTimestamp(parseInt(e.target.value));
             updateIcons(parseInt(e.target.value), 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
             updateIcons(parseInt(e.target.value), 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
@@ -321,13 +324,13 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
 
       {/* Input Box */}
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
-        <input 
-          type="number" 
-          min={1} 
-          max={maxHours} 
-          value={timestamp} 
-          onChange={(e) => { 
-            setTimestamp(parseInt(e.target.value)); 
+        <input
+          type="number"
+          min={1}
+          max={maxHours}
+          value={timestamp}
+          onChange={(e) => {
+            setTimestamp(parseInt(e.target.value));
             updateIcons(parseInt(e.target.value), 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
             updateIcons(parseInt(e.target.value), 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
