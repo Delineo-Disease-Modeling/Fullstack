@@ -1,4 +1,4 @@
-footer {
+footer.site_footer {
   left: 0;
   bottom: 0;
   background-color: #222629;
@@ -7,7 +7,7 @@ footer {
   text-align: center;
 }
 
-button {
+button.site_footer {
   border: 2px solid #F0F0F0;
   border-radius: 25px;
   background-color: #222629;
@@ -21,13 +21,13 @@ button {
   transition: 200ms ease-in-out;
 }
 
-button:hover {
+button.site_footer:hover {
   transform: scale(1.05);
   background-color: #F0F0F0;
   color: #222629;
   cursor: pointer;
 }
 
-button:active {
+button.site_footer:active {
   filter: brightness(80%);
 }

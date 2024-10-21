@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { MapContainer, Marker, TileLayer, Popup, LayersControl } from 'react-leaflet';
+import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { CustomTooltip } from './customtooltip';
 import L from 'leaflet';
 
 import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
-
-const { Overlay } = LayersControl;
 
 const icon_lookup = {
   "Depository Credit Intermediation": "🏦",
@@ -135,6 +134,38 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 }
 
 function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns }) {
+  const marker_icon = (type, addr, index) => (
+    <Marker
+    icon={addr[0]}
+    key={index}
+    position={addr[3]}
+    title={addr[1]}
+    proportion={addr[4]}
+    >
+      <Popup>
+        <div>
+          <h4>{addr[1]}</h4>
+          <p>{addr[2]}</p>
+          {/* Recharts LineChart using the graph data from move_patterns */}
+          <LineChart
+            width={300}
+            height={200}
+            data={loc_patterns[type][addr[5]]} // This is the time-series data for the graph
+            margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+          >
+            <CartesianGrid stroke="#ccc" />
+            <XAxis dataKey="time" label={{ value: 'Time (h)', position: 'insideBottomRight', offset: 0 }} />
+            <YAxis label={{ value: 'Number', angle: -90, position: 'insideLeft', offset: 0 }} />
+            <Tooltip content={CustomTooltip}/>
+            <Legend />
+            <Line type="monotone" dataKey="num_people" stroke="#8884d8" dot={false} />
+            <Line type="monotone" dataKey="num_infected" stroke="#82ca9d" dot={false}  />
+          </LineChart>
+        </div>
+      </Popup>
+    </Marker>
+  );
+
   return (
     <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} className="mapcontainer">
       <TileLayer
@@ -148,69 +179,8 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
         maxClusterRadius={150}
         key={Date.now()}
       >
-        {publicFacilities.map((addr, index) => (
-          <Marker
-            icon={addr[0]}
-            key={index}
-            position={addr[3]}
-            title={addr[1]}
-            proportion={addr[4]}
-          >
-            <Popup>
-              <div>
-                <h4>{addr[1]}</h4>
-                <p>{addr[2]}</p>
-                {/* Recharts LineChart using the graph data from move_patterns */}
-                <LineChart
-                  width={300}
-                  height={200}
-                  data={loc_patterns['places'][addr[5]]} // This is the time-series data for the graph
-                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                >
-                  <CartesianGrid stroke="#ccc" />
-                  <XAxis dataKey="time" label={{ value: 'Time', position: 'insideBottomRight', offset: 0 }} />
-                  <YAxis label={{ value: 'Number', angle: -90, position: 'insideLeft', offset: 0 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="num_people" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="num_infected" stroke="#82ca9d" />
-                </LineChart>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {households.map((addr, index) => (
-          <Marker
-            icon={addr[0]}
-            key={index}
-            position={addr[3]}
-            title={addr[1]}
-            proportion={addr[4]}
-          >
-            <Popup>
-              <div>
-                <h4>{addr[1]}</h4>
-                <p>{addr[2]}</p>
-                {/* Similar graph for households */}
-                <LineChart
-                  width={300}
-                  height={200}
-                  data={loc_patterns['homes'][addr[5]]}
-                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                >
-                  <CartesianGrid stroke="#ccc" />
-                  <XAxis dataKey="time" label={{ value: 'Time', position: 'insideBottomRight', offset: 0 }} />
-                  <YAxis label={{ value: 'Number', angle: -90, position: 'insideLeft', offset: 0 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="num_people" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="num_infected" stroke="#82ca9d" />
-                </LineChart>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {publicFacilities.map((addr, index) => marker_icon('places', addr, index))}
+        {households.map((addr, index) => marker_icon('homes', addr, index))}
       </MarkerClusterGroup>
 
       {/* <LayersControl position="topright">

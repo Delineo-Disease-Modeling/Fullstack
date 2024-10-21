@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import InfectedMap from './infectedmap.js';
-import { AreaChart,Area, PieChart, Pie, Cell, BarChart, Bar, LineChart,
+import { LineChart,
   Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { CustomTooltip } from './customtooltip';
 
 import './outputgraphs.css';
 
@@ -20,7 +20,7 @@ const styles = {
   },
 };
 
-const COLORS = [ "#8884d8", "#82ca9d", "#FFCC00", "#66FF33" ];
+const COLORS = [ "#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "ff954f", "4fd0ff" ];
 
 export default function OutputGraphs({ sim_data, move_patterns, pap_data, location }) {
   const [ diseases, setDiseases ] = useState([]);
@@ -35,9 +35,15 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
     // Get disease labels
     setDiseases(Object.keys(Object.values(sim_data)[0]));
 
+    const domain = [Math.min(...Object.keys(move_patterns).map(x => Number(x))), Math.max(...Object.keys(move_patterns).map(x => Number(x)))]
+
     // Set Infectivity over time chart
     const c_data = [];
     for (const [ time, infdata ] of Object.entries(sim_data)) {
+      if (Number(time) < domain[0] || Number(time) > domain[1]) {
+        continue;
+      }
+
       let disease_infectivity = {};
       let age_data = {};
       let sex_data = { 'male': 0, 'female': 0 };
@@ -63,9 +69,8 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
         }
       }
 
-
       c_data.push({
-        'time': time,
+        'time': time / 60,
         ...disease_infectivity,
         ...age_data,
         ...sex_data
@@ -73,12 +78,12 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
     }
 
     setChartData(c_data);
-  }, []);
+  }, [ sim_data, move_patterns, pap_data ]);
 
   return (
     <div>
-      <div>
-        <label>Select Chart Type:</label>
+      <div style={{padding: '10px'}}>
+        <label>Select Chart Type: </label>
         <select value={selected_chart} onChange={handleChartSelect}>
           <option value="iot">Infectiousness Over Time</option>
           <option value="ages">Age Of Infected </option>
@@ -97,13 +102,13 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             bottom: 5,
           }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (min)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
+            <Tooltip content={CustomTooltip}/>
             <Legend />
             {
-              diseases.map(disease => (
-                <Line type="monotone" dataKey={disease} dot={false} />
+              diseases.map((disease, index) => (
+                <Line type="monotone" dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
               ))
             }
           </LineChart>
@@ -120,13 +125,13 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             bottom: 5,
           }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (min)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
+            <Tooltip content={CustomTooltip}/>
             <Legend />
             {
-              age_ranges.map(range => (
-                <Line type="monotone" dataKey={`${range[0]}-${range[1]}`} dot={false} />
+              age_ranges.map((range, index) => (
+                <Line type="monotone" dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
               ))
             }
           </LineChart>
@@ -143,13 +148,13 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             bottom: 5,
           }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (min)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
+            <Tooltip content={CustomTooltip}/>
             <Legend />
             {
-              ['male', 'female'].map(sex => (
-                <Line type="monotone" dataKey={sex} dot={false} />
+              ['male', 'female'].map((sex, index) => (
+                <Line type="monotone" dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
               ))
             }
           </LineChart>

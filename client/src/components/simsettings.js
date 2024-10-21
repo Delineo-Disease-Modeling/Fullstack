@@ -114,7 +114,7 @@ export default function SimSettings({ sendData, showSim }) {
         />
       </div>
       
-      <button onClick={() => { 
+      <button className='simset_button' onClick={() => { 
         sendData({ matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }); 
         showSim(true); 
       }}>Simulate</button>

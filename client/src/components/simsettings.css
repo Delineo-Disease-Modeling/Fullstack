@@ -85,3 +85,28 @@ div.simset_slider_label {
   text-align: center;
   padding-bottom: 15px;
 }
+
+button.simset_button {
+  border: 2px solid #F0F0F0;
+  border-radius: 25px;
+  background-color: #222629;
+  width: 120px;
+  height: 50px;
+  padding: 12px;
+  color: #F0F0F0;
+  text-decoration: none;
+  font-size: 16px;
+  font-family: 'Poppins';
+  transition: 200ms ease-in-out;
+}
+
+button.simset_button:hover {
+  transform: scale(1.05);
+  background-color: #F0F0F0;
+  color: #222629;
+  cursor: pointer;
+}
+
+button.simset_button:active {
+  filter: brightness(80%);
+}
