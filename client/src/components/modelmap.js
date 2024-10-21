@@ -38,7 +38,7 @@ const marker_icon = (category, color) => {
   return new L.divIcon({
     html: `
     <div style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${color};width:30px;height:30px">
-      <div style="font-size:25px;text-align:center;">${icon_lookup[category]}</div>
+      <div style="font-size:22px;text-align:center;">${icon_lookup[category]}</div>
     </div>
     `
   })
@@ -182,45 +182,6 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
         {publicFacilities.map((addr, index) => marker_icon('places', addr, index))}
         {households.map((addr, index) => marker_icon('homes', addr, index))}
       </MarkerClusterGroup>
-
-      {/* <LayersControl position="topright">
-        <LayersControl.BaseLayer checked name="Map">
-          <TileLayer
-            attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </LayersControl.BaseLayer>
-
-        <Overlay checked name="Facilities">
-          <MarkerClusterGroup chunkedLoading>
-            {publicFacilities.map((addr, index) => (
-              <Marker
-                icon={addr[0]}
-                key={index}
-                position={addr[3]}
-                title={addr[1]}
-              >
-                <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
-              </Marker>
-            ))}
-          </MarkerClusterGroup>
-        </Overlay>
-
-        <Overlay checked name="Households">
-          <MarkerClusterGroup chunkedLoading>
-            {households.map((addr, index) => (
-              <Marker
-                icon={addr[0]}
-                key={index}
-                position={addr[3]}
-                title={addr[1]}
-              >
-                <Popup>{addr[1]}<br></br>{addr[2]}</Popup>
-              </Marker>
-            ))}
-          </MarkerClusterGroup>
-        </Overlay>
-      </LayersControl> */}
     </MapContainer>
   );
 }
@@ -249,8 +210,11 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
             loc_patterns[label][obj_id] = [];
           }
           if (!move_patterns[time][label][obj_id]) {
-            loc_patterns[label][obj_id].push({ 'num_people': 0 });
-            loc_patterns[label][obj_id].push({ 'num_infected': 0 });
+            loc_patterns[label][obj_id].push({
+              'time': parseInt(time) / 60,
+              'num_people': 0,
+              'num_infected': 0
+            });
           } else {
             let num_infected = 0;
             for (const variant of Object.keys(sim_data[time])) {
