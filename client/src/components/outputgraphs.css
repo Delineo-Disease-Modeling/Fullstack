@@ -2,3 +2,12 @@ div.outputgraphsContainer {
     width: 60vw;
     height: 260vh;
   }
+
+div.outputgraph_chart {
+  background-color: #fffff2;
+  padding: 25px;
+  filter: drop-shadow(2px 0 0 #70B4D4) 
+    drop-shadow(0 2px 0 #70B4D4)
+    drop-shadow(-2px 0 0 #70B4D4) 
+    drop-shadow(0 -2px 0 #70B4D4);
+}

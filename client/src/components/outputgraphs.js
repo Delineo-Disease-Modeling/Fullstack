@@ -11,13 +11,14 @@ const age_ranges = [
   [41, 60],
   [61, 80],
   [81, 99]
-]
+];
 
 const styles = {
   centerText: {
     textAlign: 'center',
     fontWeight: 'bold',
-  },
+    paddingBottom: '15px'
+  }
 };
 
 const infection_states = {
@@ -115,8 +116,8 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
       </div>
 
       {selected_chart === "iot" && (
-        <div>
-          <h6 style={styles.centerText}>Infectivity Over Time</h6>
+        <div className='outputgraph_chart'>
+          <h6 style={styles.centerText}>Infection Distribution Over Time</h6>
           <LineChart width={window.innerWidth*0.6} height={window.innerHeight*0.6} data={chart_data} margin={{
             top: 5,
             right: 30,
@@ -138,7 +139,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
       )}
 
       {selected_chart === "ages" && (
-        <div>
+        <div className='outputgraph_chart'>
           <h6 style={styles.centerText}>Infected Age Distribution Over Time</h6>
           <LineChart width={window.innerWidth*0.6} height={window.innerHeight*0.6} data={chart_data} margin={{
             top: 5,
@@ -148,7 +149,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
           }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
+            <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
             <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
@@ -161,8 +162,8 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
       )}
 
       {selected_chart === "sexes" && (
-        <div>
-          <h6 style={styles.centerText}>Infected Sex Distrubtion Over Time</h6>
+        <div className='outputgraph_chart'>
+          <h6 style={styles.centerText}>Infected Sex Distribution Over Time</h6>
           <LineChart width={window.innerWidth*0.6} height={window.innerHeight*0.6} data={chart_data} margin={{
             top: 5,
             right: 30,
@@ -171,7 +172,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
           }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
+            <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
             <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
@@ -184,8 +185,8 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
       )}
 
       {selected_chart === "states" && (
-        <div>
-          <h6 style={styles.centerText}>Infected State Distrubtion Over Time</h6>
+        <div className='outputgraph_chart'>
+          <h6 style={styles.centerText}>Infected State Distribution Over Time</h6>
           <LineChart width={window.innerWidth*0.6} height={window.innerHeight*0.6} data={chart_data} margin={{
             top: 5,
             right: 30,
@@ -194,7 +195,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
           }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total States', angle: -90, position: 'insideLeft' }} />
+            <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
             <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {

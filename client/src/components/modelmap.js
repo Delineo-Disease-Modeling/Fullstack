@@ -57,12 +57,6 @@ const map_centers = {
 const createClusterCustomIcon = function (cluster) {
   var colored = cluster.getAllChildMarkers().some(x => x.options.proportion > 0.0);
 
-  // return new L.DivIcon({ 
-  //   html: `<div><span>${cluster.getChildCount()}</span></div>`, 
-  //   className: 'marker-cluster ' + colored ? 'marker-cluster-medium' : 'marker-cluster-small', 
-  //   iconSize: new L.Point(40, 40, true) 
-  // });
-
   return L.divIcon({
     html: `<span class="marker-cluster">${cluster.getChildCount()}</span>`,
     className: colored ? 'marker-cluster-medium marker-cluster' : 'marker-cluster-small marker-cluster',
@@ -235,7 +229,6 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
     });
 
     setLocPatterns(loc_patterns);
-    console.log(loc_patterns);
   }, []);
 
   return (
