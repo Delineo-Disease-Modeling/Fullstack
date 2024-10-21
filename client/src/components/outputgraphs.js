@@ -81,9 +81,9 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
         <label>Select Chart Type:</label>
         <select value={selected_chart} onChange={handleChartSelect}>
           <option value="iot">Infectiousness Over Time</option>
-          <option value="bar">Diseases Info (WIP)</option>
           <option value="ages">Age Of Infected </option>
           <option value="sexes">Infection Gender</option>
+          <option value="bar">Diseases Info (WIP)</option>
         </select>
       </div>
 
