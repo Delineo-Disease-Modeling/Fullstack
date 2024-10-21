@@ -30,7 +30,7 @@ const infection_states = {
   'Removed': 32
 }
 
-const COLORS = [ "#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "ff954f", "4fd0ff" ];
+const COLORS = [ "#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "#ff954f", "#4fd0ff" ];
 
 export default function OutputGraphs({ sim_data, move_patterns, pap_data, location }) {
   const [ diseases, setDiseases ] = useState([]);
@@ -127,7 +127,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
-            <Legend />
+            <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
               diseases.map((disease, index) => (
                 <Line type="monotone" dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
@@ -150,7 +150,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
-            <Legend />
+            <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
               age_ranges.map((range, index) => (
                 <Line type="monotone" dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
@@ -173,7 +173,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
-            <Legend />
+            <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
               ['male', 'female'].map((sex, index) => (
                 <Line type="monotone" dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
@@ -185,7 +185,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
 
       {selected_chart === "states" && (
         <div>
-          <h6 style={styles.centerText}>Infected Sex Distrubtion Over Time</h6>
+          <h6 style={styles.centerText}>Infected State Distrubtion Over Time</h6>
           <LineChart width={window.innerWidth*0.6} height={window.innerHeight*0.6} data={chart_data} margin={{
             top: 5,
             right: 30,
@@ -196,7 +196,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total States', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={CustomTooltip}/>
-            <Legend />
+            <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
               Object.keys(infection_states).map((state, index) => (
                 <Line type="monotone" dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />
