@@ -97,7 +97,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             bottom: 5,
           }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" dataKey="time" tickCount={20} />
+            <XAxis label={{ value: 'Time (min)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
@@ -107,7 +107,6 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
               ))
             }
           </LineChart>
-          <h6 style={styles.centerText}>Time(minutes)</h6>
         </div>
       )}
 
@@ -121,7 +120,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             bottom: 5,
           }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" dataKey="time" tickCount={20} />
+            <XAxis label={{ value: 'Time (min)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
@@ -131,7 +130,6 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
               ))
             }
           </LineChart>
-          <h6 style={styles.centerText}>Time(minutes)</h6>
         </div>
       )}
 
@@ -145,7 +143,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
             bottom: 5,
           }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" dataKey="time" tickCount={20} />
+            <XAxis label={{ value: 'Time (min)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
             <YAxis label={{ value: 'Total Ages', angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
@@ -155,7 +153,6 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
               ))
             }
           </LineChart>
-          <h6 style={styles.centerText}>Time(minutes)</h6>
         </div>
       )}
 
