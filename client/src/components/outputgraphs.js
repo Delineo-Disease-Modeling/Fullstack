@@ -20,6 +20,16 @@ const styles = {
   },
 };
 
+const infection_states = {
+  'Susceptible': 0,
+  'Infected': 1,
+  'Infectious': 2,
+  'Symptomatic': 4,
+  'Hospitalized': 8,
+  'Recovered': 16,
+  'Removed': 32
+}
+
 const COLORS = [ "#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "ff954f", "4fd0ff" ];
 
 export default function OutputGraphs({ sim_data, move_patterns, pap_data, location }) {
@@ -45,8 +55,13 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
       }
 
       let disease_infectivity = {};
+      let state_data = {};
       let age_data = {};
       let sex_data = { 'male': 0, 'female': 0 };
+
+      for (const state of Object.keys(infection_states)) {
+        state_data[state] = 0;
+      }
 
       for (const range of age_ranges) {
         age_data[`${range[0]}-${range[1]}`] = 0;
@@ -55,11 +70,17 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
       for (const [ disease, infected ] of Object.entries(infdata)) {
         disease_infectivity[disease] = Object.keys(infected).length;
 
-        for (const person_id of Object.keys(infected)) {
+        for (const [ person_id, inf_state ] of Object.entries(infected)) {
           const sex = pap_data['people'][person_id.toString()]['sex'];
           const age = pap_data['people'][person_id.toString()]['age'];
 
           sex_data[(sex == 0 ? 'male' : 'female')]++;
+
+          for (const [ state, value ] of Object.entries(infection_states)) {
+            if (inf_state & value) {
+              state_data[state]++;
+            }
+          }
           
           for (const range of age_ranges) {
             if (age >= range[0] && age <= range[1]) {
@@ -73,7 +94,8 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
         'time': time / 60,
         ...disease_infectivity,
         ...age_data,
-        ...sex_data
+        ...sex_data,
+        ...state_data
       });
     }
 
@@ -88,7 +110,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
           <option value="iot">Infectiousness Over Time</option>
           <option value="ages">Age Of Infected </option>
           <option value="sexes">Infection Gender</option>
-          <option value="bar">Diseases Info (WIP)</option>
+          <option value="states">Diseases Info</option>
         </select>
       </div>
 
@@ -161,99 +183,28 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, locati
         </div>
       )}
 
-            {/* {selected_chart === "bar" &&
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh',width: '60vw'  }}>
-              <h6 style={styles.centerText}>Diseases Info</h6>
-              <BarChart
-                width={window.innerWidth*0.6}height={window.innerHeight*0.6}
-                data={InfectInfoData}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="susceptible" label={{ value: 'Diseases', position: 'insideBottom', offsetX: 25 }}/>
-                <YAxis />
-                <Tooltip />
-                <Legend />
-              <Bar dataKey="INFECTED" stackId="a" fill="#FF6633" />
-              <Bar dataKey="INFECTIOUS" stackId="a" fill="#82ca9d" />
-              <Bar dataKey="SYMPTOMATIC " stackId="a" fill="#FFCC00" />
-              <Bar dataKey="HOSPITALIZED" stackId="a" fill="#66FF33" />
-              <Bar dataKey="RECOVERED " stackId="a" fill="#00CC99" />
-              <Bar dataKey="REMOVED" stackId="a" fill="#8884d8" />
-              </BarChart>
-            </div>}
-
-            {selected_chart === "pie1" &&
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh',width: '60vw' }}>
-            <h6 style={styles.centerText}>age of infected person</h6>
-            <PieChart width={400} height={400}>
-                <Pie data={ageData} dataKey="count" nameKey="age" cx="50%" cy="50%" outerRadius={150}>
-                  {
-                    ageData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]}  label={{ position: 'bottom' }} />
-                    ))
-                  }
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-              </div>
+      {selected_chart === "states" && (
+        <div>
+          <h6 style={styles.centerText}>Infected Sex Distrubtion Over Time</h6>
+          <LineChart width={window.innerWidth*0.6} height={window.innerHeight*0.6} data={chart_data} margin={{
+            top: 5,
+            right: 30,
+            left: 20,
+            bottom: 5,
+          }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+            <YAxis label={{ value: 'Total States', angle: -90, position: 'insideLeft' }} />
+            <Tooltip content={CustomTooltip}/>
+            <Legend />
+            {
+              Object.keys(infection_states).map((state, index) => (
+                <Line type="monotone" dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />
+              ))
             }
-            
-            {selected_chart === "pie2" &&
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh',width: '60vw' }}>
-            <h6 style={styles.centerText}>Infection Gender</h6>
-              <PieChart width={400} height={400}>
-                <Pie data={genderData}  cx="50%" cy="50%" dataKey="count" nameKey="gender"  outerRadius={150}>
-                  {
-                    ageData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]}  label={{ position: 'bottom' }} />
-                    ))
-                  }
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-              </div>
-            }
-
-            {selected_chart === "area" &&
-              <div >
-                <h6 style={styles.centerText}>infectiousness Over Time</h6>
-                  <AreaChart
-                    width={window.innerWidth-200}
-                    height={window.innerHeight/2}
-                    data={rdata}
-                    margin={{
-                      top: 0,
-                      right: 30,
-                      left: 0,
-                      bottom: 0,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" dataKey="name" tickCount={20 }  />
-                    <YAxis label={{ value: 'Total Infectiousness', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="delta" stackId="1" stroke="#8884d8" fill="#8884d8" />
-                    <Area type="monotone" dataKey="omicron" stackId="1" stroke="#82ca9d" fill="#82ca9d" />
-                    
-                  </AreaChart>
-                <h6 style={styles.centerText}>Time(minutes)</h6>
-              </div>
-            }
-
-        {selected_chart === "map" &&
-          <div>
-            <h6 style={styles.centerText}>Distribution Of Infected Population</h6>
-            <InfectedMap  infectedLatitude={ 36.561075}  infectedLongitude={-96.16224} mapZoom = {233} />
-          </div>
-        } */}
+          </LineChart>
+        </div>
+      )}
     </div>
   );
 }
