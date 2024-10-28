@@ -72,7 +72,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         let disease_count = 0;
 
         for (const [ person_id, inf_state ] of Object.entries(infected)) {
-          if (selectedPoiId && move_patterns[person_id]?.[time] !== selectedPoiId) {
+          if (poi_id && move_patterns[person_id]?.[time] !== poi_id) {
             continue;
           }
 
@@ -98,7 +98,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         disease_infectivity[disease] = Object.keys(infected).length;
       }
 
-      if (Object.values(disease_infectivity).some(count => count > 0) || !selectedPoiId) {
+      if (Object.values(disease_infectivity).some(count => count > 0) || !poi_id) {
         c_data.push({
           'time': time / 60,
           ...disease_infectivity,
