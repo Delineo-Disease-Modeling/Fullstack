@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -148,6 +148,24 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
+function MapLegend() {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      L.DomEvent.disableClickPropagation(ref.current);
+    }
+  });
+
+  return (
+    <div ref={ref} className='modelmap_legend_div'>
+      {Object.entries(icon_lookup).map(([label, icon]) => {
+        return <div style={{width:'100%',marginBottom:'10px'}}>{icon} {label}</div>
+      })}
+    </div>
+  )
+}
+
 function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns }) {
   const marker_icon = (type, addr, index) => (
     <Marker
@@ -182,7 +200,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
   );
 
   return (
-    <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} className="mapcontainer">
+    <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false} className="mapcontainer">
       <TileLayer
         attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -250,10 +268,12 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
     });
 
     setLocPatterns(loc_patterns);
-  }, []);
+  }, [ sim_data, move_patterns, pap_data, location ]);
 
   return (
     <div>
+      <MapLegend />
+
       {/* Map Container */}
       <ClusteredMap location={location} timestamp={timestamp} publicFacilities={publicFacilities} households={households} loc_patterns={locPatterns} />
 

@@ -7,3 +7,25 @@ div.mapcontainer {
         drop-shadow(-2px 0 0 #70B4D4) 
         drop-shadow(0 -2px 0 #70B4D4);
 }
+
+div.modelmap_legend_div {
+  position: absolute;
+  z-index: 1;
+  background-color: #fffff2;
+  margin: 10px;
+  padding: 5px;
+  max-width: 100px;
+  max-height: 100px;
+  filter: drop-shadow(2px 0 0 #70B4D4) 
+    drop-shadow(0 2px 0 #70B4D4)
+    drop-shadow(-2px 0 0 #70B4D4) 
+    drop-shadow(0 -2px 0 #70B4D4);
+
+  overflow-y: scroll;
+  font-size: 10px;
+  transition: max-height 0.25s ease-in-out;
+}
+
+div.modelmap_legend_div:hover {
+  max-height: calc(60vh - 20px);
+}
