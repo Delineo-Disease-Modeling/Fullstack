@@ -34,10 +34,30 @@ const icon_lookup = {
   "Home": "🏠" 
 }
 
-const marker_icon = (category, color) => { 
+const marker_icon = (category, percent) => { 
+  const rgb_to_hex = (r, g, b) => {
+    return "#" + ((1 << 24) | (r << 16) | (g << 8) | (b)).toString(16).slice(1);
+  };
+
+  const percent_to_hex = (per) => {
+    const RED_COLOR = [222.0, 49.0, 99.0];
+    const GREEN_COLOR = [80.0, 200.0, 120.0];
+
+    if (per <= 0.0 || isNaN(per)) {
+      return rgb_to_hex(...GREEN_COLOR);
+    } else if (per >= 1.0) {
+      return rgb_to_hex(...RED_COLOR);
+    }
+
+    const diff = [0, 1, 2].map(i => RED_COLOR[i] - GREEN_COLOR[i]);
+    const final = [0, 1, 2].map(i => GREEN_COLOR[i] + (per * diff[i]));
+
+    return rgb_to_hex(...final.map(x => Math.round(x)));
+  };
+
   return new L.divIcon({
     html: `
-    <div style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${color};width:30px;height:30px">
+    <div style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${percent_to_hex(percent)};width:30px;height:30px">
       <div style="font-size:22px;text-align:center;">${icon_lookup[category]}</div>
     </div>
     `
@@ -89,7 +109,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
     var new_marker = null;
     var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
-    var icon = type === 'homes' ? marker_icon("Home", 'green') : marker_icon(pap_data[type][index]['top_category'], 'green');
+    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0);
     var label_text = `Pop:Inf: 0:0`;
 
     if (peopleAtFacility) {
@@ -108,11 +128,12 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 
       label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
 
-      if (numInfected / peopleAtFacility.length > 0.1) {
-        icon = type === 'homes' ? marker_icon("Home", 'red') : marker_icon(pap_data[type][index]['top_category'], 'red');
-      } else if (numInfected / peopleAtFacility.length > 0.0) {
-        icon = type === 'homes' ? marker_icon("Home", 'red') : marker_icon(pap_data[type][index]['top_category'], 'orange');
-      }  
+      const map_range = (value, low1, high1, low2, high2) => {
+        return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
+      }
+
+      const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3), 0.0, 0.3, 0.0, 1.0);
+      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio);
 
       new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
     } else {

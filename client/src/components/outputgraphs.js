@@ -33,7 +33,7 @@ const infection_states = {
 
 const COLORS = [ "#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "#ff954f", "#4fd0ff" ];
 
-export default function OutputGraphs({ sim_data, move_patterns, pap_data, location }) {
+export default function OutputGraphs({ sim_data, move_patterns, pap_data }) {
   const [ diseases, setDiseases ] = useState([]);
   const [ chart_data, setChartData ] = useState(null); // Infectivity over time data, age data, etc
   const [ selected_chart, setSelectedChart ] = useState('iot');
