@@ -14,6 +14,13 @@ div.modelmap_legend_div {
   font-size: 10px;
   
   transition: all 0.25s ease-in-out;
+
+  -ms-overflow-style: none;
+  scrollbar-width: none; 
+}
+
+div.modelmap_legend_div::-webkit-scrollbar {
+  display: none;
 }
 
 div.modelmap_legend_div_unhover {
