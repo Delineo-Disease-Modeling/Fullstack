@@ -177,7 +177,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
     title={addr[1]}
     proportion={addr[4]}
     >
-      <Popup>
+      <Popup key={type + '_' + addr[5]}>
         <div>
           <h4>{addr[1]}</h4>
           <p>{addr[2]}</p>
