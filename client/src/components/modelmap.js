@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -7,6 +7,7 @@ import L from 'leaflet';
 
 import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
+import MapLegend from './maplegend';
 
 const icon_lookup = {
   "Depository Credit Intermediation": "🏦",
@@ -148,26 +149,6 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
-function MapLegend() {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      L.DomEvent.disableClickPropagation(ref.current);
-    }
-  });
-
-  return (
-    <div ref={ref} className='modelmap_legend_div'>
-      {Object.entries(icon_lookup).map(([label, icon]) => {
-        return <div style={{marginBottom:'10px'}}>
-          <div style={{width:'100%'}}>{icon} {label}</div>
-        </div>
-      })}
-    </div>
-  )
-}
-
 function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns }) {
   const marker_icon = (type, addr, index) => (
     <Marker
@@ -274,7 +255,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
 
   return (
     <div>
-      <MapLegend />
+      <MapLegend icon_lookup={icon_lookup} />
 
       {/* Map Container */}
       <ClusteredMap location={location} timestamp={timestamp} publicFacilities={publicFacilities} households={households} loc_patterns={locPatterns} />
