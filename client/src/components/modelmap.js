@@ -132,7 +132,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
         return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
       }
 
-      const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3), 0.0, 0.3, 0.0, 1.0);
+      const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
       icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio);
 
       new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
@@ -160,7 +160,9 @@ function MapLegend() {
   return (
     <div ref={ref} className='modelmap_legend_div'>
       {Object.entries(icon_lookup).map(([label, icon]) => {
-        return <div style={{width:'100%',marginBottom:'10px'}}>{icon} {label}</div>
+        return <div style={{marginBottom:'10px'}}>
+          <div style={{width:'100%'}}>{icon} {label}</div>
+        </div>
       })}
     </div>
   )
