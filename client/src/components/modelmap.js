@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -149,38 +149,33 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
-function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns }) {
-  const marker_icon = (type, addr, index) => (
-    <Marker
-    icon={addr[0]}
-    key={index}
-    position={addr[3]}
-    title={addr[1]}
-    proportion={addr[4]}
-    >
-      <Popup key={type + '_' + addr[5]}>
-        <div>
-          <h4>{addr[1]}</h4>
-          <p>{addr[2]}</p>
-          {/* Recharts LineChart using the graph data from move_patterns */}
-          <LineChart
-            width={300}
-            height={200}
-            data={loc_patterns[type][addr[5]]} // This is the time-series data for the graph
-            margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-          >
-            <CartesianGrid stroke="#ccc" />
-            <XAxis dataKey="time" label={{ value: 'Time (h)', position: 'insideBottomRight', offset: 0 }} />
-            <YAxis label={{ value: 'Number', angle: -90, position: 'insideLeft', offset: 0 }} />
-            <Tooltip content={CustomTooltip}/>
-            <Legend />
-            <Line type="monotone" dataKey="num_people" stroke="#8884d8" dot={false} />
-            <Line type="monotone" dataKey="num_infected" stroke="#82ca9d" dot={false}  />
-          </LineChart>
-        </div>
-      </Popup>
-    </Marker>
-  );
+function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns, onMarkerClick, selectedId, isHousehold }) {
+  const marker_icon_component = (type, addr, index) => {
+    const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
+    const selectedIcon = isSelected ? marker_icon('selected_category', 0.0) : addr[0];
+
+    return (
+      <Marker
+        icon={selectedIcon}
+        key={index}
+        position={addr[3]}
+        title={addr[1]}
+        proportion={addr[4]}
+        eventHandlers={{
+          click: () => {
+            onMarkerClick(addr[5], type === 'homes'); // Notify parent on click
+          },
+        }}
+      >
+        <Popup key={type + '_' + addr[5]}>
+          <div>
+            <h4>{addr[1]}</h4>
+            <p>{addr[2]}</p>
+          </div>
+        </Popup>
+      </Marker>
+    );
+  };
 
   return (
     <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false} className="mapcontainer">
@@ -195,14 +190,14 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
         maxClusterRadius={150}
         key={Date.now()}
       >
-        {publicFacilities.map((addr, index) => marker_icon('places', addr, index))}
-        {households.map((addr, index) => marker_icon('homes', addr, index))}
+        {publicFacilities.map((addr, index) => marker_icon_component('places', addr, index))}
+        {households.map((addr, index) => marker_icon_component('homes', addr, index))}
       </MarkerClusterGroup>
     </MapContainer>
   );
 }
 
-export default function ModelMap({ sim_data, move_patterns, pap_data, location }) {
+export default function ModelMap({ sim_data, move_patterns, pap_data, location, onMarkerClick, selectedId, isHousehold }) {
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
@@ -210,7 +205,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
-  React.useEffect(() => {
+  useEffect(() => {
     household_locs = {};
 
     setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
@@ -235,7 +230,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
             let num_infected = 0;
             for (const variant of Object.keys(sim_data[time])) {
               for (const id of Object.keys(sim_data[time][variant])) {
-                if (move_patterns[time][label][obj_id].indexOf(id) !== -1) {
+                if (move_patterns[time][label][obj_id].includes(id)) {
                   num_infected += 1;
                 }
               }
@@ -251,14 +246,23 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
     });
 
     setLocPatterns(loc_patterns);
-  }, [ sim_data, move_patterns, pap_data, location ]);
+  }, [sim_data, move_patterns, pap_data, location]);
 
   return (
     <div>
       <MapLegend icon_lookup={icon_lookup} />
 
       {/* Map Container */}
-      <ClusteredMap location={location} timestamp={timestamp} publicFacilities={publicFacilities} households={households} loc_patterns={locPatterns} />
+      <ClusteredMap
+        location={location}
+        timestamp={timestamp}
+        publicFacilities={publicFacilities}
+        households={households}
+        loc_patterns={locPatterns}
+        onMarkerClick={onMarkerClick}
+        selectedId={selectedId}
+        isHousehold={isHousehold}
+      />
 
       {/* Slider Component */}
       <div style={{ width: '100%', marginTop: '20px' }}>
@@ -268,9 +272,10 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
           max={maxHours}
           value={timestamp}
           onChange={(e) => {
-            setTimestamp(parseInt(e.target.value));
-            updateIcons(parseInt(e.target.value), 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-            updateIcons(parseInt(e.target.value), 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+            const newTimestamp = parseInt(e.target.value);
+            setTimestamp(newTimestamp);
+            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
           style={{ width: '100%' }}
         />
@@ -287,9 +292,10 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location }
           max={maxHours}
           value={timestamp}
           onChange={(e) => {
-            setTimestamp(parseInt(e.target.value));
-            updateIcons(parseInt(e.target.value), 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-            updateIcons(parseInt(e.target.value), 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+            const newTimestamp = parseInt(e.target.value);
+            setTimestamp(newTimestamp);
+            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
+            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
           style={{ width: '10%' }}
         />

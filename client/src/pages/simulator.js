@@ -19,27 +19,6 @@ function makePostRequest(data, setSimData) {
 }
 
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
-  // Uncomment if you want to work with the simulator
-  // const data = {
-  //   location: location,
-  //   matrices: null,
-  //   days: days,
-  //   mask: pmask,
-  //   vaccine: pvaccine,
-  //   capacity: capacity,
-  //   selfiso: selfiso,
-  //   lockdown: lockdown,
-  // };
-
-  // if (!matrices) {
-  //   makePostRequest(data, setSimData);
-  // } else {
-  //   data.matrices = matrices;
-  //   makePostRequest(data, setSimData);
-  // }
-
-  //Uncomment for private testing
-
   fetch('data/barnsdall/patterns.json').then((res) => {
     res.json().then((data) => {
       setMovePatterns(data);
@@ -63,18 +42,31 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
 }
 
 export default function Simulator() {
-  const [ showSim, setShowSim ] = useState(false);          // Show simulator, or show settings?
-  const [ papData, setPapData ] = useState(null);       
-  const [ movePatterns, setMovePatterns ] = useState(null);          
-  const [ simData, setSimData ] = useState(null);           // Simulator output data
-  const [ location, setLocation ] = useState('barnsdall');
+  const [showSim, setShowSim] = useState(false);          // Show simulator, or show settings?
+  const [papData, setPapData] = useState(null);
+  const [movePatterns, setMovePatterns] = useState(null);
+  const [simData, setSimData] = useState(null);           // Simulator output data
+  const [location, setLocation] = useState('barnsdall');
+
+  // State to track selected marker information
+  const [selectedId, setSelectedId] = useState(null);
+  const [isHousehold, setIsHousehold] = useState(false);
+
+  // Function to handle marker clicks in ModelMap
+  const handleMarkerClick = (id, isHome) => {
+    setSelectedId(id);
+    setIsHousehold(isHome);
+  };
 
   return (
     <div>
       <div className='sim_container'>
-        {!showSim && 
+        {!showSim &&
           <div className='sim_settings'>
-            <SimSettings sendData={(dict) => { sendSimulatorData(setSimData, setMovePatterns, setPapData, dict); setLocation(dict['location']); }} showSim={setShowSim}/>
+            <SimSettings sendData={(dict) => {
+              sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
+              setLocation(dict['location']);
+            }} showSim={setShowSim} />
           </div>
         }
 
@@ -82,13 +74,25 @@ export default function Simulator() {
           <div>Loading...</div>
         }
 
-        {showSim && simData && movePatterns && papData && 
+        {showSim && simData && movePatterns && papData &&
           <div className='sim_output'>
-            <ModelMap sim_data={simData} move_patterns={movePatterns} pap_data={papData} location={location} />
-            <OutputGraphs sim_data={simData} move_patterns={movePatterns} pap_data={papData} location={location} />
+            <ModelMap
+              sim_data={simData}
+              move_patterns={movePatterns}
+              pap_data={papData}
+              location={location}
+              onMarkerClick={handleMarkerClick} // Pass the click handler to ModelMap
+            />
+            <OutputGraphs
+              sim_data={simData}
+              move_patterns={movePatterns}
+              pap_data={papData}
+              poi_id={selectedId} // Pass selected marker ID to OutputGraphs
+              is_household={isHousehold} // Pass marker type to OutputGraphs
+            />
           </div>
         }
       </div>
     </div>
-  )
+  );
 }
