@@ -47,7 +47,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
     if (!sim_data || !move_patterns || !pap_data) return;
 
     // Get disease labels
-    setDiseases(Object.keys(Object.values(sim_data)[0] || {}));
+    setDiseases([ 'uninfected', ...Object.keys(Object.values(sim_data)[0] || {})] );
 
     const domain = [Math.min(...Object.keys(move_patterns).map(x => Number(x))), Math.max(...Object.keys(move_patterns).map(x => Number(x)))]
 
@@ -70,6 +70,12 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
 
       for (const range of age_ranges) {
         age_data[`${range[0]}-${range[1]}`] = 0;
+      }
+
+      if (poi_id) {
+        const personType = is_household ? 'homes' : 'places';
+        const people_list = move_patterns[time]?.[personType]?.[poi_id];
+        disease_infectivity['uninfected'] = people_list?.length ?? 0;
       }
 
       for (const [disease, infected] of Object.entries(infdata)) {
@@ -125,6 +131,8 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
     setChartData(c_data);
   }, [sim_data, move_patterns, pap_data, poi_id, is_household]);
 
+  const poi_name = is_household ? `Household #${poi_id}` : `${pap_data['places'][poi_id]['label']}`;
+
   return (
     <div>
       <div style={{ padding: '10px' }}>
@@ -150,7 +158,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
           <h6 style={styles.centerText}>
             Infection Distribution Over Time
             {poi_id && (
-              <span> for {is_household ? 'Household' : 'Facility'} ID: {poi_id}</span>
+              <span> for {poi_name}</span>
             )}
           </h6>
           <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
@@ -165,7 +173,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
             <Tooltip content={CustomTooltip} />
             <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
-              diseases.map((disease, index) => (
+              diseases.filter((disease, _) => (poi_id || disease !== 'uninfected')).map((disease, index) => (
                 <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
               ))
             }
@@ -180,7 +188,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
           <h6 style={styles.centerText}>
             Infected Age Distribution Over Time
             {poi_id && (
-              <span> for {is_household ? 'Household' : 'Facility'} ID: {poi_id}</span>
+              <span> for {poi_name}</span>
             )}
           </h6>
           <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
@@ -208,7 +216,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
           <h6 style={styles.centerText}>
             Infected Sex Distribution Over Time
             {poi_id && (
-              <span> for {is_household ? 'Household' : 'Facility'} ID: {poi_id}</span>
+              <span> for {poi_name}</span>
             )}
           </h6>
           <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
@@ -236,7 +244,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
           <h6 style={styles.centerText}>
             Infected State Distribution Over Time
             {poi_id && (
-              <span> for {is_household ? 'Household' : 'Facility'} ID: {poi_id}</span>
+              <span> for {poi_name}</span>
             )}
           </h6>
           <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
