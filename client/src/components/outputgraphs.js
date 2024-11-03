@@ -131,7 +131,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
     setChartData(c_data);
   }, [sim_data, move_patterns, pap_data, poi_id, is_household]);
 
-  const poi_name = is_household ? `Household #${poi_id}` : `${pap_data['places'][poi_id]['label']}`;
+  const poi_name = poi_id ? (is_household ? `Household #${poi_id}` : `${pap_data['places'][poi_id]['label']}`) : '';
 
   return (
     <div>
