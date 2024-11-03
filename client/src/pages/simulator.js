@@ -58,6 +58,11 @@ export default function Simulator() {
     setIsHousehold(isHome);
   };
 
+  const onReset = () => {
+    setSelectedId(null);
+    setIsHousehold(null);
+  }
+
   return (
     <div>
       <div className='sim_container'>
@@ -89,6 +94,7 @@ export default function Simulator() {
               pap_data={papData}
               poi_id={selectedId} // Pass selected marker ID to OutputGraphs
               is_household={isHousehold} // Pass marker type to OutputGraphs
+              onReset={onReset}
             />
           </div>
         }

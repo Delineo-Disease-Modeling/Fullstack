@@ -107,10 +107,11 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
             }
           }
         }
+
         disease_infectivity[disease] = disease_count;
       }
 
-      if (Object.values(disease_infectivity).some(count => count > 0) || !poi_id) {
+      if (Object.values(disease_infectivity).some(count => count >= 0) || !poi_id) {
         c_data.push({
           'time': timeNumber / 60,
           ...disease_infectivity,
