@@ -125,7 +125,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
         }
       }
 
-      label_text = `Pop:Inf: ${peopleAtFacility.length}:${numInfected}`;
+      label_text = `Population: ${peopleAtFacility.length}\nInfected: ${numInfected}`;
 
       const map_range = (value, low1, high1, low2, high2) => {
         return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
@@ -166,9 +166,9 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
         }}
       >
         <Popup key={type + '_' + addr[5]}>
-          <div>
-            <h4>{addr[1]}</h4>
-            <p>{addr[2]}</p>
+          <div style={{width:'120px', whiteSpace: 'pre-line'}}>
+            <h style={{fontSize: '14px'}}>{addr[1]}</h>
+            <p style={{fontSize: '12px'}}>{addr[2]}</p>
           </div>
         </Popup>
       </Marker>

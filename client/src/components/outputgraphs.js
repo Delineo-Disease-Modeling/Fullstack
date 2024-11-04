@@ -50,7 +50,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
 
     // Get disease labels
     if (poi_id) {
-      setDiseases([ 'uninfected', ...Object.keys(Object.values(sim_data)[0] || {})] );
+      setDiseases([ 'total', ...Object.keys(Object.values(sim_data)[0] || {})] );
     } else {
       setDiseases(Object.keys(Object.values(sim_data)[0] || {}));
     }
@@ -81,7 +81,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
       if (poi_id) {
         const personType = is_household ? 'homes' : 'places';
         const people_list = move_patterns[time]?.[personType]?.[poi_id];
-        disease_infectivity['uninfected'] = people_list?.length ?? 0;
+        disease_infectivity['total'] = people_list?.length ?? 0;
       }
 
       for (const [disease, infected] of Object.entries(infdata)) {
