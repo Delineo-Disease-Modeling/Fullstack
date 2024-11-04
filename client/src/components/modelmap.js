@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react'; 
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { CustomTooltip } from './customtooltip';
 import L from 'leaflet';
 
 import 'leaflet/dist/leaflet.css';

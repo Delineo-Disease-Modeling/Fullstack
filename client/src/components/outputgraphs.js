@@ -44,10 +44,16 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
   };
 
   useEffect(() => {
-    if (!sim_data || !move_patterns || !pap_data) return;
+    if (!sim_data || !move_patterns || !pap_data) { 
+      return; 
+    }
 
     // Get disease labels
-    setDiseases([ 'uninfected', ...Object.keys(Object.values(sim_data)[0] || {})] );
+    if (poi_id) {
+      setDiseases([ 'uninfected', ...Object.keys(Object.values(sim_data)[0] || {})] );
+    } else {
+      setDiseases(Object.keys(Object.values(sim_data)[0] || {}));
+    }
 
     const domain = [Math.min(...Object.keys(move_patterns).map(x => Number(x))), Math.max(...Object.keys(move_patterns).map(x => Number(x)))]
 
@@ -173,7 +179,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
             <Tooltip content={CustomTooltip} />
             <Legend wrapperStyle={{ paddingTop: "30px" }} />
             {
-              diseases.filter((disease, _) => (poi_id || disease !== 'uninfected')).map((disease, index) => (
+              diseases.map((disease, index) => (
                 <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
               ))
             }
