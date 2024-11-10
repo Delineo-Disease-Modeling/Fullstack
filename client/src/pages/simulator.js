@@ -6,6 +6,7 @@ import ModelMap from '../components/modelmap.js';
 import OutputGraphs from '../components/outputgraphs.js';
 
 import './simulator.css';
+import CytoGraph from '../components/cytograph.js';
 
 function makePostRequest(data, setSimData) {
   axios.post("http://127.0.0.1:5000/simulation/", data)
@@ -95,6 +96,11 @@ export default function Simulator() {
               poi_id={selectedId} // Pass selected marker ID to OutputGraphs
               is_household={isHousehold} // Pass marker type to OutputGraphs
               onReset={onReset}
+            />
+            <CytoGraph 
+              sim_data={simData}
+              move_patterns={movePatterns}
+              pap_data={papData}
             />
           </div>
         }
