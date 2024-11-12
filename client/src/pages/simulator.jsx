@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-import SimSettings from '../components/simsettings.js';
-import ModelMap from '../components/modelmap.js';
-import OutputGraphs from '../components/outputgraphs.js';
+import SimSettings from '../components/simsettings.jsx';
+import ModelMap from '../components/modelmap.jsx';
+import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
-import CytoGraph from '../components/cytograph.js';
+import CytoGraph from '../components/cytograph.jsx';
 
+// eslint-disable-next-line no-unused-vars
 function makePostRequest(data, setSimData) {
   axios.post("http://127.0.0.1:5000/simulation/", data)
     .then((res) => {
@@ -19,6 +20,7 @@ function makePostRequest(data, setSimData) {
     });
 }
 
+// eslint-disable-next-line no-unused-vars
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
   fetch('data/barnsdall/patterns.json').then((res) => {
     res.json().then((data) => {
@@ -98,7 +100,6 @@ export default function Simulator() {
               onReset={onReset}
             />
             <CytoGraph 
-              sim_data={simData}
               move_patterns={movePatterns}
               pap_data={papData}
             />

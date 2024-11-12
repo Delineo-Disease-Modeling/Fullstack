@@ -6,13 +6,13 @@ import 'aos/dist/aos.css';
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 
-import Navbar from './components/navbar.js';
-import Footer from './components/footer.js';
+import Navbar from './components/navbar.jsx'
+import Footer from './components/footer.jsx';
 
-import Home from './pages/home.js';
-import Simulator from './pages/simulator.js';
-import Team from './pages/team.js';
-import About from './pages/about.js';
+import Home from './pages/home.jsx';
+import Simulator from './pages/simulator.jsx';
+import Team from './pages/team.jsx';
+import About from './pages/about.jsx';
 
 function App() {
   const { pathname } = useLocation();

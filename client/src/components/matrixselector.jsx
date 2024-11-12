@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import './matrixselector.css';
 
@@ -169,8 +169,8 @@ export default function MatrixSelector({ customFiles, setMatrices }) {
 
       <div className='mselect_varadder'>
         <input maxLength={20} onChange={e => setCurName(e.target.value)}></input>
-        <button className='mselect_button' onClick={_ => addVariant(curName, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>+</button>
-        <button className='mselect_button' onClick={_ => removeVariant(curVariant, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>-</button>
+        <button className='mselect_button' onClick={() => addVariant(curName, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>+</button>
+        <button className='mselect_button' onClick={() => removeVariant(curVariant, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>-</button>
       </div>
     </div>
   )

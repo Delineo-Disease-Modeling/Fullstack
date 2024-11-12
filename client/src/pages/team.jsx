@@ -1,5 +1,3 @@
-import React from 'react';
-
 import 'animate.css';
 import './team.css';
 

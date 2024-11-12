@@ -1,7 +1,6 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-import Shapes from '../components/shapes.js';
+import Shapes from '../components/shapes.jsx';
 import './home.css';
 
 export default function Home() {

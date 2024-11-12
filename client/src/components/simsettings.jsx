@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import MatrixSelector from './matrixselector';
 
 import './simsettings.css';

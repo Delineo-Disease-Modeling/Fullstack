@@ -6,7 +6,7 @@ export default function MapLegend({ icon_lookup }) {
 
   var timeout = 0;
 
-  function handleMouseEnter(event) {
+  function handleMouseEnter() {
     const legend = document.getElementById('modelmap_legend_div');
     legend.classList.remove('modelmap_legend_div_unhover');
     legend.classList.add('modelmap_legend_div_hover');
@@ -17,7 +17,7 @@ export default function MapLegend({ icon_lookup }) {
     }, 50);
   }
 
-  function handleMouseLeave(event) {
+  function handleMouseLeave() {
     const legend = document.getElementById('modelmap_legend_div');
     legend.classList.remove('modelmap_legend_div_hover');
     legend.classList.add('modelmap_legend_div_unhover');
