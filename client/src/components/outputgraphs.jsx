@@ -142,9 +142,12 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
 
   return (
     <div className='outputgraphs_container'>
-      <div style={{ padding: '10px' }}>
+      <div className='p-2.5'>
         <label>Select Chart Type: </label>
-        <select value={selected_chart} onChange={handleChartSelect}>
+        <select 
+          className='px-1'
+          value={selected_chart} 
+          onChange={handleChartSelect}>
           <option value="iot">Infectiousness Over Time</option>
           <option value="ages">Age Of Infected </option>
           <option value="sexes">Infection Gender</option>
@@ -174,7 +177,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
               <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
-              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
               {
                 diseases.map((disease, index) => (
                   <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
@@ -201,7 +204,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
               <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
-              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
               {
                 age_ranges.map((range, index) => (
                   <Line type="monotone" key={range.join('-')} dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
@@ -226,7 +229,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
               <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
-              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
               {
                 ['male', 'female'].map((sex, index) => (
                   <Line type="monotone" key={sex} dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
@@ -251,7 +254,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
               <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
-              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
               {
                 Object.keys(infection_states).map((state, index) => (
                   <Line type="monotone" key={state} dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />

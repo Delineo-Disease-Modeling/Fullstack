@@ -147,6 +147,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
+// eslint-disable-next-line no-unused-vars
 function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, selectedId, isHousehold }) {
   const marker_icon_component = (type, addr, index) => {
     //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
@@ -176,22 +177,24 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
   };
 
   return (
-    <MapContainer className="mapcontainer" center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false}>
-      <TileLayer
-        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    <div className='outline outline-2 outline-[#70B4D4]'>
+      <MapContainer className="mapcontainer" center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false}>
+        <TileLayer
+          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      <MarkerClusterGroup
-        chunkedLoading
-        iconCreateFunction={createClusterCustomIcon}
-        maxClusterRadius={150}
-        key={timestamp}
-      >
-        {publicFacilities.map((addr, index) => marker_icon_component('places', addr, index))}
-        {households.map((addr, index) => marker_icon_component('homes', addr, index))}
-      </MarkerClusterGroup>
-    </MapContainer>
+        <MarkerClusterGroup
+          chunkedLoading
+          iconCreateFunction={createClusterCustomIcon}
+          maxClusterRadius={150}
+          key={timestamp}
+        >
+          {publicFacilities.map((addr, index) => marker_icon_component('places', addr, index))}
+          {households.map((addr, index) => marker_icon_component('homes', addr, index))}
+        </MarkerClusterGroup>
+      </MapContainer>       
+    </div>
   );
 }
 
@@ -227,8 +230,9 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
       />
 
       {/* Slider Component */}
-      <div style={{ width: '100%', marginTop: '20px' }}>
+      <div className='w-full mt-5'>
         <input
+          className='min-w-full'
           type="range"
           min={1}
           max={maxHours}
@@ -239,16 +243,16 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
             updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
             updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
-          style={{ width: '100%' }}
         />
-        <div style={{ textAlign: 'center', marginTop: '12px' }}>
+        <div className='text-center mt-3'>
           {timestamp} Hours
         </div>
       </div>
 
       {/* Input Box */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
+      <div className='flex justify-center mt-3'>
         <input
+          className='w-[10%] px-1 bg-[#fffff2] outline outline-2 outline-[#70B4D4]'
           type="number"
           min={1}
           max={maxHours}
@@ -259,7 +263,6 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
             updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
             updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
           }}
-          style={{ width: '10%' }}
         />
       </div>
     </div>

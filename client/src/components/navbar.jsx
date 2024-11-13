@@ -8,7 +8,7 @@ export default function Navbar() {
     <div className='navbuffer'></div>
     <nav>
       <NavLink to='/' className='link'>
-        <img src='images/logo.png' alt='logo'></img>
+        <img className='bg-[#88D2D8]' src='./delineo.svg' alt='logo'></img>
       </NavLink>
       <ul>
         <li>

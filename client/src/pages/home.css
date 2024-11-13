@@ -55,10 +55,10 @@ button.app:active {
 }
 
 img.logo {
-  max-width: 400px;
-  max-height: 400px;
-  width: 100%;
-  height: 100%;
+  width: 400px;
+  max-width: 60vw;
+  height: auto;
+  aspect-ratio: 1 / 1;
 }
 
 @media screen and (max-width: 828px) {
