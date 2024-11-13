@@ -168,7 +168,7 @@ export default function MatrixSelector({ customFiles, setMatrices }) {
       </div>
 
       <div className='mselect_varadder'>
-        <input maxLength={20} onChange={e => setCurName(e.target.value)}></input>
+        <input className='mselect_input' maxLength={32} onChange={e => setCurName(e.target.value)}></input>
         <button className='mselect_button' onClick={() => addVariant(curName, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>+</button>
         <button className='mselect_button' onClick={() => removeVariant(curVariant, matrixDict, setMatrixDict, setMatrices, defaultMatrices, customFiles)}>-</button>
       </div>

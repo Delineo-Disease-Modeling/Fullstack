@@ -14,7 +14,7 @@ nav {
   justify-content: space-between;
   align-items: center;
 
-  z-index: 2;
+  z-index: 9999;
 }
 
 /* This is to add a height buffer at the top for other elements */

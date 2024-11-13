@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   LineChart,
-  Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
+  Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer
 } from 'recharts';
 import { CustomTooltip } from './customtooltip';
 import './outputgraphs.css';
@@ -140,7 +141,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
   const poi_name = poi_id ? (is_household ? `Household #${poi_id}` : `${pap_data['places'][poi_id]['label']}`) : '';
 
   return (
-    <div>
+    <div className='outputgraphs_container'>
       <div style={{ padding: '10px' }}>
         <label>Select Chart Type: </label>
         <select value={selected_chart} onChange={handleChartSelect}>
@@ -167,23 +168,20 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <span> for {poi_name}</span>
             )}
           </h6>
-          <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
-            top: 5,
-            right: 30,
-            left: 20,
-            bottom: 5,
-          }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={CustomTooltip} />
-            <Legend wrapperStyle={{ paddingTop: "30px" }} />
-            {
-              diseases.map((disease, index) => (
-                <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
-              ))
-            }
-          </LineChart>
+          <ResponsiveContainer width='100%' height='100%'>
+            <LineChart data={chart_data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+              <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={CustomTooltip} />
+              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              {
+                diseases.map((disease, index) => (
+                  <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
+                ))
+              }
+            </LineChart>          
+          </ResponsiveContainer>
         </div>
       )}
 
@@ -197,23 +195,20 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <span> for {poi_name}</span>
             )}
           </h6>
-          <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
-            top: 5,
-            right: 30,
-            left: 20,
-            bottom: 5,
-          }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={CustomTooltip} />
-            <Legend wrapperStyle={{ paddingTop: "30px" }} />
-            {
-              age_ranges.map((range, index) => (
-                <Line type="monotone" key={range.join('-')} dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
-              ))
-            }
-          </LineChart>
+          <ResponsiveContainer width='100%' height='100%'>
+            <LineChart data={chart_data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+              <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={CustomTooltip} />
+              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              {
+                age_ranges.map((range, index) => (
+                  <Line type="monotone" key={range.join('-')} dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
+                ))
+              }
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       )}
 
@@ -225,23 +220,20 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <span> for {poi_name}</span>
             )}
           </h6>
-          <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
-            top: 5,
-            right: 30,
-            left: 20,
-            bottom: 5,
-          }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={CustomTooltip} />
-            <Legend wrapperStyle={{ paddingTop: "30px" }} />
-            {
-              ['male', 'female'].map((sex, index) => (
-                <Line type="monotone" key={sex} dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
-              ))
-            }
-          </LineChart>
+          <ResponsiveContainer width='100%' height='100%'>
+            <LineChart data={chart_data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+              <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={CustomTooltip} />
+              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              {
+                ['male', 'female'].map((sex, index) => (
+                  <Line type="monotone" key={sex} dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
+                ))
+              }
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       )}
 
@@ -253,23 +245,20 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <span> for {poi_name}</span>
             )}
           </h6>
-          <LineChart width={window.innerWidth * 0.6} height={window.innerHeight * 0.6} data={chart_data} margin={{
-            top: 5,
-            right: 30,
-            left: 20,
-            bottom: 5,
-          }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={CustomTooltip} />
-            <Legend wrapperStyle={{ paddingTop: "30px" }} />
-            {
-              Object.keys(infection_states).map((state, index) => (
-                <Line type="monotone" key={state} dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />
-              ))
-            }
-          </LineChart>
+          <ResponsiveContainer width='100%' height='100%'>
+            <LineChart data={chart_data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+              <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={CustomTooltip} />
+              <Legend wrapperStyle={{ paddingTop: "30px" }} />
+              {
+                Object.keys(infection_states).map((state, index) => (
+                  <Line type="monotone" key={state} dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />
+                ))
+              }
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       )}
     </div>

@@ -4,39 +4,47 @@ div.mselect_container {
   justify-content: space-around;
   align-items: center;
   flex-wrap: wrap;
+  row-gap: 4px;
 }
 
 div.mselect_label {
   width: 100%;
-  padding-bottom: 15px;
+  padding-bottom: 8px;
   text-align: center;
 }
 
 select.mselect_selectvariant {
+  background-color: #fffff2;
   width: 100px;
   margin: auto;
   overflow-y: auto;
+
+  outline: 2px solid #70B4D4;
 }
 
 select.mselect_selectmatrix {
+  background-color: #fffff2;
   width: 300px;
   margin: auto;
   overflow-y: auto;
+
+  outline: 2px solid #70B4D4;
 }
 
 div.mselect_varadder {
-  width: 300px;
+  width: 100%;
   height: 35px;
   display: flex;
   justify-content: space-around;
   align-items: center;
   flex-wrap: wrap;
+  row-gap: 4px;
 }
 
 button.mselect_button {
   border: none;
   border-radius: 10px;
-  width: 50px;
+  width: 10%;
   height: 20px;
   background-color: #222629;
   color: #F0F0F0;
@@ -50,9 +58,17 @@ button.mselect_button {
 
 button.mselect_button:hover {
   transform: scale(1.05);
+  background-color: #F0F0F0;
+  color: #222629;
   cursor: pointer;
 }
 
 button.mselect_button:active {
   filter: brightness(80%);
+}
+
+input.mselect_input {
+  width: 70%;
+  outline: 2px solid #70B4D4;
+  padding: 0px 2px;
 }

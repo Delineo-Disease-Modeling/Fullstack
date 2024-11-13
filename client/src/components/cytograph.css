@@ -3,8 +3,5 @@ div.cytograph_chart {
   height: 400px;
   background-color: #fffff2;
   padding: 25px;
-  filter: drop-shadow(2px 0 0 #70B4D4) 
-    drop-shadow(0 2px 0 #70B4D4)
-    drop-shadow(-2px 0 0 #70B4D4) 
-    drop-shadow(0 -2px 0 #70B4D4);
+  outline: 2px solid #70B4D4;
 }

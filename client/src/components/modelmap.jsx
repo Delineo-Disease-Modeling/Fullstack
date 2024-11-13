@@ -147,10 +147,10 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
-function ClusteredMap({ location, timestamp, publicFacilities, households, loc_patterns, onMarkerClick, selectedId, isHousehold }) {
+function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, selectedId, isHousehold }) {
   const marker_icon_component = (type, addr, index) => {
-    const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
-    const selectedIcon = isSelected ? marker_icon('selected_category', 0.0) : addr[0];
+    //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
+    const selectedIcon = addr[0]; //isSelected ? marker_icon('selected_category', 0.0) : addr[0];
 
     return (
       <Marker
@@ -176,7 +176,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
   };
 
   return (
-    <MapContainer center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false} className="mapcontainer">
+    <MapContainer className="mapcontainer" center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false}>
       <TileLayer
         attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -186,7 +186,7 @@ function ClusteredMap({ location, timestamp, publicFacilities, households, loc_p
         chunkedLoading
         iconCreateFunction={createClusterCustomIcon}
         maxClusterRadius={150}
-        key={Date.now()}
+        key={timestamp}
       >
         {publicFacilities.map((addr, index) => marker_icon_component('places', addr, index))}
         {households.map((addr, index) => marker_icon_component('homes', addr, index))}
@@ -199,7 +199,6 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
-  const [locPatterns, setLocPatterns] = useState({});
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
@@ -210,40 +209,6 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
     updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
     updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
 
-    let loc_patterns = { 'homes': {}, 'places': {} };
-
-    ['homes', 'places'].forEach((label) => {
-      for (const time of Object.keys(move_patterns)) {
-        for (const obj_id of Object.keys(pap_data[label])) {
-          if (!loc_patterns[label][obj_id]) {
-            loc_patterns[label][obj_id] = [];
-          }
-          if (!move_patterns[time][label][obj_id]) {
-            loc_patterns[label][obj_id].push({
-              'time': parseInt(time) / 60,
-              'num_people': 0,
-              'num_infected': 0
-            });
-          } else {
-            let num_infected = 0;
-            for (const variant of Object.keys(sim_data[time])) {
-              for (const id of Object.keys(sim_data[time][variant])) {
-                if (move_patterns[time][label][obj_id].includes(id)) {
-                  num_infected += 1;
-                }
-              }
-            }
-            loc_patterns[label][obj_id].push({
-              'time': parseInt(time) / 60,
-              'num_people': move_patterns[time][label][obj_id].length,
-              'num_infected': num_infected
-            });
-          }
-        }
-      }
-    });
-
-    setLocPatterns(loc_patterns);
   }, [sim_data, move_patterns, pap_data, location]);
 
   return (
@@ -252,11 +217,10 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
 
       {/* Map Container */}
       <ClusteredMap
-        location={location}
         timestamp={timestamp}
+        location={location}
         publicFacilities={publicFacilities}
         households={households}
-        loc_patterns={locPatterns}
         onMarkerClick={onMarkerClick}
         selectedId={selectedId}
         isHousehold={isHousehold}
