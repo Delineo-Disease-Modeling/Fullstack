@@ -8,7 +8,7 @@ header.about_title {
 }
 
 div.timeline {
-  max-width: 60vw;
+  max-width: 70vw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,20 +37,13 @@ img.aboutimg {
   height: auto;
   max-width: 100%;
   aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 24px;
+  background-color: #88D2D8;
 }
 
 div.aboutinfo {
   width: 100%;
   min-width: 30%;
   max-width: 400px;
-}
-
-header {
-  font-size: 24px;
-  font-weight: 500;
-  padding-bottom: 20px;
-}
-
-p {
-  font-size: 16px;
 }

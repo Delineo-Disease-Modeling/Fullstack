@@ -9,26 +9,38 @@ export default function About() {
 
       <div className='timeline'>
         <div className='entry' data-aos='fade-up' data-aos-once='true'>
-          <img className='aboutimg rounded-3xl bg-[#88D2D8]' src='./delineo.svg' alt='logo'></img>
+          <img className='aboutimg' src='./delineo.svg' alt='logo' />
           <div className='aboutinfo'>
-            <header>The Project</header>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <header className='text-2xl font-medium pb-5'>
+              The Project
+            </header>
+            <p className='text-base'>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            </p>
           </div>
         </div>
 
         <div className='entry reverse' data-aos='fade-up' data-aos-once='true'>
           <div className='aboutinfo'>
-            <header>The Project</header>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <header className='text-2xl font-medium pb-5'>
+              The Project
+            </header>
+            <p className='text-base'>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            </p>
           </div>
-          <img className='aboutimg rounded-3xl bg-[#88D2D8]' src='./delineo.svg' alt='logo'></img>
+          <img className='aboutimg' src='./delineo.svg' alt='logo' />
         </div>
 
         <div className='entry' data-aos='fade-up' data-aos-once='true'>
-          <img className='aboutimg rounded-3xl bg-[#88D2D8]' src='./delineo.svg' alt='logo'></img>
+          <img className='aboutimg' src='./delineo.svg' alt='logo' />
           <div className='aboutinfo'>
-            <header>The Project</header>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <header className='text-2xl font-medium pb-5'>
+              The Project
+            </header>
+            <p className='text-base'>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            </p>
           </div>
         </div>
       </div>

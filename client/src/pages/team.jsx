@@ -3,32 +3,34 @@ import './team.css';
 
 const teamData = {
   professors: [
-    { name: "Professor Anton Dahbura",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Professor Anton Dahbura" },
+    { name: "Professor Kimia Ghobadi" },
+    { name: "Professor Eili Klein" },
   ],
 
   fullstackTeam: [
-    { name: "Lixing Wu", github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/1ixin9-wu/" },
-    { name: "Mahmoud Said", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Allen Gong",  github: "https://github.com/stickms", linkedin: "https://www.linkedin.com/in/allen-gong27/" },
-    { name: "Jeffrey Yao", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Matthew Yu", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Zoe Xie", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Lixing Wu", linkedin: "https://www.linkedin.com/in/1ixin9-wu/" },
+    { name: "Mahmoud Said", github: "https://github.com/stickms" },
+    { name: "Allen Gong", linkedin: "https://www.linkedin.com/in/allen-gong27/" },
+    { name: "Jeffrey Yao" },
+    { name: "Matthew Yu" },
+    { name: "Zoe Xie" },
   ],
 
   algorithmsTeam: [
-    { name: "Jin Hong Moon",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Keeyan Mukherjee", github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Ryan Lu",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Scott Klosen",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Shayan Hossain",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Siva Indukuri",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Jin Hong Moon" },
+    { name: "Keeyan Mukherjee" },
+    { name: "Ryan Lu" },
+    { name: "Scott Klosen" },
+    { name: "Shayan Hossain" },
+    { name: "Siva Indukuri"  },
   ],
 
   simulationsTeam: [
-    { name: "Alisa Yang",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Jason Mihalopoulos",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Michelle Wang",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
-    { name: "Neil Patel",  github: "https://github.com/stickms", linkedin: "https://linkedin.com" },
+    { name: "Alisa Yang" },
+    { name: "Iason Mihalopoulos" },
+    { name: "Michelle Wang" },
+    { name: "Neil Patel" },
   ],
 
   pastAlumn: [
@@ -48,9 +50,9 @@ export default function Team() {
           <img className='member' src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`} alt={member.name}></img>
           <h1 className='name'>{member.name}</h1>
           {/* <h2 className='role'>{member.role}</h2> */}
-          <div className='w-full flex items-center justify-center'>
-            <a href={member.github}><i className='px-2 bi-github'></i></a>
-            <a href={member.linkedin}><i className='px-2 bi-linkedin'></i></a>
+          <div className='w-full flex items-center justify-center min-h-6'>
+            {member.github && <a href={member.github}><i className='px-2 bi-github'></i></a>}
+            {member.linkedin && <a href={member.linkedin}><i className='px-2 bi-linkedin'></i></a>}
           </div>
         </div>
       ))}
@@ -69,7 +71,6 @@ export default function Team() {
       {renderTeamSection(teamData.algorithmsTeam, "Algorithms Team")}
       {renderTeamSection(teamData.simulationsTeam, "Simulations Team")}
       {renderTeamSection(teamData.pastAlumn, "Past Alumni")}
-
 
       <div className='w-full text-center m-auto py-32' data-aos='fade-up' data-aos-once='true'>
         <header className='font-medium text-4xl'>Join Delineo</header>
