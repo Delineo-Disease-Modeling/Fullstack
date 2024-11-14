@@ -1,6 +1,7 @@
 div.outputgraphs_container {
   width: 60vw;
   height: 600px;
+  padding-bottom: 60px; 
 }
 
 div.outputgraph_chart {
