@@ -47,10 +47,10 @@ export default function Team() {
         <div className='member' key={member.name}>
           <img className='member' src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`} alt={member.name}></img>
           <h1 className='name'>{member.name}</h1>
-          <h2 className='role'>{member.role}</h2>
-          <div className='socials'>
-            <a href={member.github}><i className='bi-github'></i></a>
-            <a href={member.linkedin}><i className='bi-linkedin'></i></a>
+          {/* <h2 className='role'>{member.role}</h2> */}
+          <div className='w-full flex items-center justify-center'>
+            <a href={member.github}><i className='px-2 bi-github'></i></a>
+            <a href={member.linkedin}><i className='px-2 bi-linkedin'></i></a>
           </div>
         </div>
       ))}

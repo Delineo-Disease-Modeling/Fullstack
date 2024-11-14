@@ -22,21 +22,21 @@ function makePostRequest(data, setSimData) {
 
 // eslint-disable-next-line no-unused-vars
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
-  fetch('data/barnsdall/patterns.json').then((res) => {
+  fetch(`data/${location}/patterns.json`).then((res) => {
     res.json().then((data) => {
       setMovePatterns(data);
       console.log(data);
     })
   });
 
-  fetch('data/barnsdall/papdata.json').then((res) => {
+  fetch(`data/${location}/papdata.json`).then((res) => {
     res.json().then((data) => {
       setPapData(data);
       console.log(data);
     })
   });
 
-  fetch('data/barnsdall/infectivity.json').then((res) => {
+  fetch(`data/${location}/infectivity.json`).then((res) => {
     res.json().then((data) => {
       setSimData(data);
       console.log(data);
