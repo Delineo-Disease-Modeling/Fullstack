@@ -54,9 +54,11 @@ const marker_icon = (category, percent) => {
     return rgb_to_hex(...final.map(x => Math.round(x)));
   };
 
+  const pulseClass = percent >= 0.8 ? 'pulse-intense' : percent >= 0.2 ? 'pulse-icon' : '';
+
   return new L.divIcon({
     html: `
-    <div style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${percent_to_hex(percent)};width:30px;height:30px">
+    <div class="${pulseClass}" style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${percent_to_hex(percent)};width:30px;height:30px;border-radius:50%;">
       <div style="font-size:22px;text-align:center;">${icon_lookup[category]}</div>
     </div>
     `
@@ -74,14 +76,20 @@ const map_centers = {
 }
 
 const createClusterCustomIcon = function (cluster) {
-  var colored = cluster.getAllChildMarkers().some(x => x.options.proportion > 0.0);
+  // Check if any marker in the cluster has a `proportion > 0.0` (used as pulsing markers in your setup)
+  const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
+
+  // Dynamically set cluster class based on whether it contains pulsing markers
+  const clusterClass = hasPulsingMarkers 
+    ? 'marker-cluster-medium marker-cluster pulsing-cluster' 
+    : 'marker-cluster-small marker-cluster';
 
   return L.divIcon({
     html: `<span class="marker-cluster">${cluster.getChildCount()}</span>`,
-    className: colored ? 'marker-cluster-medium marker-cluster' : 'marker-cluster-small marker-cluster',
+    className: clusterClass,
     iconSize: L.point(40, 40, true)
   });
-}
+};
 
 var household_locs = {};
 
