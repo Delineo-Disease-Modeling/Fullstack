@@ -236,7 +236,30 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
         const prevpeople = move_patterns[timestamps[i - 1]]?.['places']?.[index];
         const curpeople = move_patterns[timestamps[i]]?.['places']?.[index];
 
-        if (curpeople >= prevpeople * 1.3) {
+        let previnfected = 0;
+        let curinfected = 0;
+
+        if (sim_data[timestamps[i-1]]) {
+          for (const variant of Object.keys(sim_data[timestamps[i-1]])) {
+            for (const id of Object.keys(sim_data[timestamps[i-1]][variant])) {
+              if (prevpeople.indexOf(id) !== -1) {
+                previnfected += 1;
+              }
+            }
+          }
+        }  
+  
+        if (sim_data[timestamps[i]]) {
+          for (const variant of Object.keys(sim_data[timestamps[i]])) {
+            for (const id of Object.keys(sim_data[timestamps[i]][variant])) {
+              if (curpeople.indexOf(id) !== -1) {
+                curinfected += 1;
+              }
+            }
+          }
+        }  
+
+        if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 7.5) {
           setHotspots((hs) => [index, ...hs]);
         }
       }
@@ -249,6 +272,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
       const set = [...(new Set(hs))];
       updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, set);
       updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, set);  
+      console.log(set);
       return set;
     });
   }, [sim_data, move_patterns, pap_data, location]);
