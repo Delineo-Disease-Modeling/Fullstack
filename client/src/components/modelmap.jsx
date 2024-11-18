@@ -33,7 +33,7 @@ const icon_lookup = {
   "Home": "🏠" 
 }
 
-const marker_icon = (category, percent) => { 
+const marker_icon = (category, percent, pulse) => { 
   const rgb_to_hex = (r, g, b) => {
     return "#" + ((1 << 24) | (r << 16) | (g << 8) | (b)).toString(16).slice(1);
   };
@@ -54,9 +54,10 @@ const marker_icon = (category, percent) => {
     return rgb_to_hex(...final.map(x => Math.round(x)));
   };
 
-  const pulseClass = percent >= 0.8 ? 'pulse-intense' : percent >= 0.2 ? 'pulse-icon' : '';
+  const pulseClass = pulse ? 'pulse-icon' : ''; //percent >= 0.8 ? 'pulse-intense' : percent >= 0.2 ? 'pulse-icon' : '';
 
   return new L.divIcon({
+    className: '',
     html: `
     <div class="${pulseClass}" style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${percent_to_hex(percent)};width:30px;height:30px;border-radius:50%;">
       <div style="font-size:22px;text-align:center;">${icon_lookup[category]}</div>
@@ -77,23 +78,32 @@ const map_centers = {
 
 const createClusterCustomIcon = function (cluster) {
   // Check if any marker in the cluster has a `proportion > 0.0` (used as pulsing markers in your setup)
-  const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
+  //const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
+  const hasInfecteMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
+  const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.pulsing === true)
 
-  // Dynamically set cluster class based on whether it contains pulsing markers
-  const clusterClass = hasPulsingMarkers 
-    ? 'marker-cluster-medium marker-cluster pulsing-cluster' 
-    : 'marker-cluster-small marker-cluster';
+  const clusterClass = ['marker-cluster'];
+
+  if (hasInfecteMarkers) {
+    clusterClass.push('marker-cluster-medium');
+  } else {
+    clusterClass.push('marker-cluster-small');
+  }
+
+  if (hasPulsingMarkers) {
+    clusterClass.push('pulsing-cluster');
+  }
 
   return L.divIcon({
     html: `<span class="marker-cluster">${cluster.getChildCount()}</span>`,
-    className: clusterClass,
+    className: clusterClass.join(' '),
     iconSize: L.point(40, 40, true)
   });
 };
 
 var household_locs = {};
 
-function updateIcons(curtime, type, location, patterns, sim_data, pap_data, callback) {
+function updateIcons(curtime, type, location, patterns, sim_data, pap_data, callback, hotspots) {
   var new_icons = [];
 
   curtime = (curtime * 60).toString();
@@ -116,7 +126,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
     var new_marker = null;
     var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
-    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0);
+    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0, hotspots.includes(index));
     var label_text = `Pop:Inf: 0:0`;
 
     if (peopleAtFacility) {
@@ -140,7 +150,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
       }
 
       const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
-      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio);
+      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, hotspots.includes(index));
 
       new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
     } else {
@@ -156,7 +166,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 }
 
 // eslint-disable-next-line no-unused-vars
-function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, selectedId, isHousehold }) {
+function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, selectedId, isHousehold, hotspots }) {
   const marker_icon_component = (type, addr, index) => {
     //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
     const selectedIcon = addr[0]; //isSelected ? marker_icon('selected_category', 0.0) : addr[0];
@@ -168,6 +178,7 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
         position={addr[3]}
         title={addr[1]}
         proportion={addr[4]}
+        pulsing={type === 'places' && hotspots.includes(addr[5])}
         eventHandlers={{
           click: () => {
             onMarkerClick(addr[5], type === 'homes'); // Notify parent on click
@@ -210,16 +221,36 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
+  const [hotspots, setHotspots] = useState([]);
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
   useEffect(() => {
     household_locs = {};
 
-    setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
-    updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-    updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+    // Calculate "hotspot" locations (facilities only)
+    for (const index of Object.keys(pap_data['places'])) {
+      const timestamps = Object.keys(move_patterns).sort();
 
+      for (let i = 1; i < timestamps.length; i++) {
+        const prevpeople = move_patterns[timestamps[i - 1]]?.['places']?.[index];
+        const curpeople = move_patterns[timestamps[i]]?.['places']?.[index];
+
+        if (curpeople >= prevpeople * 1.3) {
+          setHotspots((hs) => [index, ...hs]);
+        }
+      }
+    }
+
+    setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
+
+    setHotspots((hs) => {
+      // Save unique facilities only    
+      const set = [...(new Set(hs))];
+      updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, set);
+      updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, set);  
+      return set;
+    });
   }, [sim_data, move_patterns, pap_data, location]);
 
   return (
@@ -235,6 +266,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
         onMarkerClick={onMarkerClick}
         selectedId={selectedId}
         isHousehold={isHousehold}
+        hotspots={hotspots}
       />
 
       {/* Slider Component */}
@@ -248,8 +280,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
             setTimestamp(newTimestamp);
-            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
         />
         <div className='text-center mt-3'>
@@ -268,8 +300,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
             setTimestamp(newTimestamp);
-            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities);
-            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds);
+            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
         />
       </div>
