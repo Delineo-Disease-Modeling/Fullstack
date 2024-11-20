@@ -79,12 +79,12 @@ const map_centers = {
 const createClusterCustomIcon = function (cluster) {
   // Check if any marker in the cluster has a `proportion > 0.0` (used as pulsing markers in your setup)
   //const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
-  const hasInfecteMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
+  const hasInfectedMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
   const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.pulsing === true)
 
   const clusterClass = ['marker-cluster'];
 
-  if (hasInfecteMarkers) {
+  if (hasInfectedMarkers) {
     clusterClass.push('marker-cluster-medium');
   } else {
     clusterClass.push('marker-cluster-small');
@@ -95,7 +95,7 @@ const createClusterCustomIcon = function (cluster) {
   }
 
   return L.divIcon({
-    html: `<span class="marker-cluster">${cluster.getChildCount()}</span>`,
+    html: `<div class="flex items-center justify-center w-full h-full text-sm font-medium">${cluster.getChildCount()}</div>`,
     className: clusterClass.join(' '),
     iconSize: L.point(40, 40, true)
   });
@@ -126,7 +126,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
     var new_marker = null;
     var peopleAtFacility = patterns[curtime]?.[type]?.[index];
 
-    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0, hotspots.includes(index));
+    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0, Object.keys(hotspots).includes(index));
     var label_text = `Pop:Inf: 0:0`;
 
     if (peopleAtFacility) {
@@ -150,7 +150,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
       }
 
       const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
-      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, hotspots.includes(index));
+      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, Object.keys(hotspots).includes(index));
 
       new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
     } else {
@@ -166,7 +166,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 }
 
 // eslint-disable-next-line no-unused-vars
-function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, selectedId, isHousehold, hotspots }) {
+function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, hotspots }) {
   const marker_icon_component = (type, addr, index) => {
     //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
     const selectedIcon = addr[0]; //isSelected ? marker_icon('selected_category', 0.0) : addr[0];
@@ -178,7 +178,7 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
         position={addr[3]}
         title={addr[1]}
         proportion={addr[4]}
-        pulsing={type === 'places' && hotspots.includes(addr[5])}
+        pulsing={type === 'places' && Object.keys(hotspots).includes(addr[5])}
         eventHandlers={{
           click: () => {
             onMarkerClick(addr[5], type === 'homes'); // Notify parent on click
@@ -186,9 +186,12 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
         }}
       >
         <Popup key={type + '_' + addr[5]}>
-          <div style={{width:'120px', whiteSpace: 'pre-line'}}>
-            <h style={{fontSize: '14px'}}>{addr[1]}</h>
-            <p style={{fontSize: '12px'}}>{addr[2]}</p>
+          <div className='w-36 whitespace-pre-line font-[Poppins]'>
+            <header className='text-sm'>{addr[1]}</header>
+            <p className='text-xs'>{addr[2]}</p>
+            {type === 'places' && Object.keys(hotspots).includes(addr[5]) && (
+              <p className='text-xs font-medium'>Hotspot at hours: {hotspots[addr[5]].join(', ')}</p>
+            )}
           </div>
         </Popup>
       </Marker>
@@ -221,11 +224,13 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
-  const [hotspots, setHotspots] = useState([]);
+  const [hotspots, setHotspots] = useState({});
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
   useEffect(() => {
+    setHotspots({});
+
     household_locs = {};
 
     // Calculate "hotspot" locations (facilities only)
@@ -260,7 +265,15 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
         }  
 
         if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 7.5) {
-          setHotspots((hs) => [index, ...hs]);
+          setHotspots((hs) => {
+            if (hs[index]) {
+              hs[index] = [ ...hs[index], timestamps[i] / 60 ];
+            } else {
+              hs[index] = [ timestamps[i] / 60 ];
+            }
+
+            return hs;
+          });
         }
       }
     }
@@ -268,12 +281,9 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
     setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
 
     setHotspots((hs) => {
-      // Save unique facilities only    
-      const set = [...(new Set(hs))];
-      updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, set);
-      updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, set);  
-      console.log(set);
-      return set;
+      updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, hs);
+      updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, hs);  
+      return hs;
     });
   }, [sim_data, move_patterns, pap_data, location]);
 
