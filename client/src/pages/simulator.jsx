@@ -7,12 +7,14 @@ import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
 import CytoGraph from '../components/cytograph.jsx';
+import { API_URL, USE_CACHED_DATA } from '../env';
 
 // eslint-disable-next-line no-unused-vars
-function makePostRequest(data, setSimData) {
-  axios.post("http://127.0.0.1:5000/simulation/", data)
+function makePostRequest(data, setSimData, setMovePatterns) {
+  axios.post(`${API_URL}simulation/`, data)
     .then((res) => {
-      setSimData(res.data);
+      setSimData(res.data['result']);
+      setMovePatterns(res.data['movement']);
       console.log(res.data);
     })
     .catch((error) => {
@@ -22,13 +24,6 @@ function makePostRequest(data, setSimData) {
 
 // eslint-disable-next-line no-unused-vars
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
-  fetch(`data/${location}/patterns.json`).then((res) => {
-    res.json().then((data) => {
-      setMovePatterns(data);
-      console.log(data);
-    })
-  });
-
   fetch(`data/${location}/papdata.json`).then((res) => {
     res.json().then((data) => {
       setPapData(data);
@@ -36,12 +31,32 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
     })
   });
 
-  fetch(`data/${location}/infectivity.json`).then((res) => {
-    res.json().then((data) => {
-      setSimData(data);
-      console.log(data);
-    })
-  });
+  if (USE_CACHED_DATA === 'TRUE') {
+    fetch(`data/${location}/patterns.json`).then((res) => {
+      res.json().then((data) => {
+        setMovePatterns(data);
+        console.log(data);
+      })
+    });
+
+    fetch(`data/${location}/infectivity.json`).then((res) => {
+      res.json().then((data) => {
+        setSimData(data);
+        console.log(data);
+      })
+    });
+  } else {
+    makePostRequest({
+      'matrices': matrices,
+      'location': location,
+      'length': 10080,
+      'mask': pmask,
+      'vaccine': pvaccine,
+      'capacity': capacity,
+      'lockdown': lockdown,
+      'selfiso': selfiso
+    }, setSimData, setMovePatterns);  
+  }
 }
 
 export default function Simulator() {
@@ -78,7 +93,7 @@ export default function Simulator() {
           </div>
         }
 
-        {showSim && !simData && !movePatterns && !papData &&
+        {showSim && (!simData || !movePatterns || !papData) &&
           <div>Loading...</div>
         }
 

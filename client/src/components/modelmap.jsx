@@ -165,7 +165,6 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
-// eslint-disable-next-line no-unused-vars
 function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, hotspots }) {
   const marker_icon_component = (type, addr, index) => {
     //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
@@ -240,6 +239,10 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
       for (let i = 1; i < timestamps.length; i++) {
         const prevpeople = move_patterns[timestamps[i - 1]]?.['places']?.[index];
         const curpeople = move_patterns[timestamps[i]]?.['places']?.[index];
+
+        if (!prevpeople || !curpeople) {
+          continue;
+        }
 
         let previnfected = 0;
         let curinfected = 0;
