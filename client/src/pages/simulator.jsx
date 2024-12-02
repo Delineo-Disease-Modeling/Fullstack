@@ -9,7 +9,6 @@ import './simulator.css';
 import CytoGraph from '../components/cytograph.jsx';
 import { API_URL, USE_CACHED_DATA } from '../env';
 
-// eslint-disable-next-line no-unused-vars
 function makePostRequest(data, setSimData, setMovePatterns) {
   axios.post(`${API_URL}simulation/`, data)
     .then((res) => {
