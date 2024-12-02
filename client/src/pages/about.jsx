@@ -12,7 +12,7 @@ export default function About() {
           <img className='aboutimg' src='./delineo.svg' alt='logo' />
           <div className='aboutinfo'>
             <header className='text-2xl font-medium pb-5'>
-              The Project
+              Algorithms & Pre-Computation
             </header>
             <p className='text-base'>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
@@ -23,7 +23,7 @@ export default function About() {
         <div className='entry reverse' data-aos='fade-up' data-aos-once='true'>
           <div className='aboutinfo'>
             <header className='text-2xl font-medium pb-5'>
-              The Project
+              Simulation & DMP
             </header>
             <p className='text-base'>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
@@ -36,7 +36,7 @@ export default function About() {
           <img className='aboutimg' src='./delineo.svg' alt='logo' />
           <div className='aboutinfo'>
             <header className='text-2xl font-medium pb-5'>
-              The Project
+              Fullstack & Visualizations
             </header>
             <p className='text-base'>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.

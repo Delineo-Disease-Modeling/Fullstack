@@ -20,23 +20,23 @@ export default function Home() {
       <div className='featurelist'>
         <div className='feature' data-aos='fade-left'>
           <i className='bi-pencil-square feature'></i>
-          <h1 className='feature'>Lorem ipsum dolor</h1>
+          <h1 className='feature'>Customize</h1>
           <p className='feature'>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+            Set custom population and disease parameters for a given geographic area. Keep it simple, or dive deep into custom disease matrices
           </p>
         </div>
         <div className='feature' data-aos='fade-up'>
-          <i className='bi-sort-up-alt feature'></i>
-          <h1 className='feature'>Lorem ipsum dolor</h1>
+          <i className='bi-diagram-3 feature'></i>
+          <h1 className='feature'>Simulate</h1>
           <p className='feature'>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+            The simulator optimizes itself by only calculating what changes. Computationally-heavy tasks are pre-computed ahead of time
           </p>
         </div>
         <div className='feature' data-aos='fade-right'>
-          <i className='bi-check-circle feature'></i>
-          <h1 className='feature'>Lorem ipsum dolor</h1>
+          <i className='bi-bar-chart-line feature'></i>
+          <h1 className='feature'>Visualize</h1>
           <p className='feature'>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+            Visualize the spread of disease through an interactive infection map, or through one of the many statistical charts on our website
           </p>
         </div>
       </div>
