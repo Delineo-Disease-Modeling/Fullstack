@@ -22,7 +22,6 @@ const teamData = {
     { name: "Keeyan Mukherjee" },
     { name: "Ryan Lu" },
     { name: "Scott Klosen" },
-    { name: "Shayan Hossain" },
     { name: "Siva Indukuri"  },
   ],
 
@@ -41,13 +40,18 @@ const teamData = {
     { name: "User 10", role: "Role"},
   ]
 }
+
 export default function Team() {
   const renderTeamSection = (team, teamName) => (
     <div className='team' data-aos='fade-up' data-aos-once='true'>
       <header className='teamheader'>{teamName}</header>
       {team.map(member => (
         <div className='member' key={member.name}>
-          <img className='member' src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`} alt={member.name}></img>
+          <img className='member bg-[#88D2D8]' 
+            onError={(e) => e.target.src='./delineo.svg'} 
+            src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`} 
+            alt={member.name} 
+          />
           <h1 className='name'>{member.name}</h1>
           {/* <h2 className='role'>{member.role}</h2> */}
           <div className='w-full flex items-center justify-center min-h-6'>
