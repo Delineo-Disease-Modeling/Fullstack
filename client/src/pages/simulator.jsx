@@ -54,7 +54,7 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
       'capacity': capacity,
       'lockdown': lockdown,
       'selfiso': selfiso,
-      'randomseed': randseed
+      'randseed': randseed
     }, setSimData, setMovePatterns);  
   }
 }
