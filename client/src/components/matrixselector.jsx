@@ -80,6 +80,10 @@ function addVariant(variant, matrix_dict, set_matrix_dict, set_matrices, def_mat
     return;
   }
 
+  if (matrix_dict && Object.keys(matrix_dict).length > 8) {
+    return;
+  }
+
   matrix_dict[variant] = Object.keys(def_matrices)[0];
 
   // need to create new object so as to trigger proper re-render

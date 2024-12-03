@@ -4,7 +4,7 @@ import MatrixSelector from './matrixselector';
 import './simsettings.css';
 
 // Dropdown
-function SimLocation({value, callback}) {
+function SimLocation({callback}) {
   return (
     <div className='simset_dropdown'>
     <div className='simset_dropdown_label'>Convenience Zone</div>
@@ -34,7 +34,23 @@ function SimParameter({label, value, callback, min=0, max=100, def=50, percent=t
   );
 }
 
-function SimFile({label, value, callback}) {
+// Checkbout
+function SimBoolean({label, value, callback}) {
+  return (
+    <div className='simset_checkbox'>
+      <div className='flex items-center justify-center gap-x-2 flex-nowrap'>
+        <input type='checkbox'
+          className='w-6 h-6'
+          checked={value}
+          onChange={(e) => callback(() => e.target.checked)}
+        />
+        <div>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function SimFile({label, callback}) {
   return (
     <div className='simset_fileup'>
       <div className='simset_fileup_label'>
@@ -57,6 +73,7 @@ export default function SimSettings({ sendData, showSim }) {
   const [ capacity, setCapacity ] = useState(1.0);          // Capacity percentages
   const [ lockdown, setLockdown ] = useState(0.0);          // Lockdown probability
   const [ selfiso, setSelfiso ] = useState(0.5);            // Self-isolation probability
+  const [ randseed, setRandseed ] = useState(true);     // Random or set seed for sim/dmp?
 
   const [ matrices, setMatrices ] = useState(null);                 // To-be-sent file matrices
   const [ customFiles, setCustomFiles ] = useState(null);           // Uploaded file matrices
@@ -65,7 +82,6 @@ export default function SimSettings({ sendData, showSim }) {
     <div className='simset_settings'>
       <div className='simset_params'>
         <SimLocation 
-          value={location}
           callback={setLocation}
         />
 
@@ -107,6 +123,11 @@ export default function SimSettings({ sendData, showSim }) {
           callback={setSelfiso}
           def={50}
         />
+        <SimBoolean 
+          label={'Random Seed'}
+          value={randseed}
+          callback={setRandseed}
+        />
         <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/>
         <SimFile 
           label={'Custom Matrix File(s)'}
@@ -115,7 +136,7 @@ export default function SimSettings({ sendData, showSim }) {
       </div>
       
       <button className='simset_button' onClick={() => { 
-        sendData({ matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }); 
+        sendData({ matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso, randseed }); 
         showSim(true); 
       }}>Simulate</button>
     </div>
