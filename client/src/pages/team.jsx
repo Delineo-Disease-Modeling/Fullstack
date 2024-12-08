@@ -23,6 +23,7 @@ const teamData = {
     { name: "Ryan Lu" },
     { name: "Scott Klosen" },
     { name: "Siva Indukuri"  },
+    { name: "Jingxu Cui" }
   ],
 
   simulationsTeam: [
