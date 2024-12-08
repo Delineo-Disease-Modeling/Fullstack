@@ -189,7 +189,7 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
             <header className='text-sm'>{addr[1]}</header>
             <p className='text-xs'>{addr[2]}</p>
             {type === 'places' && Object.keys(hotspots).includes(addr[5]) && (
-              <p className='text-xs font-medium'>Hotspot at hours: {hotspots[addr[5]].join(', ')}</p>
+              <p className='text-xs font-medium'>Hotspot at hour{hotspots[addr[5]].length === 1 ? '' : 's'}: {hotspots[addr[5]].join(', ')}</p>
             )}
           </div>
         </Popup>
@@ -228,7 +228,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
   useEffect(() => {
-    setHotspots({});
+    setHotspots(() => { return {}; });
 
     household_locs = {};
 

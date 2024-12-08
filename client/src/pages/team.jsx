@@ -75,7 +75,7 @@ export default function Team() {
       {renderTeamSection(teamData.fullstackTeam, "Full-Stack Team")}
       {renderTeamSection(teamData.algorithmsTeam, "Algorithms Team")}
       {renderTeamSection(teamData.simulationsTeam, "Simulations Team")}
-      {renderTeamSection(teamData.pastAlumn, "Past Alumni")}
+      {/*renderTeamSection(teamData.pastAlumn, "Past Alumni")*/}
 
       <div className='w-full text-center m-auto py-32' data-aos='fade-up' data-aos-once='true'>
         <header className='font-medium text-4xl'>Join Delineo</header>

@@ -6,7 +6,7 @@ import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
-import CytoGraph from '../components/cytograph.jsx';
+//import CytoGraph from '../components/cytograph.jsx';
 import { API_URL, USE_CACHED_DATA } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
@@ -22,7 +22,7 @@ function makePostRequest(data, setSimData, setMovePatterns) {
 }
 
 // eslint-disable-next-line no-unused-vars
-function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso }) {
+function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso, randseed }) {
   fetch(`data/${location}/papdata.json`).then((res) => {
     res.json().then((data) => {
       setPapData(data);
@@ -53,7 +53,8 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
       'vaccine': pvaccine,
       'capacity': capacity,
       'lockdown': lockdown,
-      'selfiso': selfiso
+      'selfiso': selfiso,
+      'randseed': randseed
     }, setSimData, setMovePatterns);  
   }
 }
@@ -113,10 +114,10 @@ export default function Simulator() {
               is_household={isHousehold} // Pass marker type to OutputGraphs
               onReset={onReset}
             />
-            <CytoGraph 
+            {/* <CytoGraph 
               move_patterns={movePatterns}
               pap_data={papData}
-            />
+            /> */}
           </div>
         }
       </div>
