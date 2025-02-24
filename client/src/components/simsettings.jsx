@@ -1,16 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import MatrixSelector from './matrixselector';
 
 import './simsettings.css';
+import { DB_URL } from '../env';
 
 // Dropdown
 function SimLocation({callback}) {
+  const [locations, setLocations] = useState([]);
+
+  useEffect(() => {
+    fetch(`${DB_URL}convenience-zones`)
+      .then((res) => res.json())
+      .then((json) => setLocations(json['data']))
+      .catch(console.error);
+  }, []);
+
   return (
     <div className='simset_dropdown'>
     <div className='simset_dropdown_label'>Convenience Zone</div>
     <select className='simset_dropdown' name='location' onChange={(e) => callback(e.target.value)}>
-      <option value='barnsdall'>Barnsdall, OK</option>
-      <option value='hagerstown'>Hagerstown, MD</option>
+      {locations.map((data) => (
+        <option key={data.id} value={data.name}>{data.label}</option>
+      ))}
+      {/* <option value='barnsdall'>Barnsdall, OK</option>
+      <option value='hagerstown'>Hagerstown, MD</option> */}
     </select>
     </div>
   );
