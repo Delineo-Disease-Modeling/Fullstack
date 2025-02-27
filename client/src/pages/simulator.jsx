@@ -66,11 +66,22 @@ export default function Simulator() {
   const [simData, setSimData] = useState(null);           // Simulator output data
   const [location, setLocation] = useState('barnsdall');
 
+  const [selectedZone, setSelectedZone] = useState(null);
+
   // State to track selected marker information
   const [selectedId, setSelectedId] = useState(null);
   const [isHousehold, setIsHousehold] = useState(false);
 
   // Function to handle marker clicks in ModelMap
+  const handleSimData = (dict) => {
+    // Run your existing function that sets papData, movePatterns, simData
+    sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
+
+    // dict.location is a string, dict.zoneObj is the entire zone
+    setLocation(dict.location);
+    setSelectedZone(dict.zoneObj); 
+  };
+
   const handleMarkerClick = (id, isHome) => {
     setSelectedId(id);
     setIsHousehold(isHome);
@@ -86,10 +97,8 @@ export default function Simulator() {
       <div className='sim_container'>
         {!showSim &&
           <div className='sim_settings'>
-            <SimSettings sendData={(dict) => {
-              sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
-              setLocation(dict['location']);
-            }} showSim={setShowSim} />
+            {/* Instead of inline, let's pass handleSimData */}
+            <SimSettings sendData={handleSimData} showSim={setShowSim} />
           </div>
         }
 
@@ -99,12 +108,24 @@ export default function Simulator() {
 
         {showSim && simData && movePatterns && papData &&
           <div className='sim_output'>
+            {/* display the zone info next to the map */}
+            {selectedZone && (
+              <div className='mb-2 p-2 border border-gray-300'>
+                <h2>{selectedZone.label}</h2>
+                <p><strong>Size:</strong> {selectedZone.size}</p>
+                <p><strong>Created At:</strong> {selectedZone.created_at}</p>
+                <p><strong>Latitude:</strong> {selectedZone.latitude}</p>
+                <p><strong>Longitude:</strong> {selectedZone.longitude}</p>
+              </div>
+            )}
+            
             <ModelMap
               sim_data={simData}
               move_patterns={movePatterns}
               pap_data={papData}
               location={location}
               onMarkerClick={handleMarkerClick} // Pass the click handler to ModelMap
+              selectedZone = {selectedZone}
             />
             <OutputGraphs
               sim_data={simData}

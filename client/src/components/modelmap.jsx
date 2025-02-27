@@ -219,13 +219,24 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
   );
 }
 
-export default function ModelMap({ sim_data, move_patterns, pap_data, location, onMarkerClick, selectedId, isHousehold }) {
+export default function ModelMap({ sim_data, move_patterns, pap_data, location, onMarkerClick, selectedId, isHousehold, selectedZone }) {
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
   const [hotspots, setHotspots] = useState({});
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
+
+  // Default center if no selectedZone was provided
+  const defaultCenter = map_centers[location] || [36.562036, -96.160775];
+  const [mapCenter, setMapCenter] = useState(defaultCenter);
+  useEffect(() => {
+    if (selectedZone && selectedZone.latitude && selectedZone.longitude) {
+      setMapCenter([selectedZone.latitude, selectedZone.longitude]);
+    } else {
+      setMapCenter(defaultCenter);
+    }
+  }, [selectedZone, defaultCenter]);
 
   useEffect(() => {
     setHotspots(() => { return {}; });
@@ -304,6 +315,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
         selectedId={selectedId}
         isHousehold={isHousehold}
         hotspots={hotspots}
+        mapCenter={mapCenter} // pass the dynamic center
       />
 
       {/* Slider Component */}

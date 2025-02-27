@@ -15,16 +15,29 @@ function SimLocation({callback}) {
       .catch(console.error);
   }, []);
 
+  const handleChange = (e) => {
+    const selectedName = e.target.value; // e.g. "barnsdall"
+    // Locate the entire zone object
+    const foundZone = locations.find(z => z.name === selectedName);
+    if (foundZone) {
+      // Pass the full zone object up to parent
+      callback(foundZone);
+    }
+  };
+
   return (
     <div className='simset_dropdown'>
-    <div className='simset_dropdown_label'>Convenience Zone</div>
-    <select className='simset_dropdown' name='location' onChange={(e) => callback(e.target.value)}>
-      {locations.map((data) => (
-        <option key={data.id} value={data.name}>{data.label}</option>
-      ))}
-      {/* <option value='barnsdall'>Barnsdall, OK</option>
-      <option value='hagerstown'>Hagerstown, MD</option> */}
-    </select>
+      <div className='simset_dropdown_label'>Convenience Zone</div>
+      <select className='simset_dropdown' onChange={handleChange}>
+        {/* Optionally add a placeholder */}
+        <option value="">-- Select a zone --</option>
+
+        {locations.map((data) => (
+          <option key={data.id} value={data.name}>
+            {data.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -79,7 +92,7 @@ function SimFile({label, callback}) {
 }
 
 export default function SimSettings({ sendData, showSim }) {
-  const [ location, setLocation ] = useState('barnsdall');  // Area to simulate
+  const [selectedZone, setSelectedZone] = useState(null);
   const [ days, setDays ] = useState(50);                   // How long to run the simulation
   const [ pmask, setPmask ] = useState(0.4);                // Percent masking
   const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated
@@ -94,9 +107,8 @@ export default function SimSettings({ sendData, showSim }) {
   return (
     <div className='simset_settings'>
       <div className='simset_params'>
-        <SimLocation 
-          callback={setLocation}
-        />
+        {/* Pass setSelectedZone to SimLocation, so we get the full object */}
+        <SimLocation callback={setSelectedZone} />
 
         {/* <SimParameter
           label={'Length (Days)'}
@@ -148,10 +160,31 @@ export default function SimSettings({ sendData, showSim }) {
         />
       </div>
       
-      <button className='simset_button' onClick={() => { 
-        sendData({ matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso, randseed }); 
-        showSim(true); 
-      }}>Simulate</button>
+      <button className='simset_button' onClick={() => {
+          if (!selectedZone) {
+            alert('Please pick a convenience zone first!');
+            return;
+          }
+
+          // Now pass the zone's name & full object to the parent
+          sendData({
+            location: selectedZone.name,
+            zoneObj: selectedZone,
+            days,
+            pmask,
+            pvaccine,
+            capacity,
+            lockdown,
+            selfiso,
+            randseed,
+            matrices
+          });
+
+          showSim(true);
+        }}
+      >
+        Simulate
+      </button>
     </div>
   );
 }
