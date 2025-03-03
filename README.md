@@ -42,17 +42,17 @@ This file captures the movement patterns within the simulation at specific times
 Structure:
 ```bash
 {
-    "60": {     // Timestep in minutes or simulation time unit
+    "60": {             // Timestep in minutes or simulation time unit
         "homes": {      // Home patterns
             "1": [      // Home ID
                 "4", 
-                "5"        // List of person IDs present at this home
+                "5"     // List of person IDs present at this home
             ]
         },
         "places": {
             "3": [      // Place ID
                 "24", 
-                "25"      // List of person IDs present at this place
+                "25"    // List of person IDs present at this place
             ]
         },
     }
