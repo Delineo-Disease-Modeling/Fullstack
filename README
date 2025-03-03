@@ -1,5 +1,31 @@
-# Delineo
+# Delineo Website
 
 Delineo website developed & ported to [React.JS](https://github.com/facebook/react).
 
-[Visit](https://delineo.me)
+Try it out: <https://delineo.me>
+
+## Setup
+
+You'll need to install [node](https://nodejs.org/) and [pnpm](https://pnpm.io/) first.
+
+You want to install and run the Delineo [Simulator](https://github.com/Delineo-Disease-Modeling/Simulation) and [Database](https://github.com/Delineo-Disease-Modeling/Database) next.
+
+Then, clone this repository locally and navigate to the `client` folder and create a `.env` file with the following schema:
+
+```text
+# Simulator server IP
+VITE_API_URL=http://127.0.0.1:1880/
+
+# Database server IP 
+VITE_DB_URL=http://127.0.0.1:1890/
+
+# If set to true, will use data from disk
+VITE_USE_CACHED_DATA=FALSE
+```
+
+Then, while still in the `client` folder, run the following commands:
+
+```bash
+pnpm install
+pnpm dev
+```
