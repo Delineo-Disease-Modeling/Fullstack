@@ -5,7 +5,7 @@ import './simsettings.css';
 import { DB_URL } from '../env';
 
 // Dropdown
-function SimLocation({callback}) {
+function SimLocation({ setZone }) {
   const [locations, setLocations] = useState([]);
 
   useEffect(() => {
@@ -16,12 +16,11 @@ function SimLocation({callback}) {
   }, []);
 
   const handleChange = (e) => {
-    const selectedName = e.target.value; // e.g. "barnsdall"
     // Locate the entire zone object
-    const foundZone = locations.find(z => z.name === selectedName);
-    if (foundZone) {
+    const zoneObj = locations.find((l) => l.id == +e.target.value);
+    if (zoneObj) {
       // Pass the full zone object up to parent
-      callback(foundZone);
+      setZone(zoneObj);
     }
   };
 
@@ -33,7 +32,7 @@ function SimLocation({callback}) {
         <option value="">-- Select a zone --</option>
 
         {locations.map((data) => (
-          <option key={data.id} value={data.name}>
+          <option key={data.id} value={data.id}>
             {data.label}
           </option>
         ))}
@@ -92,7 +91,7 @@ function SimFile({label, callback}) {
 }
 
 export default function SimSettings({ sendData, showSim }) {
-  const [selectedZone, setSelectedZone] = useState(null);
+  const [ zone, setZone ] = useState(null);
   const [ days, setDays ] = useState(50);                   // How long to run the simulation
   const [ pmask, setPmask ] = useState(0.4);                // Percent masking
   const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated
@@ -108,7 +107,7 @@ export default function SimSettings({ sendData, showSim }) {
     <div className='simset_settings'>
       <div className='simset_params'>
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
-        <SimLocation callback={setSelectedZone} />
+        <SimLocation setZone={setZone} />
 
         {/* <SimParameter
           label={'Length (Days)'}
@@ -161,15 +160,15 @@ export default function SimSettings({ sendData, showSim }) {
       </div>
       
       <button className='simset_button' onClick={() => {
-          if (!selectedZone) {
+          if (!zone) {
             alert('Please pick a convenience zone first!');
             return;
           }
 
           // Now pass the zone's name & full object to the parent
           sendData({
-            location: selectedZone.name,
-            zoneObj: selectedZone,
+            zone: zone,
+            location: zone.name,
             days,
             pmask,
             pvaccine,

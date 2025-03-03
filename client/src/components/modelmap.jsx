@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; 
+import { useState, useEffect, useMemo } from 'react'; 
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from 'leaflet';
@@ -71,11 +71,6 @@ function createFacilityMarker(id, position, name, label, icon, proportion) {
   return [icon, name, label, position, proportion, id];
 };
 
-const map_centers = {
-  'barnsdall': [36.562036, -96.160775],
-  'hagerstown': [39.64168, -77.718986]
-}
-
 const createClusterCustomIcon = function (cluster) {
   // Check if any marker in the cluster has a `proportion > 0.0` (used as pulsing markers in your setup)
   //const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
@@ -103,7 +98,7 @@ const createClusterCustomIcon = function (cluster) {
 
 var household_locs = {};
 
-function updateIcons(curtime, type, location, patterns, sim_data, pap_data, callback, hotspots) {
+function updateIcons(curtime, type, mapCenter, patterns, sim_data, pap_data, callback, hotspots) {
   var new_icons = [];
 
   curtime = (curtime * 60).toString();
@@ -114,8 +109,8 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
 
       if (!(index in household_locs)) {
         household_locs[index] = [
-          map_centers[location][0] + (Math.random() * 0.06 - 0.03),
-          map_centers[location][1] + (Math.random() * 0.06 - 0.03)
+          mapCenter[0] + (Math.random() * 0.06 - 0.03),
+          mapCenter[1] + (Math.random() * 0.06 - 0.03)
         ];
       }
 
@@ -165,7 +160,7 @@ function updateIcons(curtime, type, location, patterns, sim_data, pap_data, call
   callback(new_icons);
 }
 
-function ClusteredMap({ timestamp, location, publicFacilities, households, onMarkerClick, hotspots }) {
+function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMarkerClick, hotspots }) {
   const marker_icon_component = (type, addr, index) => {
     //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
     const selectedIcon = addr[0]; //isSelected ? marker_icon('selected_category', 0.0) : addr[0];
@@ -199,7 +194,7 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
 
   return (
     <div className='outline outline-2 outline-[#70B4D4]'>
-      <MapContainer className="mapcontainer" center={map_centers[location]} zoom={13} scrollWheelZoom={true} zoomControl={false}>
+      <MapContainer className="mapcontainer" center={mapCenter} zoom={13} scrollWheelZoom={true} zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -219,7 +214,7 @@ function ClusteredMap({ timestamp, location, publicFacilities, households, onMar
   );
 }
 
-export default function ModelMap({ sim_data, move_patterns, pap_data, location, onMarkerClick, selectedId, isHousehold, selectedZone }) {
+export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerClick, selectedId, isHousehold, selectedZone }) {
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
@@ -227,16 +222,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
 
   const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
-  // Default center if no selectedZone was provided
-  const defaultCenter = map_centers[location] || [36.562036, -96.160775];
-  const [mapCenter, setMapCenter] = useState(defaultCenter);
-  useEffect(() => {
-    if (selectedZone && selectedZone.latitude && selectedZone.longitude) {
-      setMapCenter([selectedZone.latitude, selectedZone.longitude]);
-    } else {
-      setMapCenter(defaultCenter);
-    }
-  }, [selectedZone, defaultCenter]);
+  const mapCenter = useMemo(() => [ selectedZone.latitude, selectedZone.longitude ], [selectedZone]);
 
   useEffect(() => {
     setHotspots(() => { return {}; });
@@ -295,11 +281,11 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
     setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
 
     setHotspots((hs) => {
-      updateIcons(1, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, hs);
-      updateIcons(1, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, hs);  
+      updateIcons(1, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hs);
+      updateIcons(1, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hs);  
       return hs;
     });
-  }, [sim_data, move_patterns, pap_data, location]);
+  }, [sim_data, move_patterns, pap_data, mapCenter]);
 
   return (
     <div>
@@ -308,14 +294,13 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
       {/* Map Container */}
       <ClusteredMap
         timestamp={timestamp}
-        location={location}
+        mapCenter={mapCenter}
         publicFacilities={publicFacilities}
         households={households}
         onMarkerClick={onMarkerClick}
         selectedId={selectedId}
         isHousehold={isHousehold}
         hotspots={hotspots}
-        mapCenter={mapCenter} // pass the dynamic center
       />
 
       {/* Slider Component */}
@@ -329,8 +314,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
             setTimestamp(newTimestamp);
-            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
+            updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+            updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
         />
         <div className='text-center mt-3'>
@@ -349,8 +334,8 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, location, 
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
             setTimestamp(newTimestamp);
-            updateIcons(newTimestamp, 'places', location, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-            updateIcons(newTimestamp, 'homes', location, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
+            updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+            updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
         />
       </div>

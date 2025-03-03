@@ -64,7 +64,6 @@ export default function Simulator() {
   const [papData, setPapData] = useState(null);
   const [movePatterns, setMovePatterns] = useState(null);
   const [simData, setSimData] = useState(null);           // Simulator output data
-  const [location, setLocation] = useState('barnsdall');
 
   const [selectedZone, setSelectedZone] = useState(null);
 
@@ -77,9 +76,8 @@ export default function Simulator() {
     // Run your existing function that sets papData, movePatterns, simData
     sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
 
-    // dict.location is a string, dict.zoneObj is the entire zone
-    setLocation(dict.location);
-    setSelectedZone(dict.zoneObj); 
+    console.log(dict.zone);
+    setSelectedZone(dict.zone); 
   };
 
   const handleMarkerClick = (id, isHome) => {
@@ -108,25 +106,21 @@ export default function Simulator() {
 
         {showSim && simData && movePatterns && papData &&
           <div className='sim_output'>
-            {/* display the zone info next to the map */}
-            {selectedZone && (
-              <div className='mb-2 p-2 border border-gray-300'>
-                <h2>{selectedZone.label}</h2>
-                <p><strong>Size:</strong> {selectedZone.size}</p>
-                <p><strong>Created At:</strong> {selectedZone.created_at}</p>
-                <p><strong>Latitude:</strong> {selectedZone.latitude}</p>
-                <p><strong>Longitude:</strong> {selectedZone.longitude}</p>
+            <div className='flex flex-col gap-4'>
+              <div className='flex items-center justify-between'>
+                <h2>{selectedZone.label} ({selectedZone.name})</h2>
+                <p>{new Date(selectedZone.created_at).toLocaleDateString()}</p>
               </div>
-            )}
-            
-            <ModelMap
-              sim_data={simData}
-              move_patterns={movePatterns}
-              pap_data={papData}
-              location={location}
-              onMarkerClick={handleMarkerClick} // Pass the click handler to ModelMap
-              selectedZone = {selectedZone}
-            />
+
+              <ModelMap
+                selectedZone={selectedZone}
+                sim_data={simData}
+                move_patterns={movePatterns}
+                pap_data={papData}
+                onMarkerClick={handleMarkerClick} // Pass the click handler to ModelMap
+              />
+            </div>
+
             <OutputGraphs
               sim_data={simData}
               move_patterns={movePatterns}

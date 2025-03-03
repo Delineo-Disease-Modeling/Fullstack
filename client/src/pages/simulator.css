@@ -27,10 +27,10 @@ div.sim_output {
   height: 100%;
 
   display: flex;
-  justify-content: space-around;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
   flex-wrap: wrap;
 
-  column-gap: 30px;
-  row-gap: 100px;
+  gap: 50px;
 }
