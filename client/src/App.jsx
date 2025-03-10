@@ -13,6 +13,7 @@ import Home from './pages/home.jsx';
 import Simulator from './pages/simulator.jsx';
 import Team from './pages/team.jsx';
 import About from './pages/about.jsx';
+import CZGeneration from './pages/cz-generation.jsx';
 
 function App() {
   const { pathname } = useLocation();
@@ -32,6 +33,7 @@ function App() {
       <Routes>
         <Route path='/' element={<Home />} />
         <Route path='/simulator' element={<Simulator />} />
+        <Route path='/cz-generation' element={<CZGeneration />} />
         <Route path='/team' element={<Team />} />
         <Route path='/about' element={<About />} />
       </Routes>

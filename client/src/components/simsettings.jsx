@@ -3,9 +3,12 @@ import MatrixSelector from './matrixselector';
 
 import './simsettings.css';
 import { DB_URL } from '../env';
+import { useNavigate } from 'react-router-dom';
 
 // Dropdown
 function SimLocation({ setZone }) {
+  const navigate = useNavigate();
+
   const [locations, setLocations] = useState([]);
 
   useEffect(() => {
@@ -27,16 +30,25 @@ function SimLocation({ setZone }) {
   return (
     <div className='simset_dropdown'>
       <div className='simset_dropdown_label'>Convenience Zone</div>
-      <select className='simset_dropdown' onChange={handleChange}>
-        {/* Optionally add a placeholder */}
-        <option value="">-- Select a zone --</option>
+      <div className='flex gap-4'>
+        <select className='simset_dropdown' onChange={handleChange}>
+          {/* Optionally add a placeholder */}
+          <option value="">-- Select a zone --</option>
 
-        {locations.map((data) => (
-          <option key={data.id} value={data.id}>
-            {data.label}
-          </option>
-        ))}
-      </select>
+          {locations.map((data) => (
+            <option key={data.id} value={data.id}>
+              {data.label}
+            </option>
+          ))}
+        </select>
+
+        <button
+          className='simset_button w-48'
+          onClick={() => navigate('/cz-generation')}
+        >
+          + Generate Zone
+        </button>
+      </div>
     </div>
   );
 }
@@ -159,7 +171,7 @@ export default function SimSettings({ sendData, showSim }) {
         />
       </div>
       
-      <button className='simset_button' onClick={() => {
+      <button className='simset_button w-32' onClick={() => {
           if (!zone) {
             alert('Please pick a convenience zone first!');
             return;
