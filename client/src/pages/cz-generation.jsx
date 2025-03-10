@@ -29,7 +29,10 @@ export default function CZGeneration() {
     fetch('http://localhost:1738/generate-cz', {
       method: 'POST',
       body: JSON.stringify({
-
+        name: formdata.get('name'),
+        label: formdata.get('label'),
+        core_cbg: formdata.get('core_cbg'),
+        min_pop: +formdata.get('min_pop'),
       })
     })
       .then((resp) => {
@@ -68,7 +71,7 @@ export default function CZGeneration() {
 
         <FormField 
           label='Core/Seed CBG'
-          name='label'
+          name='core_cbg'
           type='text'
           placeholder='e.g. 245101001001'
         />
