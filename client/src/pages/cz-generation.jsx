@@ -40,42 +40,28 @@ export default function CZGeneration() {
       return null;
     }
 
-    const json = await resp.json();
-
-    console.log(json['zip_code'])
-
-    return json['zip_code'];
+    return await resp.json();
   };
 
-  const zip_to_cbg = async (location) => {
-    const zip = zip_cbg_json[location]?.[0];
-
-    if (!zip) {
-      const lookup = await loc_lookup(location);
-
-      if (!lookup) {
-        return null;
-      }
-
-      return zip_cbg_json[lookup]?.[0];
-    }
-
-    return zip;
+  const zip_to_cbg = (location) => {
+    return zip_cbg_json[location]?.[0];
   };
 
   const generateCZ = async (formdata) => {
     console.log(formdata);
     setLoading(true);
 
-    const core_cbg = await zip_to_cbg(formdata.get('label'));
+    const location = await loc_lookup(formdata.get('label'));
+    const core_cbg = zip_to_cbg(location?.['zip_code'] ?? formdata.get('label'));
 
+    console.log(location);
     console.log(core_cbg);
 
     fetch(`${API_URL}generate-cz`, {
       method: 'POST',
       body: JSON.stringify({
         name: formdata.get('name'),
-        label: formdata.get('label'),
+        label: location['city'],
         core_cbg: core_cbg,
         min_pop: +formdata.get('min_pop'),
       })
@@ -101,7 +87,7 @@ export default function CZGeneration() {
 
       <form action={generateCZ} className='flex flex-col gap-8 mb-28 items-center'>
         <FormField 
-          label='Address or Zip Code'
+          label='City, Address, or Zip Code'
           name='label'
           type='text'
           placeholder='e.g. 55902'
