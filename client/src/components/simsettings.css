@@ -92,12 +92,12 @@ div.simset_dropdown_label {
 }
 
 select.simset_dropdown {
-  width: 150px;
+  width: 12rem;
   font: Poppins;
   padding: 5px;
   background-color: #fff;
   border: 2px solid #5D576B;
-  border-radius: 15px;
+  border-radius: 12px;
   cursor: pointer;
 }
 
