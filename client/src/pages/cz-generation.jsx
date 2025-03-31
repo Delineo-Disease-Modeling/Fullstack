@@ -85,28 +85,38 @@ export default function CZGeneration() {
     <div className='flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]'>
       <header className='mt-28 text-3xl'>Convenience Zone Creation</header>
 
-      <form action={generateCZ} className='flex flex-col gap-8 mb-28 items-center'>
-        <FormField 
-          label='City, Address, or Zip Code'
-          name='label'
-          type='text'
-          placeholder='e.g. 55902'
-        />
+        <form action={generateCZ} className='flex flex-col gap-8 mb-28 items-center'>
+          <div className='flex justify-center gap-10 flex-wrap mx-4'>
+            <div className='flex flex-col gap-8 items-center'>
+              <FormField 
+                label='City, Address, or Zip Code'
+                name='label'
+                type='text'
+                placeholder='e.g. 55902'
+              />
 
-        <FormField 
-          label='Internal name'
-          name='name'
-          type='text'
-          placeholder='e.g. barnsdall'
-        />
+              <FormField 
+                label='Internal name'
+                name='name'
+                type='text'
+                placeholder='e.g. barnsdall'
+              />
 
-        <FormField 
-          label='Minimum Population'
-          name='min_pop'
-          type='number'
-          defaultValue={5000}
-        />
+              <FormField 
+                label='Minimum Population'
+                name='min_pop'
+                type='number'
+                defaultValue={5000}
+              />       
+            </div>
 
+          <iframe
+            src='./hagerstown_demo.html'
+            title='Generated Convenience Zone'
+            className='h-72 w-[35rem] max-w-[85vw]'
+          />
+
+        </div>
         <input
           type='submit'
           value='Generate!'
