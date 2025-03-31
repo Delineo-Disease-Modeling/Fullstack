@@ -4,17 +4,18 @@ import { useNavigate } from "react-router-dom";
 import zip_cbg_json from '../../public/data/zip_to_cbg.json';
 import { API_URL, DB_URL } from "../env";
 
-function FormField({ label, name, type, placeholder, defaultValue }) {
+function FormField({ label, name, type, placeholder, defaultValue, disabled }) {
   return (
     <div className='flex flex-col gap-2'>
       <label htmlFor={name}>{label}</label>
       <input
-        className='px-2 py-1 rounded-lg'
+        className='px-2 py-1 rounded-lg disabled:cursor-not-allowed disabled:brightness-75'
         name={name}
         id={name}
         type={type}
         placeholder={placeholder}
         defaultValue={defaultValue}
+        disabled={disabled}
         required
       />
     </div>
@@ -23,6 +24,8 @@ function FormField({ label, name, type, placeholder, defaultValue }) {
 
 export default function CZGeneration() {
   const navigate = useNavigate();
+
+  const [ iframeHTML, setIframeHTML ] = useState();
   const [ loading, setLoading ] = useState(false);
 
   const loc_lookup = async (location) => {
@@ -61,8 +64,8 @@ export default function CZGeneration() {
       method: 'POST',
       body: JSON.stringify({
         name: formdata.get('name'),
-        label: location['city'],
-        core_cbg: core_cbg,
+        cbg: core_cbg,
+        zip_code: '21740',
         min_pop: +formdata.get('min_pop'),
       })
     })
@@ -74,8 +77,7 @@ export default function CZGeneration() {
         return resp.json();
       })
       .then((json) => {
-        console.log(json);
-        navigate('/simulator');
+        setIframeHTML(json['map']);
       })
       .catch(() => console.error('An unknown error occurred'))
       .finally(() => setLoading(false));
@@ -93,6 +95,7 @@ export default function CZGeneration() {
                 name='label'
                 type='text'
                 placeholder='e.g. 55902'
+                disabled={!!iframeHTML}
               />
 
               <FormField 
@@ -100,6 +103,7 @@ export default function CZGeneration() {
                 name='name'
                 type='text'
                 placeholder='e.g. barnsdall'
+                disabled={!!iframeHTML}
               />
 
               <FormField 
@@ -107,19 +111,21 @@ export default function CZGeneration() {
                 name='min_pop'
                 type='number'
                 defaultValue={5000}
+                disabled={!!iframeHTML}
               />       
             </div>
 
           <iframe
-            src='./hagerstown_demo.html'
+            srcDoc={iframeHTML}
             title='Generated Convenience Zone'
             className='h-72 w-[35rem] max-w-[85vw]'
           />
 
         </div>
         <input
-          type='submit'
-          value='Generate!'
+          type={!iframeHTML ? 'submit' : 'button'}
+          value={!iframeHTML ? 'Generate!' : 'Return'}
+          onClick={() => iframeHTML && navigate('/simulator')}
           disabled={loading}
           className='bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500'
         />
