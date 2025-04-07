@@ -70,7 +70,7 @@ export default function SimSettings({ sendData, showSim }) {
     <div className='simset_settings'>
       <div className='simset_params'>
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
-        <CzDict setZone={setZone} />
+        <CzDict zone={zone} setZone={setZone} />
 
         {/* <SimParameter
           label={'Length (Days)'}
