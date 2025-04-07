@@ -63,7 +63,7 @@ export default function CZGeneration() {
     fetch(`${API_URL}generate-cz`, {
       method: 'POST',
       body: JSON.stringify({
-        name: formdata.get('name'),
+        name: location['city'], //formdata.get('name'),
         cbg: core_cbg,
         zip_code: '21740',
         min_pop: +formdata.get('min_pop'),
@@ -77,6 +77,8 @@ export default function CZGeneration() {
         return resp.json();
       })
       .then((json) => {
+        const localdict = localStorage.getItem('czlist') ?? '[]';
+        localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), json['id']]));
         setIframeHTML(json['map']);
       })
       .catch(() => console.error('An unknown error occurred'))
@@ -99,14 +101,6 @@ export default function CZGeneration() {
               />
 
               <FormField 
-                label='Internal name'
-                name='name'
-                type='text'
-                placeholder='e.g. barnsdall'
-                disabled={!!iframeHTML}
-              />
-
-              <FormField 
                 label='Minimum Population'
                 name='min_pop'
                 type='number'
@@ -124,7 +118,7 @@ export default function CZGeneration() {
         </div>
         <input
           type={!iframeHTML ? 'submit' : 'button'}
-          value={!iframeHTML ? 'Generate!' : 'Return'}
+          value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
           onClick={() => iframeHTML && navigate('/simulator')}
           disabled={loading}
           className='bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500'

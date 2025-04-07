@@ -6,7 +6,6 @@ import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
-//import CytoGraph from '../components/cytograph.jsx';
 import { API_URL, USE_CACHED_DATA } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {

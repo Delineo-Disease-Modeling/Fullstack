@@ -1,57 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import MatrixSelector from './matrixselector';
+import CzDict from './czdict';
 
 import './simsettings.css';
-import { DB_URL } from '../env';
-import { useNavigate } from 'react-router-dom';
-
-// Dropdown
-function SimLocation({ setZone }) {
-  const navigate = useNavigate();
-
-  const [locations, setLocations] = useState([]);
-
-  useEffect(() => {
-    fetch(`${DB_URL}convenience-zones`)
-      .then((res) => res.json())
-      .then((json) => setLocations(json['data']))
-      .catch(console.error);
-  }, []);
-
-  const handleChange = (e) => {
-    // Locate the entire zone object
-    const zoneObj = locations.find((l) => l.id == +e.target.value);
-    if (zoneObj) {
-      // Pass the full zone object up to parent
-      setZone(zoneObj);
-    }
-  };
-
-  return (
-    <div className='simset_dropdown'>
-      <div className='simset_dropdown_label'>Convenience Zone</div>
-      <div className='flex gap-4'>
-        <select className='simset_dropdown' onChange={handleChange}>
-          {/* Optionally add a placeholder */}
-          <option value="">-- Select a zone --</option>
-
-          {locations.map((data) => (
-            <option key={data.id} value={data.id}>
-              {data.label}
-            </option>
-          ))}
-        </select>
-
-        <button
-          className='simset_button w-48'
-          onClick={() => navigate('/cz-generation')}
-        >
-          + Generate Zone
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // Slider
 function SimParameter({label, value, callback, min=0, max=100, def=50, percent=true}) {
@@ -119,7 +70,7 @@ export default function SimSettings({ sendData, showSim }) {
     <div className='simset_settings'>
       <div className='simset_params'>
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
-        <SimLocation setZone={setZone} />
+        <CzDict setZone={setZone} />
 
         {/* <SimParameter
           label={'Length (Days)'}
