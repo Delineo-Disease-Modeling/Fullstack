@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 
-import zip_cbg_json from '../../public/data/zip_to_cbg.json';
+import zip_cbg_json from '../data/zip_to_cbg.json';
 import { API_URL, DB_URL } from "../env";
 
 function InteractiveMap({ onLocationSelect, disabled }) {
@@ -117,7 +117,7 @@ export default function CZGeneration() {
         name: location['city'],
         cbg: core_cbg,
         zip_code: '21740',
-        start_date: formdata.get('start_date'),
+        start_date: new Date(formdata.get('start_date')).toISOString(),
         min_pop: +formdata.get('min_pop'),
       })
     })

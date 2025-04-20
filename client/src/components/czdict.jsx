@@ -48,11 +48,11 @@ export default function CzDict({ zone, setZone }) {
           {locations.filter((loc) => tab === 0 ? true : my_zones.includes(loc.id)).map((loc) => (
             <div
               key={loc.id}
-              className='flex px-1 justify-between hover:cursor-pointer hover:scale-[0.95]'
-              style={zone.id === loc.id ? { background: '#70B4D4', color: 'white' } : undefined}
-              onClick={() => setZone(loc)}
+              className='flex px-1 justify-between hover:cursor-pointer hover:scale-[0.98]'
+              style={!loc.ready ? { background: '#11111140', color: 'white', cursor: 'not-allowed' } : zone.id === loc.id ? { background: '#70B4D4', color: 'white' } : undefined}
+              onClick={() => loc.ready && setZone(loc)}
             >
-              <p>{loc.label}</p>
+              <p>{loc.name}</p>
               <p>{loc.size} - {new Date(loc.created_at).toLocaleDateString()}</p>
             </div>
           ))}
