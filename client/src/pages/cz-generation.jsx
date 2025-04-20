@@ -1,10 +1,50 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
 
 import zip_cbg_json from '../../public/data/zip_to_cbg.json';
 import { API_URL, DB_URL } from "../env";
+
+function InteractiveMap({ onLocationSelect, disabled }) {
+  const [ markerPosition, setMarkerPosition ] = useState(null);
+
+  function LocationMarker() {
+    useMapEvents({
+      click(e) {
+        if (disabled) {
+          return;
+        }
+
+        setMarkerPosition(e.latlng);
+        const coords = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+        onLocationSelect(coords);
+      }
+    });
+
+    return markerPosition === null ? null : (
+      <Marker position={markerPosition}>
+        <Popup>
+          Selected Location: {markerPosition.lat.toFixed(4)}, {markerPosition.lng.toFixed(4)}
+        </Popup>
+      </Marker>
+    );
+  }
+
+  return (
+    <MapContainer
+      center={[39.3290708, -76.6219753]}
+      zoom={10}
+      style={{ height: '300px', width: '100%' }}
+    >
+      <TileLayer
+        attribution='&copy; OpenStreetMap contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      <LocationMarker />
+    </MapContainer>
+  );
+}
 
 function FormField({ label, name, type, placeholder, defaultValue, disabled, value, onChange }) {
   return (
@@ -26,52 +66,12 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
   );
 }
 
-function InteractiveMap({ onLocationSelect }) {
-  const [markerPosition, setMarkerPosition] = useState(null);
-
-  function LocationMarker() {
-    useMapEvents({
-      click(e) {
-        setMarkerPosition(e.latlng);
-
-        // coords here
-
-        const coords = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-        onLocationSelect(coords);
-      }
-    });
-
-    return markerPosition === null ? null : (
-      <Marker position={markerPosition}>
-        <Popup>
-          Selected Location: {markerPosition.lat.toFixed(4)}, {markerPosition.lng.toFixed(4)}
-        </Popup>
-      </Marker>
-    );
-  }
-
-  return (
-    <MapContainer
-      center={[37.7749, -122.4194]}
-      zoom={13}
-      style={{ height: '300px', width: '100%' }}
-    >
-      <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <LocationMarker />
-    </MapContainer>
-  );
-}
-
 export default function CZGeneration() {
   const navigate = useNavigate();
 
-  const [iframeHTML, setIframeHTML] = useState();
-  const [loading, setLoading] = useState(false);
-
-  const [locationLabel, setLocationLabel] = useState('');
+  const [ location, setLocation ] = useState('');
+  const [ iframeHTML, setIframeHTML ] = useState();
+  const [ loading, setLoading ] = useState(false);
 
   const loc_lookup = async (location) => {
     const resp = await fetch(`${DB_URL}lookup-zip`, {
@@ -79,11 +79,15 @@ export default function CZGeneration() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ location })
+      body: JSON.stringify({
+        location: location
+      })
     });
+
     if (!resp.ok) {
       return null;
     }
+
     return await resp.json();
   };
 
@@ -92,78 +96,106 @@ export default function CZGeneration() {
   };
 
   const generateCZ = async (formdata) => {
+    console.log(formdata);
     setLoading(true);
-    const locationData = await loc_lookup(formdata.get('label'));
-    const core_cbg = zip_to_cbg(locationData?.['zip_code'] ?? formdata.get('label'));
+
+    const location = await loc_lookup(formdata.get('location'));
+    const core_cbg = zip_to_cbg(location?.['zip_code'] ?? formdata.get('location'));
+
+    if (!core_cbg) {
+      console.error('Could not find location');
+      setLoading(false);
+      return;
+    }
+
+    console.log(location);
+    console.log(core_cbg);
 
     fetch(`${API_URL}generate-cz`, {
       method: 'POST',
       body: JSON.stringify({
-        name: locationData['city'],
+        name: location['city'],
         cbg: core_cbg,
-        zip_code: locationData['zip_code'] || formdata.get('label'),
+        zip_code: '21740',
+        start_date: formdata.get('start_date'),
         min_pop: +formdata.get('min_pop'),
       })
     })
       .then((resp) => {
-        if (!resp.ok) throw new Error();
+        if (!resp.ok) {
+          throw new Error();
+        }
+
         return resp.json();
       })
       .then((json) => {
         const localdict = localStorage.getItem('czlist') ?? '[]';
-        localStorage.setItem('czlist', JSON.stringify([...JSON.parse(localdict), json['id']]));
+        localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), json['id']]));
         setIframeHTML(json['map']);
       })
       .catch(() => console.error('An unknown error occurred'))
       .finally(() => setLoading(false));
-  };
+  }
 
   return (
+    <div className='flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]'>
+      <header className='mt-28 text-3xl mx-8 text-wrap text-center'>
+        Convenience Zone Creation
+      </header>
 
-    <div className='container mx-auto px-8 flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]'>
-      <header className='text-3xl mt-28'>Convenience Zone Creation</header>
-      {/* Two-column layout without wrapping */}
-      <div className='flex flex-row w-full gap-10'>
-        {/* Left Column: Form & iFrame */}
-        <div className='flex flex-col items-center w-1/2 gap-8'>
-          <form action={generateCZ} className='flex flex-col items-center w-full gap-8'>
-            <div className='flex flex-col w-full gap-10'>
-              <FormField
-                label='City, Address, or Zip Code'
-                name='label'
+        <form action={generateCZ} className='flex flex-col gap-8 mb-28 items-center'>
+          <div className='flex justify-center items-center gap-10 flex-wrap mx-4'>
+            <div className='flex flex-col gap-8 items-center'>
+              <FormField 
+                label='City, Address, or Location'
+                name='location'
                 type='text'
-                placeholder='e.g. 55902 or lat, lng'
-                value={locationLabel}
-                onChange={(e) => setLocationLabel(e.target.value)}
-                disabled={!!iframeHTML}
+                placeholder='e.g. 55902'
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                disabled={loading || !!iframeHTML}
               />
-              <FormField
+
+              <FormField 
                 label='Minimum Population'
                 name='min_pop'
                 type='number'
                 defaultValue={5000}
-                disabled={!!iframeHTML}
+                disabled={loading || !!iframeHTML}
+              />
+
+              <FormField 
+                label='Start Date'
+                name='start_date'
+                type='date'
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                disabled={loading || !!iframeHTML}
+              /> 
+            </div>
+
+          {iframeHTML ? (
+            <iframe
+              srcDoc={iframeHTML}
+              title='Generated Convenience Zone'
+              className='h-72 w-[35rem] max-w-[85vw]'
+            />
+          ) : (
+            <div className='h-72 w-[35rem] max-w-[85vw]'>
+              <InteractiveMap
+                onLocationSelect={setLocation}
+                disabled={loading}
               />
             </div>
-            <input
-              type={!iframeHTML ? 'submit' : 'button'}
-              value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
-              onClick={() => iframeHTML && navigate('/simulator')}
-              disabled={loading}
-              className='bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500'
-            />
-          </form>
-          <iframe
-            srcDoc={iframeHTML}
-            title='Generated Convenience Zone'
-            className='w-full h-72'
-          />
+          )}
         </div>
-        {/* Right Column: Interactive Map */}
-        <div className='w-1/2'>
-          <InteractiveMap onLocationSelect={setLocationLabel} />
-        </div>
-      </div>
+        <input
+          type={!iframeHTML ? 'submit' : 'button'}
+          value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
+          onClick={() => iframeHTML && navigate('/simulator')}
+          disabled={loading}
+          className='bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500'
+        />
+      </form>
     </div>
   );
 }
