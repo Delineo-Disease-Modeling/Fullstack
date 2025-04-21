@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import axios from 'axios';
 
 import SimSettings from '../components/simsettings.jsx';
 import ModelMap from '../components/modelmap.jsx';
@@ -9,15 +8,22 @@ import './simulator.css';
 import { DB_URL, SIM_URL } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
-  axios.post(`${SIM_URL}simulation/`, data)
-    .then((res) => {
-      setSimData(res.data['result']);
-      setMovePatterns(res.data['movement']);
-      console.log(res.data);
+  fetch(`${SIM_URL}simulation`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+    .then((resp) => {
+      if (!resp.ok) {
+        throw new Error();
+      }
+
+      return resp.json();
     })
-    .catch((error) => {
-      console.log(error);
-    });
+    .then((json) => {
+      setSimData(json['result']);
+      setMovePatterns(json['movement']);
+    })
+    .catch(console.error);
 }
 
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, hours, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone }) {
