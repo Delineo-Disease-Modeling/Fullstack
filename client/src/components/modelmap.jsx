@@ -319,7 +319,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerCl
           }}
         />
         <div className='text-center mt-3'>
-          {timestamp} Hours
+          {new Date(new Date(selectedZone.start_date).getTime() + timestamp * 60 * 60 * 1000).toLocaleString()}
         </div>
       </div>
 
