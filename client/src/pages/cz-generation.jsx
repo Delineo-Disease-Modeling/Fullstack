@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import axios from 'axios';
 
 import zip_cbg_json from '../data/zip_to_cbg.json';
 import { ALG_URL, DB_URL } from "../env";
@@ -109,31 +110,25 @@ export default function CZGeneration() {
   
       console.log(location);
       console.log(core_cbg);
-  
-      const resp = await fetch(`${ALG_URL}generate-cz`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: location['city'],
-          cbg: core_cbg,
-          start_date: new Date(formdata.get('start_date')).toISOString(),
-          min_pop: +formdata.get('min_pop'),
-        })
-      });
-  
-      if (!resp.ok) {
-        console.error('An unknown error occurred');
-        return;
-      }
-  
-      const json = await resp.json();
 
-      if (!json['id']) {
-        throw new Error('Invalid JSON Response Body');
+      const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
+        name: location['city'],
+        cbg: core_cbg,
+        start_date: new Date(formdata.get('start_date')).toISOString(),
+        min_pop: +formdata.get('min_pop')
+      });
+
+      if (status !== 200) {
+        throw new Error('Status code mismatch');
+      }
+
+      if (!data?.['id']) {
+        throw new Error('Invalid JSON (missing id)');
       }
 
       const localdict = localStorage.getItem('czlist') ?? '[]';
-      localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), json['id']]));
-      setIframeHTML(json['map']);
+      localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), data['id']]));
+      setIframeHTML(data['map']);
     };
 
     if (loading) {

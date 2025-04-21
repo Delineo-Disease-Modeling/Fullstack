@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 
 import SimSettings from '../components/simsettings.jsx';
 import ModelMap from '../components/modelmap.jsx';
@@ -8,28 +9,19 @@ import './simulator.css';
 import { DB_URL, SIM_URL } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
-  const func_body = async (data, setSimData, setMovePatterns) => {
-    const resp = await fetch(`${SIM_URL}simulation`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+  axios.post(`${SIM_URL}simulation`, data)
+    .then(({ status, data }) => {
+      if (status !== 200) {
+        throw new Error('Status code mismatch');
+      }
 
-    if (!resp.ok) {
-      console.error('Could not simulate')
-      return
-    }
-
-    const json = await resp.json();
-
-    if (!json['result']) {
-      throw new Error('Invalid JSON Response Body');
-    }
-
-    setSimData(json['result']);
-    setMovePatterns(json['movement']);
-  };
-
-  func_body(data, setSimData, setMovePatterns)
+      if (!data?.['result']) {
+        throw new Error('Invalid JSON (missing id)');
+      }
+  
+      setSimData(data['result']);
+      setMovePatterns(data['movement']);  
+    })
     .catch(console.error);
 }
 
