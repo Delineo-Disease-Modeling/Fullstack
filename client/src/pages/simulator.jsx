@@ -6,7 +6,7 @@ import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
-import { SIM_URL } from '../env';
+import { DB_URL, SIM_URL } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
   axios.post(`${SIM_URL}simulation/`, data)
@@ -16,18 +16,22 @@ function makePostRequest(data, setSimData, setMovePatterns) {
       console.log(res.data);
     })
     .catch((error) => {
-      console.log(error.response);
+      console.log(error);
     });
 }
 
 // eslint-disable-next-line no-unused-vars
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone }) {
-  fetch(`data/${location}/papdata.json`).then((res) => {
-    res.json().then((data) => {
-      setPapData(data);
-      console.log(data);
+  fetch(`${DB_URL}patterns/${zone.id}`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error();
+      }
+
+      return res.json()
     })
-  });
+    .then((json) => setPapData(json['papdata']))
+    .catch(console.error);
 
   makePostRequest({
     'czone_id': zone.id,
