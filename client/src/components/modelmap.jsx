@@ -30,6 +30,7 @@ const icon_lookup = {
   "Coating, Engraving, Heat Treating, and Allied Activities": "🏢",
   "Building Material and Supplies Dealers": "🏢",
   "Postal Service": "📬",
+  "None": "❓",
   "Home": "🏠" 
 }
 

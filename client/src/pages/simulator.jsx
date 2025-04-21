@@ -96,7 +96,7 @@ export default function Simulator() {
           <div className='sim_output'>
             <div className='flex flex-col gap-4'>
               <div className='flex items-center justify-between'>
-                <h2>{selectedZone.label} ({selectedZone.name})</h2>
+                <h2>{selectedZone.name}</h2>
                 <p>{new Date(selectedZone.created_at).toLocaleDateString()}</p>
               </div>
 
