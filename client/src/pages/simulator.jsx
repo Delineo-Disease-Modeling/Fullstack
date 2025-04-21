@@ -6,7 +6,7 @@ import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
-import { SIM_URL, USE_CACHED_DATA } from '../env';
+import { SIM_URL } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
   axios.post(`${SIM_URL}simulation/`, data)
@@ -29,33 +29,17 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
     })
   });
 
-  if (USE_CACHED_DATA === 'TRUE') {
-    fetch(`data/${location}/patterns.json`).then((res) => {
-      res.json().then((data) => {
-        setMovePatterns(data);
-        console.log(data);
-      })
-    });
-
-    fetch(`data/${location}/infectivity.json`).then((res) => {
-      res.json().then((data) => {
-        setSimData(data);
-        console.log(data);
-      })
-    });
-  } else {
-    makePostRequest({
-      'matrices': matrices,
-      'location': location,
-      'length': 10080,
-      'mask': pmask,
-      'vaccine': pvaccine,
-      'capacity': capacity,
-      'lockdown': lockdown,
-      'selfiso': selfiso,
-      'randseed': randseed
-    }, setSimData, setMovePatterns);  
-  }
+  makePostRequest({
+    'matrices': matrices,
+    'location': location,
+    'length': 10080,
+    'mask': pmask,
+    'vaccine': pvaccine,
+    'capacity': capacity,
+    'lockdown': lockdown,
+    'selfiso': selfiso,
+    'randseed': randseed
+  }, setSimData, setMovePatterns);  
 }
 
 export default function Simulator() {
