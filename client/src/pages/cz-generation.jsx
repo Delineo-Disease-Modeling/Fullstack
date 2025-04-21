@@ -96,44 +96,71 @@ export default function CZGeneration() {
   };
 
   const generateCZ = async (formdata) => {
-    console.log(formdata);
-    setLoading(true);
-
-    const location = await loc_lookup(formdata.get('location'));
-    const core_cbg = zip_to_cbg(location?.['zip_code'] ?? formdata.get('location'));
-
-    if (!core_cbg) {
-      console.error('Could not find location');
-      setLoading(false);
-      return;
-    }
-
-    console.log(location);
-    console.log(core_cbg);
-
-    fetch(`${ALG_URL}generate-cz`, {
-      method: 'POST',
-      body: JSON.stringify({
-        name: location['city'],
-        cbg: core_cbg,
-        zip_code: '21740',
-        start_date: new Date(formdata.get('start_date')).toISOString(),
-        min_pop: +formdata.get('min_pop'),
-      })
-    })
-      .then((resp) => {
-        if (!resp.ok) {
-          throw new Error();
+    const func_body = async (formdata) => {
+      console.log(formdata);
+  
+      const location = await loc_lookup(formdata.get('location'));
+      const core_cbg = zip_to_cbg(location?.['zip_code'] ?? formdata.get('location'));
+  
+      if (!core_cbg) {
+        console.error('Could not find location');
+        return;
+      }
+  
+      console.log(location);
+      console.log(core_cbg);
+  
+      const resp = await fetch(`${ALG_URL}generate-cz`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: location['city'],
+          cbg: core_cbg,
+          zip_code: '21740',
+          start_date: new Date(formdata.get('start_date')).toISOString(),
+          min_pop: +formdata.get('min_pop'),
+        })
+      });
+  
+      if (!resp.ok) {
+        console.error('An unknown error occurred');
+        return;
+      }
+  
+      const reader = resp.body.getReader();
+      const chunks = [];
+  
+      while (true) {
+        const { done, value } = await reader.read();
+  
+        if (done) {
+          break;
         }
+  
+        chunks.push(value);
+      }
+  
+      try {
+        const decoder = new TextDecoder();
+        const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
 
-        return resp.json();
-      })
-      .then((json) => {
+        if (!json['id']) {
+          throw new Error('Invalid JSON');
+        }
+  
         const localdict = localStorage.getItem('czlist') ?? '[]';
         localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), json['id']]));
         setIframeHTML(json['map']);
-      })
-      .catch(() => console.error('An unknown error occurred'))
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+    func_body(formdata)
       .finally(() => setLoading(false));
   }
 

@@ -8,22 +8,45 @@ import './simulator.css';
 import { DB_URL, SIM_URL } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
-  fetch(`${SIM_URL}simulation`, {
-    method: 'POST',
-    body: JSON.stringify(data)
-  })
-    .then((resp) => {
-      if (!resp.ok) {
-        throw new Error();
+  const func_body = async (data, setSimData, setMovePatterns) => {
+    const resp = await fetch(`${SIM_URL}simulation`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+
+    if (!resp.ok) {
+      return
+    }
+
+    const reader = resp.body.getReader();
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
       }
 
-      return resp.json();
-    })
-    .then((json) => {
+      chunks.push(value);
+    }
+
+    try {
+      const decoder = new TextDecoder();
+      const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
+
+      if (!json['result']) {
+        throw new Error('Invalid JSON');
+      }
+
       setSimData(json['result']);
       setMovePatterns(json['movement']);
-    })
-    .catch(console.error);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  func_body(data, setSimData, setMovePatterns);
 }
 
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, hours, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone }) {
