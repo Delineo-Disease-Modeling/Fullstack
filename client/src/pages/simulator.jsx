@@ -6,10 +6,10 @@ import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 
 import './simulator.css';
-import { API_URL, USE_CACHED_DATA } from '../env';
+import { SIM_URL, USE_CACHED_DATA } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
-  axios.post(`${API_URL}simulation/`, data)
+  axios.post(`${SIM_URL}simulation/`, data)
     .then((res) => {
       setSimData(res.data['result']);
       setMovePatterns(res.data['movement']);

@@ -55,7 +55,7 @@ function SimFile({label, callback}) {
 
 export default function SimSettings({ sendData, showSim }) {
   const [ zone, setZone ] = useState(null);
-  const [ days, setDays ] = useState(50);                   // How long to run the simulation
+  const [ days, setDays ] = useState(7);                   // How long to run the simulation
   const [ pmask, setPmask ] = useState(0.4);                // Percent masking
   const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated
   const [ capacity, setCapacity ] = useState(1.0);          // Capacity percentages

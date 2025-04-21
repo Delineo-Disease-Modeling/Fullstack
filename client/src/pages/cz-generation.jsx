@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 
 import zip_cbg_json from '../data/zip_to_cbg.json';
-import { API_URL, DB_URL } from "../env";
+import { ALG_URL, DB_URL } from "../env";
 
 function InteractiveMap({ onLocationSelect, disabled }) {
   const [ markerPosition, setMarkerPosition ] = useState(null);
@@ -111,7 +111,7 @@ export default function CZGeneration() {
     console.log(location);
     console.log(core_cbg);
 
-    fetch(`${API_URL}generate-cz`, {
+    fetch(`${ALG_URL}generate-cz`, {
       method: 'POST',
       body: JSON.stringify({
         name: location['city'],
