@@ -5,7 +5,7 @@ import CzDict from './czdict';
 import './simsettings.css';
 
 // Slider
-function SimParameter({label, value, callback, min=0, max=100, def=50, percent=true}) {
+function SimParameter({label, value, callback, min=0, max=100, percent=true}) {
   return (
     <div className='simset_slider'>
       <div className='simset_slider_label'>
@@ -15,7 +15,7 @@ function SimParameter({label, value, callback, min=0, max=100, def=50, percent=t
       <input type='range' className='simset_slider_input'
         min={min}
         max={max}
-        defaultValue={def}
+        defaultValue={percent ? value * 100.0 : value}
         onChange={(e) => callback(percent ? e.target.value / 100.0 : e.target.value)}
       />
     </div>
@@ -77,38 +77,33 @@ export default function SimSettings({ sendData, showSim }) {
           value={hours}
           callback={setHours}
           min={1}
-          max={336}
+          max={168}
           percent={false}
         />
         <SimParameter
           label={'Percent Masking'}
           value={pmask}
           callback={setPmask}
-          def={40}
         />
         <SimParameter
           label={'Percent Vaccinated'}
           value={pvaccine}
           callback={setPvaccine}
-          def={20}
         />
         <SimParameter
           label={'Maximum Facility Capacity'}
           value={capacity}
           callback={setCapacity}
-          def={100}
         />
         <SimParameter
           label={'Lockdown Probability'}
           value={lockdown}
           callback={setLockdown}
-          def={0}
         />
         <SimParameter
           label={'Self-Isolation Percent'}
           value={selfiso}
           callback={setSelfiso}
-          def={50}
         />
         <SimBoolean 
           label={'Random Seed'}

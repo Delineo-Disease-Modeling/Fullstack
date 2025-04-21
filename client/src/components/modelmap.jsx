@@ -30,7 +30,6 @@ const icon_lookup = {
   "Coating, Engraving, Heat Treating, and Allied Activities": "🏢",
   "Building Material and Supplies Dealers": "🏢",
   "Postal Service": "📬",
-  "None": "❓",
   "Home": "🏠" 
 }
 
@@ -61,7 +60,7 @@ const marker_icon = (category, percent, pulse) => {
     className: '',
     html: `
     <div class="${pulseClass}" style="display:flex;justify-content:center;align-items:center;text-align:center;background-color:${percent_to_hex(percent)};width:30px;height:30px;border-radius:50%;">
-      <div style="font-size:22px;text-align:center;">${icon_lookup[category]}</div>
+      <div style="font-size:22px;text-align:center;">${icon_lookup[category] ?? '❓'}</div>
     </div>
     `
   })
