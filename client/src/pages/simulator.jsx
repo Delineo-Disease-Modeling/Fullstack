@@ -19,21 +19,7 @@ function makePostRequest(data, setSimData, setMovePatterns) {
       return
     }
 
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    const chunks = [];
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      chunks.push(decoder.decode(value));
-    }
-
-    const json = JSON.parse(chunks.join(''));
+    const json = await resp.json();
 
     if (!json['result']) {
       throw new Error('Invalid JSON Response Body');

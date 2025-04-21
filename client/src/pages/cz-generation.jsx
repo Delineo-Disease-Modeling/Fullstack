@@ -95,7 +95,7 @@ export default function CZGeneration() {
     return zip_cbg_json[location]?.[0];
   };
 
-  const generateCZ = async (formdata) => {
+  const generateCZ = (formdata) => {
     const func_body = async (formdata) => {
       console.log(formdata);
   
@@ -115,7 +115,6 @@ export default function CZGeneration() {
         body: JSON.stringify({
           name: location['city'],
           cbg: core_cbg,
-          zip_code: '21740',
           start_date: new Date(formdata.get('start_date')).toISOString(),
           min_pop: +formdata.get('min_pop'),
         })
@@ -126,21 +125,7 @@ export default function CZGeneration() {
         return;
       }
   
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      const chunks = [];
-  
-      while (true) {
-        const { done, value } = await reader.read();
-  
-        if (done) {
-          break;
-        }
-  
-        chunks.push(decoder.decode(value));
-      }
-  
-      const json = JSON.parse(chunks.join(''));
+      const json = await resp.json();
 
       if (!json['id']) {
         throw new Error('Invalid JSON Response Body');
