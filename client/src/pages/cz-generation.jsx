@@ -127,6 +127,7 @@ export default function CZGeneration() {
       }
   
       const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
       const chunks = [];
   
       while (true) {
@@ -136,10 +137,10 @@ export default function CZGeneration() {
           break;
         }
   
-        chunks.push(...value);
+        chunks.push(decoder.decode(value));
       }
   
-      const json = JSON.parse(new TextDecoder().decode(chunks));
+      const json = JSON.parse(chunks.join(''));
 
       if (!json['id']) {
         throw new Error('Invalid JSON Response Body');
