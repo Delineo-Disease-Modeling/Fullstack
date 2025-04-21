@@ -21,7 +21,7 @@ function makePostRequest(data, setSimData, setMovePatterns) {
 }
 
 // eslint-disable-next-line no-unused-vars
-function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso, randseed }) {
+function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, days, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone }) {
   fetch(`data/${location}/papdata.json`).then((res) => {
     res.json().then((data) => {
       setPapData(data);
@@ -30,6 +30,7 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
   });
 
   makePostRequest({
+    'czone_id': zone.id,
     'matrices': matrices,
     'location': location,
     'length': 10080,
