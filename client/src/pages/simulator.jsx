@@ -9,7 +9,7 @@ import './simulator.css';
 import { DB_URL, SIM_URL } from '../env';
 
 function makePostRequest(data, setSimData, setMovePatterns) {
-  axios.post(`${SIM_URL}simulation`, data)
+  axios.post(`${SIM_URL}simulation/`, data)
     .then(({ status, data }) => {
       if (status !== 200) {
         throw new Error('Status code mismatch');
