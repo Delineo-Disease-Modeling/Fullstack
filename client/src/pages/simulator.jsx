@@ -30,7 +30,7 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
 
       return res.json()
     })
-    .then((json) => setPapData(json['papdata']))
+    .then((json) => setPapData(json['data']['papdata']))
     .catch(console.error);
 
   makePostRequest({
