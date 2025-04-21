@@ -55,7 +55,7 @@ function SimFile({label, callback}) {
 
 export default function SimSettings({ sendData, showSim }) {
   const [ zone, setZone ] = useState(null);
-  const [ days, setDays ] = useState(7);                   // How long to run the simulation
+  const [ hours, setHours ] = useState(168);                // How long to run the simulation
   const [ pmask, setPmask ] = useState(0.4);                // Percent masking
   const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated
   const [ capacity, setCapacity ] = useState(1.0);          // Capacity percentages
@@ -72,14 +72,14 @@ export default function SimSettings({ sendData, showSim }) {
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
         <CzDict zone={zone} setZone={setZone} />
 
-        {/* <SimParameter
-          label={'Length (Days)'}
-          value={days}
-          callback={setDays}
-          min={14}
-          max={180}
+        <SimParameter
+          label={'Length (Hours)'}
+          value={hours}
+          callback={setHours}
+          min={1}
+          max={336}
           percent={false}
-        /> */}
+        />
         <SimParameter
           label={'Percent Masking'}
           value={pmask}
@@ -132,7 +132,7 @@ export default function SimSettings({ sendData, showSim }) {
           sendData({
             zone: zone,
             location: zone.name,
-            days,
+            hours,
             pmask,
             pvaccine,
             capacity,
