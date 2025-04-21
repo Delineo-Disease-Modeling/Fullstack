@@ -29,11 +29,10 @@ function makePostRequest(data, setSimData, setMovePatterns) {
         break;
       }
 
-      chunks.push(value);
+      chunks.push(...value);
     }
 
-    const decoder = new TextDecoder();
-    const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
+    const json = JSON.parse(new TextDecoder().decode(chunks));
 
     if (!json['result']) {
       throw new Error('Invalid JSON Response Body');
