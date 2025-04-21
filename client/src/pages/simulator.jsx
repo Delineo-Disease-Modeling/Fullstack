@@ -15,6 +15,7 @@ function makePostRequest(data, setSimData, setMovePatterns) {
     });
 
     if (!resp.ok) {
+      console.error('Could not simulate')
       return
     }
 
@@ -31,22 +32,19 @@ function makePostRequest(data, setSimData, setMovePatterns) {
       chunks.push(value);
     }
 
-    try {
-      const decoder = new TextDecoder();
-      const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
+    const decoder = new TextDecoder();
+    const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
 
-      if (!json['result']) {
-        throw new Error('Invalid JSON');
-      }
-
-      setSimData(json['result']);
-      setMovePatterns(json['movement']);
-    } catch (error) {
-      console.error(error);
+    if (!json['result']) {
+      throw new Error('Invalid JSON Response Body');
     }
+
+    setSimData(json['result']);
+    setMovePatterns(json['movement']);
   };
 
-  func_body(data, setSimData, setMovePatterns);
+  func_body(data, setSimData, setMovePatterns)
+    .catch(console.error);
 }
 
 function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, hours, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone }) {

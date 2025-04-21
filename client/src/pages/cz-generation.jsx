@@ -139,20 +139,16 @@ export default function CZGeneration() {
         chunks.push(value);
       }
   
-      try {
-        const decoder = new TextDecoder();
-        const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
+      const decoder = new TextDecoder();
+      const json = JSON.parse(chunks.reduce((acc, chunk) => acc + decoder.decode(chunk), ''));
 
-        if (!json['id']) {
-          throw new Error('Invalid JSON');
-        }
-  
-        const localdict = localStorage.getItem('czlist') ?? '[]';
-        localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), json['id']]));
-        setIframeHTML(json['map']);
-      } catch (error) {
-        console.error(error);
+      if (!json['id']) {
+        throw new Error('Invalid JSON Response Body');
       }
+
+      const localdict = localStorage.getItem('czlist') ?? '[]';
+      localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), json['id']]));
+      setIframeHTML(json['map']);
     };
 
     if (loading) {
@@ -161,6 +157,7 @@ export default function CZGeneration() {
 
     setLoading(true);
     func_body(formdata)
+      .catch(console.error)
       .finally(() => setLoading(false));
   }
 
