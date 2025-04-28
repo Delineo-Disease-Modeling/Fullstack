@@ -17,8 +17,33 @@ function InstructionBanner({ text }) {
   );
 }
 
-function makePostRequest(data, setSimData, setMovePatterns) {
-  axios.post(`${SIM_URL}simulation/`, data)
+async function makePostRequest(reqdata, setSimData, setMovePatterns, useCache) {
+  if (useCache) {
+    try {
+      const resp = await axios.get(`${DB_URL}simdata/${reqdata.czone_id}`);
+
+      if (resp.status === 200 && resp.data['data']) {
+        console.log('Using cached data!');
+  
+        const data = JSON.parse(resp.data['data']);
+        const movement = data['movement'];
+
+        for (const key in movement) {
+          if (key > reqdata['length']) {
+            delete movement[key];
+          }
+        }
+
+        setSimData(data['result']);
+        setMovePatterns(movement);
+        return;
+      }  
+    } catch (error) {
+      console.error(error.status);
+    }
+  }
+
+  axios.post(`${SIM_URL}simulation/`, reqdata)
     .then(({ status, data }) => {
       if (status !== 200) {
         throw new Error('Status code mismatch');
@@ -29,11 +54,20 @@ function makePostRequest(data, setSimData, setMovePatterns) {
 
       setSimData(data['result']);
       setMovePatterns(data['movement']);
+
+      if (reqdata['length'] == 10080) {
+        axios.post(`${DB_URL}simdata`, {
+          czone_id: reqdata['czone_id'],
+          simdata: JSON.stringify(data)
+        })
+          .then((res) => console.log(res))
+          .catch(console.error);
+      }
     })
     .catch(console.error);
 }
 
-function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, hours, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone }) {
+function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, hours, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone, useCache }) {
   fetch(`${DB_URL}patterns/${zone.id}`)
     .then((res) => {
       if (!res.ok) {
@@ -55,7 +89,7 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
     'lockdown': lockdown,
     'selfiso': selfiso,
     'randseed': randseed
-  }, setSimData, setMovePatterns);
+  }, setSimData, setMovePatterns, useCache);
 }
 
 export default function Simulator() {

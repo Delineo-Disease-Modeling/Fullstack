@@ -55,13 +55,14 @@ function SimFile({label, callback}) {
 
 export default function SimSettings({ sendData, showSim }) {
   const [ zone, setZone ] = useState(null);
-  const [ hours, setHours ] = useState(168);                // How long to run the simulation
+  const [ hours, setHours ] = useState(84);                // How long to run the simulation
   const [ pmask, setPmask ] = useState(0.4);                // Percent masking
   const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated
   const [ capacity, setCapacity ] = useState(1.0);          // Capacity percentages
   const [ lockdown, setLockdown ] = useState(0.0);          // Lockdown probability
   const [ selfiso, setSelfiso ] = useState(0.5);            // Self-isolation probability
-  const [ randseed, setRandseed ] = useState(true);     // Random or set seed for sim/dmp?
+  const [ randseed, setRandseed ] = useState(true);         // Random or set seed for sim/dmp?
+  const [ useCache, setUseCache ] = useState(true);         // Use cached sim data for speed?
 
   const [ matrices, setMatrices ] = useState(null);                 // To-be-sent file matrices
   const [ customFiles, setCustomFiles ] = useState(null);           // Uploaded file matrices
@@ -110,6 +111,11 @@ export default function SimSettings({ sendData, showSim }) {
           value={randseed}
           callback={setRandseed}
         />
+        <SimBoolean 
+          label={'Use Cached Data (faster)'}
+          value={useCache}
+          callback={setUseCache}
+        />
         <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/>
         <SimFile 
           label={'Custom Matrix File(s)'}
@@ -134,7 +140,8 @@ export default function SimSettings({ sendData, showSim }) {
             lockdown,
             selfiso,
             randseed,
-            matrices
+            matrices,
+            useCache
           });
 
           showSim(true);
