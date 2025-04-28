@@ -31,13 +31,13 @@ const infection_states = {
   'Hospitalized': 8,
   'Recovered': 16,
   'Removed': 32
-}
+};
 
 const COLORS = ["#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "#ff954f", "#4fd0ff"];
 
 export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id, is_household, onReset }) {
   const [diseases, setDiseases] = useState([]);
-  const [chart_data, setChartData] = useState(null); // Infectivity over time data, age data, etc
+  const [chart_data, setChartData] = useState(null);
   const [selected_chart, setSelectedChart] = useState('iot');
 
   const handleChartSelect = (e) => {
@@ -45,20 +45,22 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
   };
 
   useEffect(() => {
-    if (!sim_data || !move_patterns || !pap_data) { 
-      return; 
+    if (!sim_data || !move_patterns || !pap_data) {
+      return;
     }
 
     // Get disease labels
     if (poi_id) {
-      setDiseases([ 'total', ...Object.keys(Object.values(sim_data)[0] || {})] );
+      setDiseases(['total', ...Object.keys(Object.values(sim_data)[0] || {})]);
     } else {
       setDiseases(Object.keys(Object.values(sim_data)[0] || {}));
     }
 
-    const domain = [Math.min(...Object.keys(move_patterns).map(x => Number(x))), Math.max(...Object.keys(move_patterns).map(x => Number(x)))]
+    const domain = [
+      Math.min(...Object.keys(move_patterns).map(x => Number(x))),
+      Math.max(...Object.keys(move_patterns).map(x => Number(x)))
+    ];
 
-    // Set Infectivity over time chart
     const c_data = [];
     for (const [time, infdata] of Object.entries(sim_data)) {
       const timeNumber = Number(time);
@@ -89,24 +91,21 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         let disease_count = 0;
 
         for (const [person_id, inf_state] of Object.entries(infected)) {
-          // If a poi_id is selected, filter data for that specific poi
           if (poi_id) {
-            // Determine the location of the person at the given time
-            // Assuming move_patterns structure is move_patterns[time][type][poi_id] = [person_ids]
             const personType = is_household ? 'homes' : 'places';
             const person_move = move_patterns[time]?.[personType]?.[poi_id];
-
             if (!person_move || !person_move.includes(person_id)) {
               continue;
             }
           }
 
-          // keep track of disease infectivity
           disease_count++;
-          const sex = pap_data['people'][person_id.toString()]['sex'];
-          const age = pap_data['people'][person_id.toString()]['age'];
+          const sex = pap_data['people'][person_id.toString()]?.['sex'];
+          const age = pap_data['people'][person_id.toString()]?.['age'];
 
-          sex_data[(sex === 0 ? 'male' : 'female')]++;
+          if (sex !== undefined) {
+            sex_data[sex === 0 ? 'male' : 'female']++;
+          }
 
           for (const [state, value] of Object.entries(infection_states)) {
             if (inf_state & value) {
@@ -138,18 +137,31 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
     setChartData(c_data);
   }, [sim_data, move_patterns, pap_data, poi_id, is_household]);
 
-  const poi_name = poi_id ? (is_household ? `Household #${poi_id}` : `${pap_data['places'][poi_id]['label']}`) : '';
+  const poi_name = poi_id ? (is_household ? `Household #${poi_id}` : `${pap_data['places'][poi_id]?.['label']}`) : '';
+
+  const noInfectionsAtFacility = () => {
+    return (
+      chart_data &&
+      poi_id &&
+      chart_data.every(dataPoint =>
+        diseases
+          .filter(disease => disease !== 'total')  // Ignore total
+          .every(disease => (dataPoint[disease] ?? 0) === 0)
+      )
+    );
+  };
 
   return (
     <div className='outputgraphs_container'>
       <div className='p-2.5'>
         <label>Select Chart Type: </label>
-        <select 
+        <select
           className='px-1'
-          value={selected_chart} 
-          onChange={handleChartSelect}>
+          value={selected_chart}
+          onChange={handleChartSelect}
+        >
           <option value="iot">Infectiousness Over Time</option>
-          <option value="ages">Age Of Infected </option>
+          <option value="ages">Age Of Infected</option>
           <option value="sexes">Infection Gender</option>
           <option value="states">Diseases Info</option>
         </select>
@@ -163,13 +175,18 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         </div>
       )}
 
+      {/* Chart Areas */}
       {selected_chart === "iot" && (
-        <div className='outputgraph_chart'>
+        <div className='relative outputgraph_chart'>
+          {noInfectionsAtFacility() && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center bg-white bg-opacity-75">
+              <p className="text-lg font-semibold">No infections occurred at this location during the simulation.</p>
+              <p className="mt-2 text-sm">Try selecting another location or generating a new simulation.</p>
+            </div>
+          )}
           <h6 style={styles.centerText}>
             Infection Distribution Over Time
-            {poi_id && (
-              <span> for {poi_name}</span>
-            )}
+            {poi_id && <span> for {poi_name}</span>}
           </h6>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart data={chart_data}>
@@ -178,25 +195,19 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <YAxis label={{ value: 'Total Infected', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
               <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
-              {
-                diseases.map((disease, index) => (
-                  <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
-                ))
-              }
-            </LineChart>          
+              {diseases.map((disease, index) => (
+                <Line type="monotone" key={disease} dataKey={disease} stroke={COLORS[index % COLORS.length]} dot={false} />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-
-      {/* Similar structures for other chart types: "ages", "sexes", "states" */}
 
       {selected_chart === "ages" && (
         <div className='outputgraph_chart'>
           <h6 style={styles.centerText}>
             Infected Age Distribution Over Time
-            {poi_id && (
-              <span> for {poi_name}</span>
-            )}
+            {poi_id && <span> for {poi_name}</span>}
           </h6>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart data={chart_data}>
@@ -205,11 +216,9 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
               <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
-              {
-                age_ranges.map((range, index) => (
-                  <Line type="monotone" key={range.join('-')} dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
-                ))
-              }
+              {age_ranges.map((range, index) => (
+                <Line type="monotone" key={range.join('-')} dataKey={`${range[0]}-${range[1]}`} stroke={COLORS[index % COLORS.length]} dot={false} />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -219,9 +228,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         <div className='outputgraph_chart'>
           <h6 style={styles.centerText}>
             Infected Sex Distribution Over Time
-            {poi_id && (
-              <span> for {poi_name}</span>
-            )}
+            {poi_id && <span> for {poi_name}</span>}
           </h6>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart data={chart_data}>
@@ -230,11 +237,9 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
               <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
-              {
-                ['male', 'female'].map((sex, index) => (
-                  <Line type="monotone" key={sex} dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
-                ))
-              }
+              {['male', 'female'].map((sex, index) => (
+                <Line type="monotone" key={sex} dataKey={sex} stroke={COLORS[index % COLORS.length]} dot={false} />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -244,9 +249,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         <div className='outputgraph_chart'>
           <h6 style={styles.centerText}>
             Infected State Distribution Over Time
-            {poi_id && (
-              <span> for {poi_name}</span>
-            )}
+            {poi_id && <span> for {poi_name}</span>}
           </h6>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart data={chart_data}>
@@ -255,11 +258,9 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               <YAxis label={{ value: 'Total Number', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={CustomTooltip} />
               <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
-              {
-                Object.keys(infection_states).map((state, index) => (
-                  <Line type="monotone" key={state} dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />
-                ))
-              }
+              {Object.keys(infection_states).map((state, index) => (
+                <Line type="monotone" key={state} dataKey={state} stroke={COLORS[index % COLORS.length]} dot={false} />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </div>

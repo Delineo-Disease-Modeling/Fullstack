@@ -335,7 +335,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerCl
             updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
         />
-        <div className='text-center mt-3'>
+        <div className='mt-3 text-center'>
           {new Date(new Date(selectedZone.start_date).getTime() + timestamp * 60 * 60 * 1000).toLocaleString()}
         </div>
       </div>

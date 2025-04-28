@@ -97,7 +97,7 @@ export default function Simulator() {
           <div>Loading simulation data...</div>
         ) : (
           <div className='sim_output'>
-            <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the right." />
+            <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
             <div className='flex flex-col gap-4'>
               <div className='flex items-center justify-between'>
                 <h2 className='text-xl font-semibold'>Convenience Zone: {selectedZone.name}</h2>
@@ -120,7 +120,7 @@ export default function Simulator() {
               is_household={isHousehold}
               onReset={onReset}
             />
-            <button onClick={onReset} className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+            <button onClick={onReset} className="px-4 py-2 mt-4 text-white bg-red-500 rounded hover:bg-red-600">
               Reset Selection
             </button>
           </div>
