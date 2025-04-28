@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 
 import SimSettings from '../components/simsettings.jsx';
@@ -26,8 +26,9 @@ function makePostRequest(data, setSimData, setMovePatterns) {
       if (!data?.['result']) {
         throw new Error('Invalid JSON (missing id)');
       }
+
       setSimData(data['result']);
-      setMovePatterns(data['movement']);  
+      setMovePatterns(data['movement']);
     })
     .catch(console.error);
 }
@@ -63,14 +64,12 @@ export default function Simulator() {
   const [movePatterns, setMovePatterns] = useState(null);
   const [simData, setSimData] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
-  const [simulationHours, setSimulationHours] = useState(null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [isHousehold, setIsHousehold] = useState(false);
 
   // Handle initial simulation request
   const handleSimData = (dict) => {
-    setSimulationHours(dict.hours);
     setShowSim(true);
     sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
     setSelectedZone(dict.zone);
@@ -98,12 +97,11 @@ export default function Simulator() {
           <div>Loading simulation data...</div>
         ) : (
           <div className='sim_output'>
-            <InstructionBanner text={`Zone: ${selectedZone.name} | Simulated Time: ${simulationHours} hours`} />
             <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the right." />
             <div className='flex flex-col gap-4'>
               <div className='flex items-center justify-between'>
-                <h2 className='text-xl font-semibold'>{selectedZone.name}</h2>
-                <p className='text-sm text-gray-600'>{new Date(selectedZone.created_at).toLocaleDateString()}</p>
+                <h2 className='text-xl font-semibold'>Convenience Zone: {selectedZone.name}</h2>
+                <p className='text-sm text-gray-600'>Created on: {new Date(selectedZone.created_at).toLocaleDateString()}</p>
               </div>
               <ModelMap
                 selectedZone={selectedZone}
@@ -113,7 +111,7 @@ export default function Simulator() {
                 onMarkerClick={handleMarkerClick}
               />
             </div>
-            <InstructionBanner text="Use the time slider below to navigate through the simulation timeline." />
+            <InstructionBanner text="Use the time slider above to navigate through the simulation timeline." />
             <OutputGraphs
               sim_data={simData}
               move_patterns={movePatterns}
