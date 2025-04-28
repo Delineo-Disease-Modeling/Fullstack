@@ -214,6 +214,23 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
   );
 }
 
+function MapInstructions({ mapCenter }) {
+  const map = useMap();
+  useEffect(() => {
+    const popup = L.popup({
+      autoClose: false,
+      closeOnClick: false,
+      className: 'p-2 text-sm font-medium bg-white border rounded shadow'
+    })
+      .setLatLng(mapCenter)
+      .setContent('Click any marker to explore its statistics.');
+    popup.openOn(map);
+    return () => { map.closePopup(popup); };
+  }, [map, mapCenter]);
+  return null;
+}
+
+
 export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerClick, selectedId, isHousehold, selectedZone }) {
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);

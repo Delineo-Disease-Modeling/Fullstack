@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
 import SimSettings from '../components/simsettings.jsx';
@@ -8,17 +8,24 @@ import OutputGraphs from '../components/outputgraphs.jsx';
 import './simulator.css';
 import { DB_URL, SIM_URL } from '../env';
 
+// InstructionBanner component to show user-friendly instructions
+function InstructionBanner({ text }) {
+  return (
+    <div className="p-4 mb-4 text-blue-800 bg-blue-100 border border-blue-200 rounded">
+      {text}
+    </div>
+  );
+}
+
 function makePostRequest(data, setSimData, setMovePatterns) {
   axios.post(`${SIM_URL}simulation/`, data)
     .then(({ status, data }) => {
       if (status !== 200) {
         throw new Error('Status code mismatch');
       }
-
       if (!data?.['result']) {
         throw new Error('Invalid JSON (missing id)');
       }
-  
       setSimData(data['result']);
       setMovePatterns(data['movement']);  
     })
@@ -31,8 +38,7 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
       if (!res.ok) {
         throw new Error();
       }
-
-      return res.json()
+      return res.json();
     })
     .then((json) => setPapData(json['data']['papdata']))
     .catch(console.error);
@@ -48,28 +54,26 @@ function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, 
     'lockdown': lockdown,
     'selfiso': selfiso,
     'randseed': randseed
-  }, setSimData, setMovePatterns);  
+  }, setSimData, setMovePatterns);
 }
 
 export default function Simulator() {
-  const [showSim, setShowSim] = useState(false);          // Show simulator, or show settings?
+  const [showSim, setShowSim] = useState(false);
   const [papData, setPapData] = useState(null);
   const [movePatterns, setMovePatterns] = useState(null);
-  const [simData, setSimData] = useState(null);           // Simulator output data
-
+  const [simData, setSimData] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
+  const [simulationHours, setSimulationHours] = useState(null);
 
-  // State to track selected marker information
   const [selectedId, setSelectedId] = useState(null);
   const [isHousehold, setIsHousehold] = useState(false);
 
-  // Function to handle marker clicks in ModelMap
+  // Handle initial simulation request
   const handleSimData = (dict) => {
-    // Run your existing function that sets papData, movePatterns, simData
+    setSimulationHours(dict.hours);
+    setShowSim(true);
     sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
-
-    console.log(dict.zone);
-    setSelectedZone(dict.zone); 
+    setSelectedZone(dict.zone);
   };
 
   const handleMarkerClick = (id, isHome) => {
@@ -80,53 +84,49 @@ export default function Simulator() {
   const onReset = () => {
     setSelectedId(null);
     setIsHousehold(null);
-  }
+  };
 
   return (
     <div>
       <div className='sim_container'>
-        {!showSim &&
+        {!showSim ? (
           <div className='sim_settings'>
-            {/* Instead of inline, let's pass handleSimData */}
+            <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
             <SimSettings sendData={handleSimData} showSim={setShowSim} />
           </div>
-        }
-
-        {showSim && (!simData || !movePatterns || !papData) &&
-          <div>Loading...</div>
-        }
-
-        {showSim && simData && movePatterns && papData &&
+        ) : !simData || !movePatterns || !papData ? (
+          <div>Loading simulation data...</div>
+        ) : (
           <div className='sim_output'>
+            <InstructionBanner text={`Zone: ${selectedZone.name} | Simulated Time: ${simulationHours} hours`} />
+            <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the right." />
             <div className='flex flex-col gap-4'>
               <div className='flex items-center justify-between'>
-                <h2>{selectedZone.name}</h2>
-                <p>{new Date(selectedZone.created_at).toLocaleDateString()}</p>
+                <h2 className='text-xl font-semibold'>{selectedZone.name}</h2>
+                <p className='text-sm text-gray-600'>{new Date(selectedZone.created_at).toLocaleDateString()}</p>
               </div>
-
               <ModelMap
                 selectedZone={selectedZone}
                 sim_data={simData}
                 move_patterns={movePatterns}
                 pap_data={papData}
-                onMarkerClick={handleMarkerClick} // Pass the click handler to ModelMap
+                onMarkerClick={handleMarkerClick}
               />
             </div>
-
+            <InstructionBanner text="Use the time slider below to navigate through the simulation timeline." />
             <OutputGraphs
               sim_data={simData}
               move_patterns={movePatterns}
               pap_data={papData}
-              poi_id={selectedId} // Pass selected marker ID to OutputGraphs
-              is_household={isHousehold} // Pass marker type to OutputGraphs
+              poi_id={selectedId}
+              is_household={isHousehold}
               onReset={onReset}
             />
-            {/* <CytoGraph 
-              move_patterns={movePatterns}
-              pap_data={papData}
-            /> */}
+            <button onClick={onReset} className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+              Reset Selection
+            </button>
           </div>
-        }
+        )}
       </div>
     </div>
   );
