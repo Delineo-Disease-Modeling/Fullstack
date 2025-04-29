@@ -193,8 +193,8 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
   };
 
   return (
-    <div className='outline outline-2 outline-[#70B4D4]'>
-      <MapContainer className="mapcontainer" center={mapCenter} zoom={13} scrollWheelZoom={true} zoomControl={false}>
+    <div className='outline outline-2 outline-[#70B4D4] mapcontainer'>
+      <MapContainer className="size-full" center={mapCenter} zoom={13} scrollWheelZoom={true} zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -323,7 +323,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerCl
       {/* Slider Component */}
       <div className='w-full mt-5'>
         <input
-          className='min-w-full'
+          className='w-full max-w-[95vw]'
           type="range"
           min={1}
           max={maxHours}

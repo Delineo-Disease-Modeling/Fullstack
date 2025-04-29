@@ -1,6 +1,6 @@
 div.mapcontainer {
-  width: 900px;
-  max-width: 85vw;
+  width: 56rem;
+  max-width: 90vw;
   height: 0;
   padding-bottom: 65%;
   z-index: 0;

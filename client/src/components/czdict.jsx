@@ -25,7 +25,7 @@ export default function CzDict({ zone, setZone }) {
 
   return (
     <div className='flex flex-col items-center w-full gap-4'>
-      <div className='flex flex-col w-[25rem] h-[20rem] outline outline-2 outline-[#70B4D4] bg-[#fffff2]'>
+      <div className='flex flex-col w-[30rem] h-[20rem] max-w-[90vw] outline outline-2 outline-[#70B4D4] bg-[#fffff2]'>
         {/* Tabs */}
         <div className='flex h-6'>
           <div

@@ -167,14 +167,6 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
         </select>
       </div>
 
-      {poi_id && (
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <button onClick={onReset}>
-            Reset Selection
-          </button>
-        </div>
-      )}
-
       {/* Chart Areas */}
       {selected_chart === "iot" && (
         <div className='relative outputgraph_chart'>
@@ -263,6 +255,14 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
               ))}
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {poi_id && (
+        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+          <button onClick={onReset} className="px-4 py-2 mt-4 text-white bg-red-500 rounded hover:bg-red-600">
+            Reset Selection
+          </button>
         </div>
       )}
     </div>

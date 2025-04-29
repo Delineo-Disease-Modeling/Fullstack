@@ -12,7 +12,7 @@ function SimParameter({label, value, callback, min=0, max=100, percent=true}) {
         {label}: {percent ? Math.ceil(value * 100) : value}{percent ? '%' : ''}
       </div>
 
-      <input type='range' className='simset_slider_input'
+      <input type='range' className='simset_slider_input w-[300px]'
         min={min}
         max={max}
         defaultValue={percent ? value * 100.0 : value}

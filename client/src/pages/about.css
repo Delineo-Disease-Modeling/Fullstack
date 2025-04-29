@@ -8,7 +8,7 @@ header.about_title {
 }
 
 div.timeline {
-  max-width: 70vw;
+  max-width: 85vw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -40,6 +40,7 @@ img.aboutimg {
   object-fit: contain; 
   border-radius: 24px; 
   background-color: #88D2D8; 
+  outline: 2px solid #70B4D4;
 }
 
 

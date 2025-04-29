@@ -11,7 +11,7 @@ import { DB_URL, SIM_URL } from '../env';
 // InstructionBanner component to show user-friendly instructions
 function InstructionBanner({ text }) {
   return (
-    <div className="p-4 mb-4 text-blue-800 bg-blue-100 border border-blue-200 rounded">
+    <div className="p-4 mb-4 text-blue-800 bg-blue-100 border border-blue-200 rounded text-center">
       {text}
     </div>
   );
@@ -115,17 +115,17 @@ export default function Simulator() {
     <div>
       <div className='sim_container'>
         {!showSim ? (
-          <div className='sim_settings'>
+          <div className='sim_settings px-4'>
             <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
             <SimSettings sendData={handleSimData} showSim={setShowSim} />
           </div>
         ) : !simData || !movePatterns || !papData ? (
           <div>Loading simulation data...</div>
         ) : (
-          <div className='sim_output'>
+          <div className='sim_output px-4'>
             <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
             <div className='flex flex-col gap-4'>
-              <div className='flex items-center justify-between'>
+              <div className='flex items-center justify-between gap-4 text-center'>
                 <h2 className='text-xl font-semibold'>Convenience Zone: {selectedZone.name}</h2>
                 <p className='text-sm text-gray-600'>Created on: {new Date(selectedZone.created_at).toLocaleDateString()}</p>
               </div>
@@ -146,9 +146,6 @@ export default function Simulator() {
               is_household={isHousehold}
               onReset={onReset}
             />
-            <button onClick={onReset} className="px-4 py-2 mt-4 text-white bg-red-500 rounded hover:bg-red-600">
-              Reset Selection
-            </button>
           </div>
         )}
       </div>
