@@ -36,6 +36,7 @@ async function makePostRequest(reqdata, setSimData, setMovePatterns, useCache) {
 
         setSimData(data['result']);
         setMovePatterns(movement);
+
         return;
       }  
     } catch (error) {
@@ -54,15 +55,6 @@ async function makePostRequest(reqdata, setSimData, setMovePatterns, useCache) {
 
       setSimData(data['result']);
       setMovePatterns(data['movement']);
-
-      if (reqdata['length'] == 10080) {
-        axios.post(`${DB_URL}simdata`, {
-          czone_id: reqdata['czone_id'],
-          simdata: JSON.stringify(data)
-        })
-          .then((res) => console.log(res))
-          .catch(console.error);
-      }
     })
     .catch(console.error);
 }
