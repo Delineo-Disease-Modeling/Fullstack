@@ -193,7 +193,7 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
   };
 
   return (
-    <div className='outline outline-2 outline-[#70B4D4] mapcontainer'>
+    <div className='mapcontainer outline outline-2 outline-[#70B4D4]'>
       <MapContainer className="size-full" center={mapCenter} zoom={13} scrollWheelZoom={true} zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'

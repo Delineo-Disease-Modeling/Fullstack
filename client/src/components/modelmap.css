@@ -1,8 +1,7 @@
 div.mapcontainer {
   width: 56rem;
+  height: 32rem;
   max-width: 90vw;
-  height: 0;
-  padding-bottom: 65%;
   z-index: 0;
 }
 
