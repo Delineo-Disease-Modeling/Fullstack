@@ -43,9 +43,10 @@ function SimFile({label, callback}) {
     <div className='simset_fileup'>
       <div className='simset_fileup_label'>
         {label}
+        <p className='text-gray-400 italic'>for advanced users</p>
       </div>
 
-      <input type='file' className='simset_fileup_input' 
+      <input type='file' className='max-w-72' 
         multiple={true}
         onChange={(e) => callback(e.target.files)}
       />
@@ -116,9 +117,9 @@ export default function SimSettings({ sendData, showSim }) {
           value={useCache}
           callback={setUseCache}
         />
-        <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/>
+        {/* <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/> */}
         <SimFile 
-          label={'Custom Matrix File(s)'}
+          label={'Custom DMP Matrix Files'}
           callback={setCustomFiles}
         />
       </div>
