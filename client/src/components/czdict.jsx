@@ -25,7 +25,7 @@ export default function CzDict({ zone, setZone }) {
 
   return (
     <div className='flex flex-col items-center w-full gap-4'>
-      <div className='flex flex-col w-[30rem] h-[20rem] max-w-[90vw] outline outline-2 outline-[#70B4D4] bg-[#fffff2]'>
+      <div className='flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2]'>
         {/* Tabs */}
         <div className='flex h-6'>
           <div
@@ -73,7 +73,7 @@ export default function CzDict({ zone, setZone }) {
               <p className="flex-1 text-right">{new Date(loc.created_at).toLocaleDateString()}</p>
 
               {!loc.ready && hoveredLocId === loc.id && (
-                <div className="absolute z-10 px-2 py-1 text-xs text-white -translate-x-1/2 -translate-y-1/2 bg-black rounded shadow-lg top-1/2 left-1/2">
+                <div className="absolute z-10 px-2 py-1 text-xs text-white -translate-x-1/2 -translate-y-1/2 bg-black rounded-sm shadow-lg top-1/2 left-1/2">
                   Currently Generating
                 </div>
               )}

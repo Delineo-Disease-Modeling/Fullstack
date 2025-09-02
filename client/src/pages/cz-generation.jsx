@@ -52,7 +52,7 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
     <div className='flex flex-col gap-2'>
       <label htmlFor={name}>{label}</label>
       <input
-        className='px-2 py-1 rounded-lg disabled:cursor-not-allowed disabled:brightness-75'
+        className='px-2 py-1 rounded-lg disabled:cursor-not-allowed disabled:brightness-75 bg-[#F0F0F0]'
         name={name}
         id={name}
         type={type}
@@ -181,10 +181,10 @@ export default function CZGeneration() {
             <iframe
               srcDoc={iframeHTML}
               title='Generated Convenience Zone'
-              className='h-72 w-[35rem] max-w-[85vw]'
+              className='h-72 w-140 max-w-[85vw]'
             />
           ) : (
-            <div className='h-72 w-[35rem] max-w-[85vw]'>
+            <div className='h-72 w-140 max-w-[85vw]'>
               <InteractiveMap
                 onLocationSelect={setLocation}
                 disabled={loading}

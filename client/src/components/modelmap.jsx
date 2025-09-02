@@ -193,7 +193,7 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
   };
 
   return (
-    <div className='mapcontainer outline outline-2 outline-[#70B4D4]'>
+    <div className='mapcontainer outline-solid outline-2 outline-[#70B4D4]'>
       <MapContainer className="size-full" center={mapCenter} zoom={13} scrollWheelZoom={true} zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
@@ -220,7 +220,7 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
 //     const popup = L.popup({
 //       autoClose: false,
 //       closeOnClick: false,
-//       className: 'p-2 text-sm font-medium bg-white border rounded shadow'
+//       className: 'p-2 text-sm font-medium bg-white border rounded-sm shadow-sm'
 //     })
 //       .setLatLng(mapCenter)
 //       .setContent('Click any marker to explore its statistics.');
@@ -343,7 +343,7 @@ export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerCl
       {/* Input Box */}
       <div className='flex justify-center mt-3'>
         <input
-          className='w-[10%] px-1 bg-[#fffff2] outline outline-2 outline-[#70B4D4]'
+          className='w-[10%] px-1 bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]'
           type="number"
           min={1}
           max={maxHours}

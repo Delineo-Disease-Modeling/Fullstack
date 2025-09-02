@@ -1,8 +1,12 @@
 import { NavLink } from 'react-router-dom';
 
 import './navbar.css';
+import { useState } from 'react';
+import LoginModal from './login-modal';
 
 export default function Navbar() {
+  const [modalOpen, setModalOpen] = useState(false);
+
  return (
   <div>
     <div className='navbuffer'></div>
@@ -20,8 +24,14 @@ export default function Navbar() {
         <li>
           <NavLink to='/team' className='link'>Team</NavLink>
         </li>
+        <li>
+          <NavLink className='link' onClick={() => setModalOpen((o) => !o)}>
+            Login
+          </NavLink>
+        </li>
       </ul>
     </nav>
+    <LoginModal isOpen={modalOpen} onRequestClose={() => setModalOpen(false)} />
   </div>
  );
 }
