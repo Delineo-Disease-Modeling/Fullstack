@@ -94,14 +94,15 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           <button
             onClick={() => setCurTab(0)}
             data-tab={curTab}
-            className='cursor-pointer underline underline-offset-8 decoration-2 data-[tab=0]:decoration-[#70B4D4]'
+            className='cursor-pointer underline underline-offset-[10px] decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-[#70B4D4] hover:bg-slate-700'
+            style={{'boxShadow': 'inset 0 -1px 0 0 #313131'}}
           >
             Login
           </button>
           <button
             onClick={() => setCurTab(1)}
             data-tab={curTab}
-            className='cursor-pointer underline underline-offset-8 decoration-2 data-[tab=1]:decoration-[#70B4D4]'
+            className='cursor-pointer underline underline-offset-[10px] decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-[#70B4D4] hover:bg-slate-700'
           >
             Register
           </button>
