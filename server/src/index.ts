@@ -152,7 +152,7 @@ app.get('/convenience-zones', async (c) => {
   });
 
   return c.json({
-    data: zones.map((zone) => ({
+    data: zones.map((zone: any) => ({
       ...zone,
       papdata: undefined,
       ready: !!zone.papdata
@@ -337,6 +337,6 @@ app.get(
   }
 );
 
-const port = PORT;
+const port = +PORT;
 serve({ fetch: app.fetch, port });
 console.log(`Server is listening on port ${port}`);

@@ -10,6 +10,5 @@
     ],
     "resolveJsonModule": true,
     "outDir": "dist"
-  },
-  "include": ["./package.json"],
+  }
 }
