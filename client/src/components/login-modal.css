@@ -18,7 +18,7 @@ button[type=submit] {
 
 button[type=submit]:hover {
   transform: scale(1.05);
-  background-color: #F0F0F0;
+  background-color: #fffff2;
   color: #222629;
   cursor: pointer;
 }

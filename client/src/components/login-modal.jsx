@@ -48,6 +48,17 @@ function FormData({ curTab }) {
           className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
         />
       </div>
+      {curTab === 1 && <>
+        <div className='flex flex-col gap-1'>
+          <label htmlFor='organization'>Organization</label>
+          <input
+            id='organization'
+            name='organization'
+            type='text'
+            className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+          />
+        </div>
+      </>}
       <button
         type='submit'
         className='w-fit outline-solid outline-1 px-8 py-1 rounded-lg mt-2'
@@ -81,7 +92,9 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           borderRadius: '0.5rem',
           background: '#222629',
           border: '1px solid #F0F0F0',
-          color: '#F0F0F0'
+          color: '#F0F0F0',
+          maxHeight: '90vh',
+          overflowY: 'scroll'
         }
       }}
       isOpen={isOpen}

@@ -77,6 +77,17 @@ input[type="range"]::-moz-range-thumb:active {
   transform: scale(1.2);
 }
 
+input[type="file"] {
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button {
+  padding: 2px 12px;
+  border-radius: var(--radius-md);
+  background: #fffff2;
+  border: 2px solid #70B4D4;
+}
+
 div.simset_dropdown {
   width: 100%;
 

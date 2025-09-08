@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import MatrixSelector from './matrixselector';
 import CzDict from './czdict';
 
 import './simsettings.css';
