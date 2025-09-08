@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ConvenienceZone {
+  id                Int   @id @default(autoincrement())
+  name              String
+  latitude          Float
+  longitude         Float
+  cbg_list          String[]        // JSON-like array of CBG identifiers
+  size              Int
+  start_date        DateTime
+  created_at        DateTime @default(now())
+  papdata           PaPData?
+  patterns          MovementPattern?
+  simdata           SimData?
+}
+
+model MovementPattern {
+  id                Int   @id @default(autoincrement())
+  patterns          String
+  created_at        DateTime @default(now())
+  czone_id          Int @unique
+  czone             ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)          
+}
+
+model PaPData {
+  id      Int @id @default(autoincrement())
+  papdata   String
+  czone_id  Int @unique
+  czone     ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
+}
+
+model SimData {
+  id Int @id @default(autoincrement())
+  simdata   String
+  czone_id  Int @unique
+  czone     ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
+}
+
+model POI {
+  id          String  @id @default(uuid())
+  latitude    Float
+  longitude   Float
+  address     String
+  cbg         String
+  categories  String[]
+}

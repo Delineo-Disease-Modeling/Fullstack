@@ -1,0 +1,37 @@
+{
+  "name": "delineo_database",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -b",
+    "prisma": "npx prisma db push",
+    "prettier": "prettier --write \"src/**/*.{js,ts,jsx,tsx}\" --config \"./.prettierrc.json\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.13.2",
+    "eslint": "^9.20.1",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "globals": "^15.15.0",
+    "prettier": "^3.5.1",
+    "prisma": "^6.3.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.1",
+    "@hono/zod-validator": "^0.5.0",
+    "@prisma/client": "6.3.1",
+    "dotenv": "^16.4.7",
+    "hono": "^4.7.8",
+    "zod": "^3.24.2"
+  }
+}
