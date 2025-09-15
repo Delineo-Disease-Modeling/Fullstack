@@ -16,6 +16,7 @@ import {
   postSimDataSchema
 } from './schemas.js';
 import { streamText } from 'hono/streaming';
+import { HTTPException } from 'hono/http-exception';
 
 const app = new Hono();
 const prisma = new PrismaClient();
@@ -33,13 +34,14 @@ app.use(
   })
 );
 
-app.onError((err, c) => {
-  return c.json(
-    {
-      message: 'An unknown error occurred'
-    },
-    500
-  );
+app.onError((error, c) => {
+  if (error instanceof HTTPException) {
+    return c.json({ message: error.message }, error.status);
+  }
+
+  console.log(error);
+
+  return c.json({ message: 'An unknown error has occurred' }, 500);
 });
 
 interface GeocodeResponse {

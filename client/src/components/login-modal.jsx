@@ -1,17 +1,34 @@
+import { useState } from 'react';
+import { DB_URL } from '../env';
 import Modal from 'react-modal';
 
 import './login-modal.css';
-import { useState } from 'react';
 
 Modal.setAppElement(document.getElementById('root'));
 
-function FormData({ curTab }) {
+function FormData({ curTab, closeModal }) {
   const login = (formdata) => {
-    console.log(formdata);
+    fetch(`${DB_URL}login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formdata)
+    })
+      .then(() => closeModal())
+      .catch(console.error);
   }
 
   const register = (formdata) => {
-    console.log(formdata);
+    fetch(`${DB_URL}register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formdata)
+    })
+      .then(() => closeModal())
+      .catch(console.error);
   }
 
   return (
@@ -30,10 +47,10 @@ function FormData({ curTab }) {
       </div>
       {curTab === 1 && (
         <div className='flex flex-col gap-1'>
-          <label htmlFor='username'>Display Name</label>
+          <label htmlFor='name'>Display Name</label>
           <input
-            id='username'
-            name='username'
+            id='name'
+            name='name'
             type='text'
             className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
           />
@@ -120,7 +137,7 @@ export default function LoginModal({ isOpen, onRequestClose }) {
             Register
           </button>
         </div>
-        <FormData curTab={curTab} />
+        <FormData curTab={curTab} closeModal={onRequestClose} />
       </div>
     </Modal>
   );

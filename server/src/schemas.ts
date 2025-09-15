@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+export const loginSchema = z.object({
+  email: z.string().email().nonempty(),
+  password: z.string().nonempty()
+})
+
+export const registerSchema = z.object({
+  email: z.string().email().nonempty(),
+  name: z.string().nonempty(),
+  password: z.string().nonempty(),
+  organization: z.string().nonempty()
+})
+
 export const postLookupZipSchema = z.object({
   location: z.string().nonempty()
 });

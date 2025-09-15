@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                String @id @default(uuid())
+  name              String
+  email             String
+  password_hash     String
+  organization      String
+}
+
 model ConvenienceZone {
   id                Int   @id @default(autoincrement())
   name              String
