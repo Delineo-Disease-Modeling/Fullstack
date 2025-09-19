@@ -26,7 +26,7 @@ app.use('*', trimTrailingSlash());
 app.use(
   '*',
   cors({
-    origin: ['https://localhost:5173', 'https://coviddev.isi.jhu.edu'],
+    origin: ['http://localhost:5173', 'https://coviddev.isi.jhu.edu', 'http://coviddev.isi.jhu.edu', 'https://covidweb.isi.jhu.edu', 'http://covidweb.isi.jhu.edu'],
     allowMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
     allowHeaders: ['Content-Type', 'Authorization'],
     exposeHeaders: ['Set-Cookie'],
