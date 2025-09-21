@@ -1,14 +1,25 @@
 import { zValidator } from "@hono/zod-validator";
 import { PrismaClient } from "@prisma/client";
 import { Hono } from "hono";
-import { loginSchema, registerSchema } from "../schemas.js";
 import { HTTPException } from "hono/http-exception";
 import { hashPassword, verifyPassword } from "../lib/password.js";
-import { useFormStatus } from "hono/jsx/dom";
+import { z } from "zod";
 
 const auth_route = new Hono();
 
 const prisma = new PrismaClient();
+
+const loginSchema = z.object({
+  email: z.string().email().nonempty(),
+  password: z.string().nonempty()
+});
+
+const registerSchema = z.object({
+  email: z.string().email().nonempty(),
+  name: z.string().nonempty(),
+  password: z.string().nonempty(),
+  organization: z.string().nonempty()
+});
 
 auth_route.post('/login', zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json');
