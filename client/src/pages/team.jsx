@@ -21,6 +21,7 @@ const teamData = {
   simulationsTeam: [
     { name: "Iason Mihalopoulos" },
     { name: "Navya Mehrotra", linkedin: "https://www.linkedin.com/in/navyamehrotra/", department: "Computer Science, Applied Mathematics and Statistics", gradYear: "2028"},
+    { name: "Liam Perez", linkedin: "https://www.linkedin.com/in/liam-p-5a4033323/", gradYear: "2027", department: "Computer Science"},
   ],
 
   pastAlumn: [
