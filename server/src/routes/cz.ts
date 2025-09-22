@@ -7,6 +7,10 @@ const cz_route = new Hono();
 
 const prisma = new PrismaClient();
 
+const getConvZonesSchema = z.object({
+  user_id: z.string().optional()
+})
+
 const postConvZonesSchema = z.object({
   name: z.string().nonempty(),
   latitude: z.number(),
@@ -21,7 +25,9 @@ const deleteConvZonesSchema = z.object({
   czone_id: z.coerce.number().nonnegative()
 });
 
-cz_route.get('/convenience-zones', async (c) => {
+cz_route.get('/convenience-zones', zValidator('query', getConvZonesSchema), async (c) => {
+  const { user_id } = c.req.valid('query');
+
   const zones = await prisma.convenienceZone.findMany({
     include: {
       papdata: {
@@ -29,6 +35,9 @@ cz_route.get('/convenience-zones', async (c) => {
           id: true
         }
       }
+    },
+    where: {
+      user_id
     }
   });
 

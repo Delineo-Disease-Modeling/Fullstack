@@ -133,8 +133,6 @@ export default function CZGeneration() {
         throw new Error('Invalid JSON (missing id)');
       }
 
-      const localdict = localStorage.getItem('czlist') ?? '[]';
-      localStorage.setItem('czlist', JSON.stringify([ ...JSON.parse(localdict), data['id']]));
       setIframeHTML(data['map']);
     };
 

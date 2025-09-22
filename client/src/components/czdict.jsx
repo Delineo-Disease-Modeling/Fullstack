@@ -12,8 +12,6 @@ export default function CzDict({ zone, setZone }) {
   const [locations, setLocations] = useState([]);
   const [hoveredLocId, setHoveredLocId] = useState(null);
 
-  const my_zones = JSON.parse(localStorage.getItem('czlist') ?? '[]');
-
   useEffect(() => {
     fetch(`${DB_URL}convenience-zones`)
       .then((res) => res.json())
@@ -56,7 +54,7 @@ export default function CzDict({ zone, setZone }) {
 
         {/* List */}
         <div className='relative flex flex-col h-auto overflow-y-scroll gap-y-1'>
-          {locations.filter((loc) => tab === 0 ? true : my_zones.includes(loc.id)).map((loc) => (
+          {locations.filter((loc) => tab === 0 ? true : loc.user_id === user?.id).map((loc) => (
             <div
               key={loc.id}
               className='flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative'
@@ -94,9 +92,7 @@ export default function CzDict({ zone, setZone }) {
         </button>
       ) : (
         <InstructionBanner text='Login to generate a Convenience Zone'/>
-      )
-      }
-
+      )}
     </div>
   );
 }
