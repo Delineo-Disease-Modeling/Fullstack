@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import { DB_URL } from '../env';
+import useAuth from '../stores/auth';
+import InstructionBanner from './instruction-banner';
 
 export default function CzDict({ zone, setZone }) {
   const navigate = useNavigate();
+  const user = useAuth((state) => state.user);
 
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState([]);
@@ -82,12 +85,18 @@ export default function CzDict({ zone, setZone }) {
         </div>
       </div>
 
-      <button
-        className='w-48 simset_button'
-        onClick={() => navigate('/cz-generation')}
-      >
-        + Generate Zone
-      </button>
+      {user ? (
+        <button
+          className='w-48 simset_button'
+          onClick={() => navigate('/cz-generation')}
+        >
+          + Generate Zone
+        </button>
+      ) : (
+        <InstructionBanner text='Login to generate a Convenience Zone'/>
+      )
+      }
+
     </div>
   );
 }

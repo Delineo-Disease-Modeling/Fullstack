@@ -5,6 +5,7 @@ import axios from 'axios';
 
 import zip_cbg_json from '../data/zip_to_cbg.json';
 import { ALG_URL, DB_URL } from "../env";
+import useAuth from "../stores/auth";
 
 function InteractiveMap({ onLocationSelect, disabled }) {
   const [ markerPosition, setMarkerPosition ] = useState(null);
@@ -69,10 +70,15 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
 
 export default function CZGeneration() {
   const navigate = useNavigate();
+  const user = useAuth((state) => state.user);
 
   const [ location, setLocation ] = useState('');
   const [ iframeHTML, setIframeHTML ] = useState();
   const [ loading, setLoading ] = useState(false);
+
+  if (!user) {
+    navigate('/simulator');
+  }
 
   const loc_lookup = async (location) => {
     const resp = await fetch(`${DB_URL}lookup-zip`, {

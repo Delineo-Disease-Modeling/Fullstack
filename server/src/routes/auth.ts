@@ -4,6 +4,8 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { z } from "zod";
+import { createSession, deleteSessionTokenCookie, generateSessionToken, setSessionTokenCookie } from "../lib/session.js";
+import { authGuard } from "../middleware/auth-guard.js";
 
 const auth_route = new Hono();
 
@@ -21,18 +23,24 @@ const registerSchema = z.object({
   organization: z.string().nonempty()
 });
 
+auth_route.post('/validate-session', authGuard, async (c) => {
+  return c.json({
+    message: 'Session is valid'
+  });
+});
+
 auth_route.post('/login', zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json');
 
-  const user = await prisma.user.findFirst({
+  const user = await prisma.user.findUnique({
     where: {
       email: email
     }
   });
 
   if (!user) {
-    throw new HTTPException(404, {
-      message: 'User not found'
+    throw new HTTPException(401, {
+      message: 'Email or password is incorrect.'
     });
   }
 
@@ -40,14 +48,14 @@ auth_route.post('/login', zValidator('json', loginSchema), async (c) => {
 
   if (!verified) {
     throw new HTTPException(401, {
-      message: 'Unauthorized'
+      message: 'Email or password is incorrect.'
     });
   }
 
   // Set session-related cookies
-  // const sessionToken = generateSessionToken();
-  // const session = await createSession(sessionToken, user.id);
-  // setSessionTokenCookie(c, sessionToken, session.expiresAt);
+  const sessionToken = generateSessionToken();
+  await createSession(sessionToken, user.id);
+  setSessionTokenCookie(c, sessionToken);
 
   return c.json({
     message: 'Successfully logged in.',
@@ -61,9 +69,19 @@ auth_route.post('/login', zValidator('json', loginSchema), async (c) => {
 auth_route.post('/register', zValidator('json', registerSchema), async (c) => {
   const { name, email, password, organization } = c.req.valid('json');
 
+  const exists = await prisma.user.findUnique({
+    where: { email: email }
+  });
+
+  if (exists) {
+    throw new HTTPException(409, {
+      message: 'A user already exists with that email'
+    });
+  }
+
   const password_hash = await hashPassword(password);
 
-  const user = prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       name,
       email,
@@ -77,9 +95,9 @@ auth_route.post('/register', zValidator('json', registerSchema), async (c) => {
   }
 
   // Set session-related cookies
-  // const sessionToken = generateSessionToken();
-  // const session = await createSession(sessionToken, user.id);
-  // setSessionTokenCookie(c, sessionToken, session.expiresAt);
+  const sessionToken = generateSessionToken();
+  await createSession(sessionToken, user.id);
+  setSessionTokenCookie(c, sessionToken);
 
   return c.json({
     message: 'Successfully registered.',
@@ -87,6 +105,14 @@ auth_route.post('/register', zValidator('json', registerSchema), async (c) => {
       ...user,
       password_hash: undefined
     }
+  });
+});
+
+auth_route.post('/logout', authGuard, async (c) => {
+  deleteSessionTokenCookie(c);
+
+  return c.json({
+    message: 'Successfully logged out.',
   });
 });
 

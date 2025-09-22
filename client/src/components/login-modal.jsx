@@ -1,39 +1,31 @@
 import { useState } from 'react';
-import { DB_URL } from '../env';
 import Modal from 'react-modal';
-
-import './login-modal.css';
+import useAuth from '../stores/auth';
 
 Modal.setAppElement(document.getElementById('root'));
 
 function FormData({ curTab, closeModal }) {
-  const login = (formdata) => {
-    fetch(`${DB_URL}login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formdata)
-    })
-      .then(() => closeModal())
-      .catch(console.error);
-  }
+  const login = useAuth((state) => state.login);
+  const register = useAuth((state) => state.register);
 
-  const register = (formdata) => {
-    fetch(`${DB_URL}register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formdata)
-    })
-      .then(() => closeModal())
-      .catch(console.error);
+  const formSubmit = (formdata) => {
+    const request = {};
+    formdata.forEach((value, key) => request[key] = value);
+
+    if (curTab === 0) {
+      login(request)
+        .then(closeModal)
+        .catch(console.error);
+    } else {
+      register(request)
+        .then(closeModal)
+        .catch(console.error);
+    }
   }
 
   return (
     <form
-      action={curTab === 0 ? login : register}
+      action={formSubmit}
       className='flex flex-col gap-4 items-center'
     >
       <div className='flex flex-col gap-1'>
@@ -78,7 +70,7 @@ function FormData({ curTab, closeModal }) {
       </>}
       <button
         type='submit'
-        className='w-fit outline-solid outline-1 px-8 py-1 rounded-lg mt-2'
+        className='modal outline-solid outline-1 px-8 py-1 rounded-lg mt-2'
       >
         {curTab === 0 ? 'Login' : 'Register'}
       </button>

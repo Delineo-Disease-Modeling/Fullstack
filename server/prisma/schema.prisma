@@ -8,11 +8,19 @@ datasource db {
 }
 
 model User {
-  id                String @id @default(uuid())
+  id                String      @id @default(uuid())
   name              String
-  email             String
+  email             String      @unique
   password_hash     String
   organization      String
+  sessions          Session[]
+}
+
+model Session {
+  id                String        @unique
+  user_id           String
+  user              User          @relation(references: [id], fields: [user_id], onDelete: Cascade)
+  created_at        DateTime      @default(now())
 }
 
 model ConvenienceZone {

@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { trimTrailingSlash } from 'hono/trailing-slash';
-import { PrismaClient } from '@prisma/client';
 import { PORT } from './env.js';
 import { HTTPException } from 'hono/http-exception';
+import { auth } from './middleware/auth.js';
 
 import auth_route from './routes/auth.js';
 import lookup_route from './routes/lookup.js';
@@ -15,6 +15,7 @@ import simdata_route from './routes/simdata.js';
 const app = new Hono();
 
 app.use('*', trimTrailingSlash());
+app.use('*', auth);
 
 app.use(
   '*',
@@ -27,7 +28,7 @@ app.use(
       'http://covidweb.isi.jhu.edu'
     ],
     allowMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Upgrade-Insecure-Requests'],
     exposeHeaders: ['Set-Cookie'],
     credentials: true
   })
