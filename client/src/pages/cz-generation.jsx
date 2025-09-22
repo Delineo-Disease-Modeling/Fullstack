@@ -121,7 +121,8 @@ export default function CZGeneration() {
         name: location['city'],
         cbg: core_cbg,
         start_date: new Date(formdata.get('start_date')).toISOString(),
-        min_pop: +formdata.get('min_pop')
+        min_pop: +formdata.get('min_pop'),
+        user_id: user.id
       });
 
       if (status !== 200) {
