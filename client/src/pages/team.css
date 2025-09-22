@@ -83,6 +83,15 @@ h2.role {
   max-width: 150px;
 }
 
+h2.gradYear {
+  margin: auto;
+  font-weight: 400;
+  font-size: 13px;
+  width: 100%;
+  max-width: 150px;
+  
+}
+
 i.socials {
   margin: auto;
   padding-left: 5px;
