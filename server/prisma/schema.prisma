@@ -27,6 +27,7 @@ model Session {
 model ConvenienceZone {
   id                Int   @id @default(autoincrement())
   name              String
+  description       String
   latitude          Float
   longitude         Float
   cbg_list          String[]        // JSON-like array of CBG identifiers

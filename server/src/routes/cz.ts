@@ -13,6 +13,7 @@ const getConvZonesSchema = z.object({
 
 const postConvZonesSchema = z.object({
   name: z.string().nonempty(),
+  description: z.string().nonempty(),
   latitude: z.number(),
   longitude: z.number(),
   cbg_list: z.array(z.string()),
@@ -54,12 +55,13 @@ cz_route.post(
   '/convenience-zones',
   zValidator('json', postConvZonesSchema),
   async (c) => {
-    const { name, latitude, longitude, cbg_list, start_date, size, user_id } =
+    const { name, description, latitude, longitude, cbg_list, start_date, size, user_id } =
       c.req.valid('json');
 
     const zone = await prisma.convenienceZone.create({
       data: {
         name,
+        description,
         latitude,
         longitude,
         cbg_list,

@@ -35,6 +35,7 @@ function FormData({ curTab, closeModal }) {
           name='email'
           type='email'
           className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+          required
         />
       </div>
       {curTab === 1 && (
@@ -45,6 +46,7 @@ function FormData({ curTab, closeModal }) {
             name='name'
             type='text'
             className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+            required
           />
         </div>
       )}
@@ -55,6 +57,7 @@ function FormData({ curTab, closeModal }) {
           name='password'
           type='password'
           className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+          required
         />
       </div>
       {curTab === 1 && <>
@@ -65,6 +68,7 @@ function FormData({ curTab, closeModal }) {
             name='organization'
             type='text'
             className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+            required
           />
         </div>
       </>}

@@ -83,6 +83,14 @@ export default function CzDict({ zone, setZone }) {
         </div>
       </div>
 
+      {/* Description of current zone */}
+      {zone && (
+        <div className='w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2] italic whitespace-pre-line'>
+          {zone.description}
+        </div>
+      )}
+
+
       {user ? (
         <button
           className='w-48 simset_button'

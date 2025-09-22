@@ -7,6 +7,8 @@ import zip_cbg_json from '../data/zip_to_cbg.json';
 import { ALG_URL, DB_URL } from "../env";
 import useAuth from "../stores/auth";
 
+import './cz-generation.css';
+
 function InteractiveMap({ onLocationSelect, disabled }) {
   const [ markerPosition, setMarkerPosition ] = useState(null);
 
@@ -36,7 +38,7 @@ function InteractiveMap({ onLocationSelect, disabled }) {
     <MapContainer
       center={[39.3290708, -76.6219753]}
       zoom={10}
-      style={{ height: '300px', width: '100%' }}
+      style={{ height: '100%', width: '100%'}}
     >
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
@@ -50,20 +52,32 @@ function InteractiveMap({ onLocationSelect, disabled }) {
 
 function FormField({ label, name, type, placeholder, defaultValue, disabled, value, onChange }) {
   return (
-    <div className='flex flex-col gap-2'>
+    <div className='flex flex-col gap-0.5'>
       <label htmlFor={name}>{label}</label>
-      <input
-        className='px-2 py-1 rounded-lg disabled:cursor-not-allowed disabled:brightness-75 bg-[#F0F0F0]'
-        name={name}
-        id={name}
-        type={type}
-        placeholder={placeholder}
-        defaultValue={defaultValue}
-        disabled={disabled}
-        value={value}
-        onChange={onChange}
-        required
-      />
+      {type === 'textarea' ? (
+        <textarea
+          className='formfield'
+          name={name}
+          id={name}
+          type={type}
+          placeholder={placeholder}
+          disabled={disabled}
+          required
+        />
+      ): (
+        <input
+          className='formfield'
+          name={name}
+          id={name}
+          type={type}
+          placeholder={placeholder}
+          defaultValue={defaultValue}
+          disabled={disabled}
+          value={value}
+          onChange={onChange}
+          required
+        />
+      )}
     </div>
   );
 }
@@ -86,9 +100,7 @@ export default function CZGeneration() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        location: location
-      })
+      body: JSON.stringify({ location })
     });
 
     if (!resp.ok) {
@@ -119,6 +131,7 @@ export default function CZGeneration() {
 
       const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
         name: location['city'],
+        description: formdata.get('description'),
         cbg: core_cbg,
         start_date: new Date(formdata.get('start_date')).toISOString(),
         min_pop: +formdata.get('min_pop'),
@@ -153,8 +166,8 @@ export default function CZGeneration() {
       </header>
 
         <form action={generateCZ} className='flex flex-col gap-8 mb-28 items-center'>
-          <div className='flex justify-center items-center gap-10 flex-wrap mx-4'>
-            <div className='flex flex-col gap-8 items-center'>
+          <div className='flex justify-center items-start gap-10 flex-wrap mx-4'>
+            <div className='flex flex-col gap-4 items-stretch'>
               <FormField 
                 label='City, Address, or Location'
                 name='location'
@@ -179,7 +192,15 @@ export default function CZGeneration() {
                 type='date'
                 defaultValue={new Date().toISOString().slice(0, 10)}
                 disabled={loading || !!iframeHTML}
-              /> 
+              />
+
+              <FormField
+                label='Description'
+                name='description'
+                type='textarea'
+                placeholder='a short description for this convenience zone...'
+                disabled={loading || !!iframeHTML}
+              />
             </div>
 
           {iframeHTML ? (
