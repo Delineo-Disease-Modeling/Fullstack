@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from 'leaflet';
+import useSimData from '../stores/simdata';
 
 import 'leaflet/dist/leaflet.css';
 import './modelmap.css';
@@ -214,24 +215,11 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
   );
 }
 
-// function MapInstructions({ mapCenter }) {
-//   const map = useMap();
-//   useEffect(() => {
-//     const popup = L.popup({
-//       autoClose: false,
-//       closeOnClick: false,
-//       className: 'p-2 text-sm font-medium bg-white border rounded-sm shadow-sm'
-//     })
-//       .setLatLng(mapCenter)
-//       .setContent('Click any marker to explore its statistics.');
-//     popup.openOn(map);
-//     return () => { map.closePopup(popup); };
-//   }, [map, mapCenter]);
-//   return null;
-// }
+export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone }) {
+  const sim_data = useSimData((state) => state.simdata);
+  const move_patterns = useSimData((state) => state.patterns);
+  const pap_data = useSimData((state) => state.papdata);
 
-
-export default function ModelMap({ sim_data, move_patterns, pap_data, onMarkerClick, selectedId, isHousehold, selectedZone }) {
   const [publicFacilities, setPublicFacilities] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [maxHours, setMaxHours] = useState(1);

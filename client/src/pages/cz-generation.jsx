@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { ALG_URL, DB_URL } from "../env";
 import axios from 'axios';
+import useAuth from "../stores/auth";
 
 import zip_cbg_json from '../data/zip_to_cbg.json';
-import { ALG_URL, DB_URL } from "../env";
-import useAuth from "../stores/auth";
 
 import './cz-generation.css';
 
@@ -62,6 +62,8 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
           type={type}
           placeholder={placeholder}
           disabled={disabled}
+          value={value}
+          onChange={onChange}
           required
         />
       ): (
@@ -87,6 +89,9 @@ export default function CZGeneration() {
   const user = useAuth((state) => state.user);
 
   const [ location, setLocation ] = useState('');
+  const [ minPop, setMinPop ] = useState(5000);
+  const [ startDate, setStartDate ] = useState(new Date().toISOString().slice(0, 10));
+  const [ description, setDescription ] = useState('');
   const [ iframeHTML, setIframeHTML ] = useState();
   const [ loading, setLoading ] = useState(false);
 
@@ -182,7 +187,8 @@ export default function CZGeneration() {
                 label='Minimum Population'
                 name='min_pop'
                 type='number'
-                defaultValue={5000}
+                value={minPop}
+                onChange={(e) => setMinPop(e.target.value)}
                 disabled={loading || !!iframeHTML}
               />
 
@@ -190,7 +196,8 @@ export default function CZGeneration() {
                 label='Start Date'
                 name='start_date'
                 type='date'
-                defaultValue={new Date().toISOString().slice(0, 10)}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                 disabled={loading || !!iframeHTML}
               />
 
@@ -199,6 +206,8 @@ export default function CZGeneration() {
                 name='description'
                 type='textarea'
                 placeholder='a short description for this convenience zone...'
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 disabled={loading || !!iframeHTML}
               />
             </div>

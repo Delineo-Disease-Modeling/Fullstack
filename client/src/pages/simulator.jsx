@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { DB_URL, SIM_URL } from '../env';
 import axios from 'axios';
+import useSimSettings from '../stores/simsettings';
+import useSimData from '../stores/simdata';
 
 import SimSettings from '../components/simsettings.jsx';
 import ModelMap from '../components/modelmap.jsx';
@@ -7,90 +10,96 @@ import OutputGraphs from '../components/outputgraphs.jsx';
 import InstructionBanner from '../components/instruction-banner.jsx';
 
 import './simulator.css';
-import { DB_URL, SIM_URL } from '../env';
-
-async function makePostRequest(reqdata, setSimData, setMovePatterns, useCache) {
-  if (useCache) {
-    try {
-      const resp = await axios.get(`${DB_URL}simdata/${reqdata.czone_id}`);
-
-      if (resp.status === 200 && resp.data['data']) {
-        console.log('Using cached data!');
-  
-        const data = JSON.parse(resp.data['data']);
-        const movement = data['movement'];
-
-        for (const key in movement) {
-          if (key > reqdata['length']) {
-            delete movement[key];
-          }
-        }
-
-        setSimData(data['result']);
-        setMovePatterns(movement);
-
-        return;
-      }  
-    } catch (error) {
-      console.error(error.status);
-    }
-  }
-
-  axios.post(`${SIM_URL}simulation/`, reqdata)
-    .then(({ status, data }) => {
-      if (status !== 200) {
-        throw new Error('Status code mismatch');
-      }
-      if (!data?.['result']) {
-        throw new Error('Invalid JSON (missing id)');
-      }
-
-      setSimData(data['result']);
-      setMovePatterns(data['movement']);
-    })
-    .catch(console.error);
-}
-
-function sendSimulatorData(setSimData, setMovePatterns, setPapData, { matrices, location, hours, pmask, pvaccine, capacity, lockdown, selfiso, randseed, zone, useCache }) {
-  fetch(`${DB_URL}patterns/${zone.id}`)
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error();
-      }
-      return res.json();
-    })
-    .then((json) => setPapData(json['data']['papdata']))
-    .catch(console.error);
-
-  makePostRequest({
-    'czone_id': zone.id,
-    'matrices': matrices,
-    'location': location,
-    'length': hours * 60,
-    'mask': pmask,
-    'vaccine': pvaccine,
-    'capacity': capacity,
-    'lockdown': lockdown,
-    'selfiso': selfiso,
-    'randseed': randseed
-  }, setSimData, setMovePatterns, useCache);
-}
 
 export default function Simulator() {
+  const settings = useSimSettings((state) => state.settings);
+  const simdata = useSimData((state) => state.simdata);
+  const patterns = useSimData((state) => state.patterns);
+  const papdata = useSimData((state) => state.papdata);
+
+  const setSimData = useSimData((state) => state.setSimData);
+  const setPatterns = useSimData((state) => state.setPatterns);
+  const setPapData = useSimData((state) => state.setPapData);
+
   const [showSim, setShowSim] = useState(false);
-  const [papData, setPapData] = useState(null);
-  const [movePatterns, setMovePatterns] = useState(null);
-  const [simData, setSimData] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [isHousehold, setIsHousehold] = useState(false);
 
-  // Handle initial simulation request
-  const handleSimData = (dict) => {
+  const makePostRequest = async () => {
+    const reqbody = {
+      ...settings,
+      czone_id: settings.zone.id,
+      length: settings.hours * 60
+    };
+
+    if (settings.usecache) {
+      try {
+        const resp = await axios.get(`${DB_URL}simdata/${settings.zone.id}`);
+
+        if (resp.status === 200 && resp.data['data']) {
+          console.log('Using cached data!');
+    
+          const data = JSON.parse(resp.data['data']);
+          const movement = data['movement'];
+
+          for (const key in movement) {
+            if (key > reqbody['length']) {
+              delete movement[key];
+            }
+          }
+
+          setSimData(data['result']);
+          setPatterns(movement);
+
+          return;
+        }  
+      } catch (error) {
+        console.error(error.status);
+      }
+    }
+
+    axios.post(`${SIM_URL}simulation/`, reqbody)
+      .then(({ status, data }) => {
+        if (status !== 200) {
+          throw new Error('Status code mismatch');
+        }
+        if (!data?.['result']) {
+          throw new Error('Invalid JSON (missing id)');
+        }
+
+        setSimData(data['result']);
+        setPatterns(data['movement']);
+      })
+      .catch(console.error);
+  };
+
+  const sendSimulatorData = () => {
+    // Reset Data
+    setSimData(null);
+    setPatterns(null);
+    setPapData(null);
+
+    // Switch "pages"
     setShowSim(true);
-    sendSimulatorData(setSimData, setMovePatterns, setPapData, dict);
-    setSelectedZone(dict.zone);
+    setSelectedZone(settings.zone);
+    
+    fetch(`${DB_URL}patterns/${settings.zone.id}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error();
+        }
+        return res.json();
+      })
+      .then((json) => setPapData(json['data']['papdata']))
+      .catch(console.error);
+
+    makePostRequest({
+      ...settings,
+      czone_id: settings.zone.id,
+      length: settings.hours * 60
+    });
   };
 
   const handleMarkerClick = (id, isHome) => {
@@ -109,9 +118,9 @@ export default function Simulator() {
         {!showSim ? (
           <div className='sim_settings px-4'>
             <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
-            <SimSettings sendData={handleSimData} showSim={setShowSim} />
+            <SimSettings sendData={sendSimulatorData} />
           </div>
-        ) : !simData || !movePatterns || !papData ? (
+        ) : !simdata || !patterns || !papdata ? (
           <div>Loading simulation data...</div>
         ) : (
           <div className='sim_output px-4'>
@@ -123,17 +132,11 @@ export default function Simulator() {
               </div>
               <ModelMap
                 selectedZone={selectedZone}
-                sim_data={simData}
-                move_patterns={movePatterns}
-                pap_data={papData}
                 onMarkerClick={handleMarkerClick}
               />
             </div>
             <InstructionBanner text="Use the time slider above to navigate through the simulation timeline." />
             <OutputGraphs
-              sim_data={simData}
-              move_patterns={movePatterns}
-              pap_data={papData}
               poi_id={selectedId}
               is_household={isHousehold}
               onReset={onReset}

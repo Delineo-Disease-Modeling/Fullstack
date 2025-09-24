@@ -1,15 +1,13 @@
 div.simset_settings {
-  width: 100%;
+  width: 70rem;
   height: 100%;
 
-  max-width: 70rem;
+  max-width: 90vw;
 
   display: flex;
   justify-content: space-around;
   align-items: center;
   flex-wrap: wrap;
-
-  margin: 0 0.5rem;
 
   column-gap: 30px;
   row-gap: 30px;

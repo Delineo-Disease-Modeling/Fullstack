@@ -1,5 +1,6 @@
-import { useState } from 'react';
 import CzDict from './czdict';
+import useSimSettings from '../stores/simsettings';
+// import InterventionTimeline from './intervention-timeline';
 
 import './simsettings.css';
 
@@ -29,7 +30,7 @@ function SimBoolean({label, value, callback}) {
         <input type='checkbox'
           className='w-6 h-6'
           checked={value}
-          onChange={(e) => callback(() => e.target.checked)}
+          onChange={(e) => callback(e.target.checked)}
         />
         <div>{label}</div>
       </div>
@@ -53,98 +54,82 @@ function SimFile({label, callback}) {
   );
 }
 
-export default function SimSettings({ sendData, showSim }) {
-  const [ zone, setZone ] = useState(null);
-  const [ hours, setHours ] = useState(84);                // How long to run the simulation
-  const [ pmask, setPmask ] = useState(0.4);                // Percent masking
-  const [ pvaccine, setPvaccine ] = useState(0.2);          // Percent vaccinated
-  const [ capacity, setCapacity ] = useState(1.0);          // Capacity percentages
-  const [ lockdown, setLockdown ] = useState(0.0);          // Lockdown probability
-  const [ selfiso, setSelfiso ] = useState(0.5);            // Self-isolation probability
-  const [ randseed, setRandseed ] = useState(true);         // Random or set seed for sim/dmp?
-  const [ useCache, setUseCache ] = useState(true);         // Use cached sim data for speed?
-
-  const [ matrices, setMatrices ] = useState(null);                 // To-be-sent file matrices
-  const [ customFiles, setCustomFiles ] = useState(null);           // Uploaded file matrices
+export default function SimSettings({ sendData }) {
+  const settings = useSimSettings((state) => state.settings);
+  const setSettings = useSimSettings((state) => state.setSettings);
 
   return (
     <div className='simset_settings'>
       <div className='simset_params'>
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
-        <CzDict zone={zone} setZone={setZone} />
+        <CzDict
+          zone={settings.zone}
+          setZone={(zone) => setSettings({ zone })}
+        />
 
         <SimParameter
           label={'Length (Hours)'}
-          value={hours}
-          callback={setHours}
+          value={settings.hours}
+          callback={(hours) => setSettings({ hours })}
           min={1}
           max={168}
           percent={false}
         />
         <SimParameter
           label={'Percent Masking'}
-          value={pmask}
-          callback={setPmask}
+          value={settings.mask}
+          callback={(mask) => setSettings({ mask })}
         />
         <SimParameter
           label={'Percent Vaccinated'}
-          value={pvaccine}
-          callback={setPvaccine}
+          value={settings.vaccine}
+          callback={(vaccine) => setSettings({ vaccine })}
         />
         <SimParameter
           label={'Maximum Facility Capacity'}
-          value={capacity}
-          callback={setCapacity}
+          value={settings.capacity}
+          callback={(capacity) => setSettings({ capacity })}
         />
         <SimParameter
           label={'Lockdown Probability'}
-          value={lockdown}
-          callback={setLockdown}
+          value={settings.lockdown}
+          callback={(lockdown) => setSettings({ lockdown })}
         />
         <SimParameter
           label={'Self-Isolation Percent'}
-          value={selfiso}
-          callback={setSelfiso}
+          value={settings.selfiso}
+          callback={(selfiso) => setSettings({ selfiso })}
         />
         <SimBoolean 
           label={'Random Seed'}
-          value={randseed}
-          callback={setRandseed}
+          value={settings.randseed}
+          callback={(randseed) => setSettings({ randseed })}
         />
         <SimBoolean 
           label={'Use Cached Data (faster)'}
-          value={useCache}
-          callback={setUseCache}
+          value={settings.usecache}
+          callback={(usecache) => setSettings({ usecache })}
         />
         {/* <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/> */}
         <SimFile 
           label={'Custom DMP Matrix Files'}
-          callback={setCustomFiles}
+          // callback={setCustomFiles}
+          callback={console.log}
         />
       </div>
+
+      {/* <InterventionTimeline hours={hours} /> */}
       
-      <button className='simset_button w-32' onClick={() => {
-          if (!zone?.ready) {
+      <button
+        className='simset_button w-32'
+        onClick={() => {
+          if (!settings.zone?.ready) {
             alert('Please pick a valid convenience zone first!');
             return;
           }
 
           // Now pass the zone's name & full object to the parent
-          sendData({
-            zone: zone,
-            location: zone.name,
-            hours,
-            pmask,
-            pvaccine,
-            capacity,
-            lockdown,
-            selfiso,
-            randseed,
-            matrices,
-            useCache
-          });
-
-          showSim(true);
+          sendData();
         }}
       >
         Simulate
