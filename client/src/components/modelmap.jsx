@@ -324,7 +324,12 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           }}
         />
         <div className='mt-3 text-center'>
-          {new Date(new Date(selectedZone.start_date).getTime() + timestamp * 60 * 60 * 1000).toLocaleString()}
+          {new Date(new Date(selectedZone.start_date).getTime() + timestamp * 60 * 60 * 1000).toLocaleString('en-US', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            weekday: 'short'
+          })}
         </div>
       </div>
 
