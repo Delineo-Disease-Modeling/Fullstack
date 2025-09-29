@@ -45,6 +45,22 @@ export default function InterventionTimeline() {
     setCurtime(() => next[next.length - 1]);
   }
 
+  const moveLeft = () => {
+    if (curtime === values.sort()[0]) {
+      setCurtime(values.sort()[values.length - 1]);
+    } else {
+      setCurtime(values.sort()[values.sort().indexOf(curtime) - 1]);
+    }
+  };
+
+  const moveRight = () => {
+    if (curtime === values.sort()[values.length - 1]) {
+      setCurtime(values.sort()[0]);
+    } else {
+      setCurtime(values.sort()[values.sort().indexOf(curtime) + 1]);
+    }
+  };
+
   return (
     <div className='flex flex-col w-full p-4 gap-4'>
       {/* Timeline bar */}
@@ -74,7 +90,7 @@ export default function InterventionTimeline() {
               setValues((cur) => [...cur].with(i, +e.target.value));
               setCurtime(+e.target.value);
             }}
-            onMouseDown={(e) => {
+            onMouseDownCapture={(e) => {
               setCurtime(+e.target.value);
             }}
             onContextMenu={(e) => {
@@ -87,15 +103,12 @@ export default function InterventionTimeline() {
 
       {/* Buttons */}
       <div className='flex w-full items-center justify-center gap-2'>
-        <div className={curtime === values.sort()[0] ? 'cursor-not-allowed' : ''}>
-          <button
-            className='timeline bg-[#222629] disabled:bg-stone-600 px-4!'
-            onClick={() => setCurtime(() => values.sort()[values.sort().indexOf(curtime) - 1])}
-            disabled={curtime === values.sort()[0]}
-          >
-            &lt;
-          </button>
-        </div>
+        <button
+          className='timeline bg-[#222629] disabled:bg-stone-600 px-4!'
+          onClick={moveLeft}
+        >
+          &lt;
+        </button>
         <div className={values.length <= 1 ? 'cursor-not-allowed' : ''}>
           <button
             className='timeline bg-red-400 disabled:bg-red-800'
@@ -121,15 +134,12 @@ export default function InterventionTimeline() {
             + Add Intervention
           </button>
         </div>
-        <div className={curtime === values.sort()[values.length - 1] ? 'cursor-not-allowed' : ''}>
-          <button
-            className='timeline bg-[#222629] disabled:bg-stone-600 px-4!'
-            onClick={() => setCurtime(() => values.sort()[values.sort().indexOf(curtime) + 1])}
-            disabled={curtime === values.sort()[values.length - 1]}
-          >
-            &gt;
-          </button>
-        </div>
+        <button
+          className='timeline bg-[#222629] disabled:bg-stone-600 px-4!'
+          onClick={moveRight}
+        >
+          &gt;
+        </button>
       </div>
 
       {/* Information & Buttons*/}
