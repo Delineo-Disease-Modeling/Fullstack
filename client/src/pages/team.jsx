@@ -4,8 +4,8 @@ import './team.css';
 const teamData = {
   professors: [
     { name: "Professor Anton Dahbura", department: "Computer Science"},
-    { name: "Professor Kimia Ghobadi" },
-    { name: "Professor Eili Klein" },
+    { name: "Professor Kimia Ghobadi", department: "Civil and Systems Engineering" },
+    { name: "Professor Eili Klein", department: "Emergency Medicine" },
   ],
 
   fullstackTeam: [
