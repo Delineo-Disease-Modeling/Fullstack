@@ -38,7 +38,6 @@ button.timeline {
   outline: solid 1px #fffff2;
   padding: 0.25rem 2rem;
   border-radius: var(--radius-lg);
-  margin-top: 0.5rem;
   color: #F0F0F0;
 }
 
