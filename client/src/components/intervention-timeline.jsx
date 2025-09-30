@@ -34,6 +34,11 @@ export default function InterventionTimeline() {
   };
 
   const deleteThumb = (i) => {
+    // Can't delete value 0 
+    if (values[i] === 0) {
+      return;
+    }
+
     if (values.length === 1) {
       return;
     }
@@ -64,23 +69,31 @@ export default function InterventionTimeline() {
   return (
     <div className='flex flex-col w-full p-4 gap-4'>
       {/* Timeline bar */}
-      <div className='relative w-full mb-4 select-none'>
+      <div
+        className='relative flex items-center w-full h-6 select-none'
+        onDoubleClick={addThumb}
+      >
         {/* Background slider */}
         <div
           className='absolute w-full h-2 bg-[#5D576B] rounded-md outline-0'
-          onDoubleClick={addThumb}
         />
 
         {values.map((value, i) => (
           <input
             key={i}
             className={'timeline absolute w-full h-1.5 '
-              + (curtime === value ? 'current' : '')}
+              + (curtime === value ? 'current ' : '')
+            }
             type="range"
             min={0}
             max={settings.hours}
             value={value}
             onChange={(e) => {
+              // Can't change the first timeline option
+              if (value === 0) {
+                return;
+              }
+
               // No repeat values
               if (values.includes(+e.target.value)) {
                 return;
