@@ -34,6 +34,8 @@ export default function Simulator() {
       length: settings.hours * 60
     };
 
+    console.log(reqbody);
+
     if (settings.usecache) {
       try {
         const resp = await axios.get(`${DB_URL}simdata/${settings.zone.id}`);

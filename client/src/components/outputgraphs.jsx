@@ -162,7 +162,7 @@ export default function OutputGraphs({ poi_id, is_household, onReset }) {
       <div className='p-2.5'>
         <label>Select Chart Type: </label>
         <select
-          className='px-1'
+          className='px-1 outline-2 outline-solid bg-[#fffff2] outline-[#70B4D4]'
           value={selected_chart}
           onChange={handleChartSelect}
         >

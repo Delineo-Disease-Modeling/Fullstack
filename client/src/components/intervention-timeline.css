@@ -1,38 +1,43 @@
-input.timeline {
+input.iv_timeline {
   appearance: none;
   -webkit-appearance: none;
   pointer-events: none;
+  background: transparent !important;
 }
 
-input.timeline::-webkit-slider-runnable-track {
-  background: transparent;
+input.iv_timeline::-webkit-slider-runnable-track {
+  background: transparent !important;
+  border: transparent !important;
+  height: 0 !important;
 }
 
-input.timeline::-moz-range-track {
-  background: transparent;
+input.iv_timeline::-moz-range-track {
+  background: transparent !important;
+  border: transparent !important;
+  height: 0 !important;
 }
 
-input.timeline::-webkit-slider-thumb {
+input.iv_timeline::-webkit-slider-thumb {
   pointer-events: auto;
   width: 8px !important;
   border-radius: 4px !important;
 }
 
-input.timeline::-moz-range-thumb {
+input.iv_timeline::-moz-range-thumb {
   pointer-events: auto;
   width: 10px !important;
   border-radius: 4px !important;
 }
 
-input.timeline.current::webkit-slider-thumb {
+input.iv_timeline.current::webkit-slider-thumb {
   background-color: #f0f0f0;
 }
 
-input.timeline.current::-moz-range-thumb {
+input.iv_timeline.current::-moz-range-thumb {
   background-color: #f0f0f0;
 }
 
-button.timeline {
+button.iv_timeline {
   cursor: pointer;
   transition: all 200ms ease-in-out;
   outline: solid 1px #fffff2;
@@ -41,7 +46,7 @@ button.timeline {
   color: #F0F0F0;
 }
 
-button.timeline:hover {
+button.iv_timeline:hover {
   transform: scale(1.05);
   background-color: #fffff2;
   color: #222629;
@@ -49,10 +54,10 @@ button.timeline:hover {
   cursor: pointer;
 }
 
-button.timeline:active {
+button.iv_timeline:active {
   filter: brightness(80%);
 }
 
-button.timeline:disabled {
+button.iv_timeline:disabled {
   pointer-events: none;
 }

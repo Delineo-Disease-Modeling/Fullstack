@@ -91,7 +91,7 @@ patterns_route.get(
         const timestamps = Object.keys(patterns).sort((a, b) => +a - +b);
 
         for (const curtime of timestamps) {
-          await stream.write(`${JSON.stringify(patterns[curtime])}\n`);
+          await stream.write(`${JSON.stringify({ patterns: { [curtime]: patterns[curtime] } })}\n`);
         }
       });
     }
