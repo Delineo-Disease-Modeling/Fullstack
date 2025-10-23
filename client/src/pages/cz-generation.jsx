@@ -50,7 +50,7 @@ function InteractiveMap({ onLocationSelect, disabled }) {
   );
 }
 
-function FormField({ label, name, type, placeholder, defaultValue, disabled, value, onChange }) {
+function FormField({ label, name, type, placeholder, defaultValue, disabled, value, onChange, min, max }) {
   return (
     <div className='flex flex-col gap-0.5'>
       <label htmlFor={name}>{label}</label>
@@ -77,6 +77,8 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
           disabled={disabled}
           value={value}
           onChange={onChange}
+          min={min}
+          max={max}
           required
         />
       )}
@@ -91,6 +93,7 @@ export default function CZGeneration() {
   const [ location, setLocation ] = useState('');
   const [ minPop, setMinPop ] = useState(5000);
   const [ startDate, setStartDate ] = useState(new Date().toISOString().slice(0, 10));
+  const [ length, setLength ] = useState(15);
   const [ description, setDescription ] = useState('');
   const [ iframeHTML, setIframeHTML ] = useState();
   const [ loading, setLoading ] = useState(false);
@@ -139,6 +142,7 @@ export default function CZGeneration() {
         description: formdata.get('description'),
         cbg: core_cbg,
         start_date: new Date(formdata.get('start_date')).toISOString(),
+        length: +formdata.get('length') * 24,     // Days turn to hours
         min_pop: +formdata.get('min_pop'),
         user_id: user.id
       });
@@ -188,6 +192,8 @@ export default function CZGeneration() {
                 name='min_pop'
                 type='number'
                 value={minPop}
+                min={100}
+                max={100_000}
                 onChange={(e) => setMinPop(e.target.value)}
                 disabled={loading || !!iframeHTML}
               />
@@ -198,6 +204,17 @@ export default function CZGeneration() {
                 type='date'
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                disabled={loading || !!iframeHTML}
+              />
+
+              <FormField 
+                label='Length (days)'
+                name='length'
+                type='number'
+                value={length}
+                min={7}
+                max={365}
+                onChange={(e) => setLength(e.target.value)}
                 disabled={loading || !!iframeHTML}
               />
 

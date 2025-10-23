@@ -8,6 +8,7 @@ type ConvenienceZone = {
   longitude: number;
   cbg_list: string[];
   size: number;
+  length: number;
   start_date: string;
   created_at: string;
   user_id: string;
