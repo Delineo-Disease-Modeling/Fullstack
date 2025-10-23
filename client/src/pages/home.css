@@ -55,8 +55,8 @@ button.app:active {
 }
 
 img.logo {
-  width: 400px;
-  max-width: 60vw;
+  width: 300px;
+  max-width: 40vw;
   height: auto;
   aspect-ratio: 1 / 1;
 }

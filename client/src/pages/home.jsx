@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import Shapes from '../components/shapes.jsx';
 import './home.css';
 
+
 export default function Home() {
   return (
     <div>
@@ -15,7 +16,7 @@ export default function Home() {
             <button className='app'>Start</button>
           </NavLink>
         </div>
-        <img className='logo rounded-3xl bg-[#88D2D8]' src='./delineo.svg' alt='logo'></img>
+        <img className='logo p-4 rounded-3xl border-10 border-[#932D3B]' src='/logo2.png' alt='logo'></img>
       </div>
       <div className='featurelist'>
         <div className='feature' data-aos='fade-left'>
