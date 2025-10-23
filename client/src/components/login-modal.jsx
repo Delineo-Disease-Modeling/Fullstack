@@ -1,22 +1,31 @@
-import Modal from 'react-modal';
-
-import './login-modal.css';
 import { useState } from 'react';
+import Modal from 'react-modal';
+import useAuth from '../stores/auth';
 
 Modal.setAppElement(document.getElementById('root'));
 
-function FormData({ curTab }) {
-  const login = (formdata) => {
-    console.log(formdata);
-  }
+function FormData({ curTab, closeModal }) {
+  const login = useAuth((state) => state.login);
+  const register = useAuth((state) => state.register);
 
-  const register = (formdata) => {
-    console.log(formdata);
+  const formSubmit = (formdata) => {
+    const request = {};
+    formdata.forEach((value, key) => request[key] = value);
+
+    if (curTab === 0) {
+      login(request)
+        .then(closeModal)
+        .catch(console.error);
+    } else {
+      register(request)
+        .then(closeModal)
+        .catch(console.error);
+    }
   }
 
   return (
     <form
-      action={curTab === 0 ? login : register}
+      action={formSubmit}
       className='flex flex-col gap-4 items-center'
     >
       <div className='flex flex-col gap-1'>
@@ -26,16 +35,18 @@ function FormData({ curTab }) {
           name='email'
           type='email'
           className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+          required
         />
       </div>
       {curTab === 1 && (
         <div className='flex flex-col gap-1'>
-          <label htmlFor='username'>Display Name</label>
+          <label htmlFor='name'>Display Name</label>
           <input
-            id='username'
-            name='username'
+            id='name'
+            name='name'
             type='text'
             className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+            required
           />
         </div>
       )}
@@ -46,6 +57,7 @@ function FormData({ curTab }) {
           name='password'
           type='password'
           className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+          required
         />
       </div>
       {curTab === 1 && <>
@@ -56,12 +68,13 @@ function FormData({ curTab }) {
             name='organization'
             type='text'
             className='rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]'
+            required
           />
         </div>
       </>}
       <button
         type='submit'
-        className='w-fit outline-solid outline-1 px-8 py-1 rounded-lg mt-2'
+        className='modal outline-solid outline-1 px-8 py-1 rounded-lg mt-2'
       >
         {curTab === 0 ? 'Login' : 'Register'}
       </button>
@@ -120,7 +133,7 @@ export default function LoginModal({ isOpen, onRequestClose }) {
             Register
           </button>
         </div>
-        <FormData curTab={curTab} />
+        <FormData curTab={curTab} closeModal={onRequestClose} />
       </div>
     </Modal>
   );

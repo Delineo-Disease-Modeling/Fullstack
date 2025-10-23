@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import { DB_URL } from '../env';
+import useAuth from '../stores/auth';
+import InstructionBanner from './instruction-banner';
 
 export default function CzDict({ zone, setZone }) {
   const navigate = useNavigate();
+  const user = useAuth((state) => state.user);
 
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState([]);
   const [hoveredLocId, setHoveredLocId] = useState(null);
-
-  const my_zones = JSON.parse(localStorage.getItem('czlist') ?? '[]');
 
   useEffect(() => {
     fetch(`${DB_URL}convenience-zones`)
@@ -53,7 +54,7 @@ export default function CzDict({ zone, setZone }) {
 
         {/* List */}
         <div className='relative flex flex-col h-auto overflow-y-scroll gap-y-1'>
-          {locations.filter((loc) => tab === 0 ? true : my_zones.includes(loc.id)).map((loc) => (
+          {locations.filter((loc) => tab === 0 ? true : loc.user_id === user?.id).map((loc) => (
             <div
               key={loc.id}
               className='flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative'
@@ -82,12 +83,24 @@ export default function CzDict({ zone, setZone }) {
         </div>
       </div>
 
-      <button
-        className='w-48 simset_button'
-        onClick={() => navigate('/cz-generation')}
-      >
-        + Generate Zone
-      </button>
+      {/* Description of current zone */}
+      {zone && (
+        <div className='w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2] italic whitespace-pre-line'>
+          {zone.description}
+        </div>
+      )}
+
+
+      {user ? (
+        <button
+          className='w-48 simset_button'
+          onClick={() => navigate('/cz-generation')}
+        >
+          + Generate Zone
+        </button>
+      ) : (
+        <InstructionBanner text='Login to generate a Convenience Zone'/>
+      )}
     </div>
   );
 }
