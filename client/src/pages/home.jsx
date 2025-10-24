@@ -16,7 +16,7 @@ export default function Home() {
             <button className='app'>Start</button>
           </NavLink>
         </div>
-        <img className='logo p-4 rounded-3xl border-10 border-[#932D3B]' src='/logo2.png' alt='logo'></img>
+        <img className='logo' src='/logo.png' alt='logo'></img>
       </div>
       <div className='featurelist'>
         <div className='feature' data-aos='fade-left'>
