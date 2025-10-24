@@ -25,7 +25,7 @@ export default function Navbar() {
     <div className='navbuffer'></div>
     <nav>
       <NavLink to='/' className='link'>
-        <img src='./delineo-inv.svg' alt='logo'></img>
+        <img src='./logo.png' alt='logo'></img>
       </NavLink>
       <ul>
         <li>
