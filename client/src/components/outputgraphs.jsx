@@ -5,6 +5,8 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { CustomTooltip } from './customtooltip';
+import useSimData from '../stores/simdata';
+
 import './outputgraphs.css';
 
 const age_ranges = [
@@ -35,7 +37,11 @@ const infection_states = {
 
 const COLORS = ["#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "#ff954f", "#4fd0ff"];
 
-export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id, is_household, onReset }) {
+export default function OutputGraphs({ poi_id, is_household, onReset }) {
+  const sim_data = useSimData((state) => state.simdata);
+  const move_patterns = useSimData((state) => state.patterns);
+  const pap_data = useSimData((state) => state.papdata);
+
   const [diseases, setDiseases] = useState([]);
   const [chart_data, setChartData] = useState(null);
   const [selected_chart, setSelectedChart] = useState('iot');
@@ -156,7 +162,7 @@ export default function OutputGraphs({ sim_data, move_patterns, pap_data, poi_id
       <div className='p-2.5'>
         <label>Select Chart Type: </label>
         <select
-          className='px-1'
+          className='px-1 outline-2 outline-solid bg-[#fffff2] outline-[#70B4D4]'
           value={selected_chart}
           onChange={handleChartSelect}
         >
