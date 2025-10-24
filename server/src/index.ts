@@ -5,6 +5,7 @@ import { trimTrailingSlash } from 'hono/trailing-slash';
 import { PORT } from './env.js';
 import { HTTPException } from 'hono/http-exception';
 import { auth } from './middleware/auth.js';
+import { bodyLimit } from 'hono/body-limit';
 
 import auth_route from './routes/auth.js';
 import lookup_route from './routes/lookup.js';
@@ -16,6 +17,9 @@ const app = new Hono();
 
 app.use('*', trimTrailingSlash());
 app.use('*', auth);
+app.use('*', bodyLimit({
+  maxSize: 20 * 1024 * 1024 * 1024
+}));
 
 app.use(
   '*',
@@ -28,14 +32,15 @@ app.use(
       'http://covidweb.isi.jhu.edu'
     ],
     allowMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-    allowHeaders: ['Content-Type', 'Authorization', 'Upgrade-Insecure-Requests'],
-    exposeHeaders: ['Set-Cookie'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Upgrade-Insecure-Requests', 'Content-Length'],
+    exposeHeaders: ['Set-Cookie', 'Content-Length'],
     credentials: true
   })
 );
 
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
+    console.log(error);
     return c.json({ message: error.message }, error.status);
   }
 

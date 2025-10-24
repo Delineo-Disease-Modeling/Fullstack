@@ -328,7 +328,9 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
             day: 'numeric',
             month: 'long',
             year: 'numeric',
-            weekday: 'short'
+            weekday: 'short',
+            hour: 'numeric',
+            minute: '2-digit'
           })}
         </div>
       </div>

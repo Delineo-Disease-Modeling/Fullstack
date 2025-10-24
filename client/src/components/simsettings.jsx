@@ -22,8 +22,8 @@ export default function SimSettings({ sendData }) {
           label={'Length (Hours)'}
           value={settings.hours}
           callback={(hours) => setSettings({ hours })}
-          min={1}
-          max={168}
+          min={24}
+          max={settings.zone?.length ?? 168}
           percent={false}
         />
         <SimBoolean 

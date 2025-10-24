@@ -3,14 +3,15 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { PrismaClient } from "@prisma/client";
 import { streamText } from "hono/streaming";
+import { gunzip } from "zlib";
 
 const patterns_route = new Hono();
 const prisma = new PrismaClient();
 
 const postPatternsSchema = z.object({
   czone_id: z.number().nonnegative(),
-  papdata: z.object({}).passthrough(),
-  patterns: z.object({}).passthrough()
+  papdata: z.string(),
+  patterns: z.string()
 });
 
 const getPatternsSchema = z.object({
@@ -29,14 +30,14 @@ patterns_route.post(
 
     const papdata_obj = await prisma.paPData.create({
       data: {
-        papdata: JSON.stringify(papdata),
+        papdata: papdata,
         czone_id: czone_id
       }
     });
 
     const patterns_obj = await prisma.movementPattern.create({
       data: {
-        patterns: JSON.stringify(patterns),
+        patterns: patterns,
         czone_id: czone_id
       }
     });
@@ -94,15 +95,15 @@ patterns_route.get(
           await stream.write(`${JSON.stringify({ patterns: { [curtime]: patterns[curtime] } })}\n`);
         }
       });
+    } else {
+      // Not streaming? return data as normal
+      return c.json({
+        data: {
+          papdata: JSON.parse(papdata_obj.papdata),
+          patterns: JSON.parse(patterns_obj.patterns)
+        }
+      });
     }
-
-    // Not streaming? return data as normal
-    return c.json({
-      data: {
-        papdata: JSON.parse(papdata_obj.papdata),
-        patterns: JSON.parse(patterns_obj.patterns)
-      }
-    });
   }
 );
 
