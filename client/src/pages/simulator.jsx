@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DB_URL, SIM_URL } from '../env';
 import axios from 'axios';
 import useSimSettings from '../stores/simsettings';
@@ -10,6 +10,7 @@ import OutputGraphs from '../components/outputgraphs.jsx';
 import InstructionBanner from '../components/instruction-banner.jsx';
 
 import './simulator.css';
+
 
 export default function Simulator() {
   const settings = useSimSettings((state) => state.settings);
@@ -26,6 +27,9 @@ export default function Simulator() {
 
   const [selectedId, setSelectedId] = useState(null);
   const [isHousehold, setIsHousehold] = useState(false);
+
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const makePostRequest = async () => {
     const reqbody = {
@@ -114,6 +118,25 @@ export default function Simulator() {
     setIsHousehold(null);
   };
 
+  useEffect(() => {
+    let interval;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setCurrentTime((prev) => {
+          const next = prev + 1;
+          if (next >= Object.keys(patterns).length) {
+            clearInterval(interval);
+            setIsPlaying(false);
+            return prev;
+          }
+          return next;
+        });
+      }, 200); // speed (ms between frames)
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, patterns]);
+
+
   return (
     <div>
       <div className='sim_container'>
@@ -135,13 +158,19 @@ export default function Simulator() {
               <ModelMap
                 selectedZone={selectedZone}
                 onMarkerClick={handleMarkerClick}
+                currentTime={currentTime}
+                isPlaying={isPlaying}
+                setIsPlaying={setIsPlaying}
               />
             </div>
-            <InstructionBanner text="Use the time slider above to navigate through the simulation timeline." />
+            
+            <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
+
             <OutputGraphs
               poi_id={selectedId}
               is_household={isHousehold}
               onReset={onReset}
+              currentTime={currentTime}
             />
           </div>
         )}

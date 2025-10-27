@@ -215,7 +215,8 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
   );
 }
 
-export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone }) {
+export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone, currentTime, isPlaying, setIsPlaying })
+ {
   const sim_data = useSimData((state) => state.simdata);
   const move_patterns = useSimData((state) => state.patterns);
   const pap_data = useSimData((state) => state.papdata);
@@ -291,6 +292,16 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
       return hs;
     });
   }, [sim_data, move_patterns, pap_data, mapCenter]);
+  
+  useEffect(() => {
+    if (!currentTime || !move_patterns || !sim_data || !pap_data) return;
+    if (currentTime > maxHours) return;
+
+    setTimestamp(currentTime);
+    updateIcons(currentTime, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+    updateIcons(currentTime, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
+  }, [currentTime]);
+
 
   return (
     <div>
@@ -309,9 +320,16 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
       />
 
       {/* Slider Component */}
-      <div className='w-full mt-5'>
+      <div className="flex items-center justify-center gap-3 mt-5">
+        <button
+          className="bg-[#70B4D4] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
+          onClick={() => setIsPlaying(!isPlaying)}
+        >
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+
         <input
-          className='w-full max-w-[95vw]'
+          className='w-full max-w-[90vw]'
           type="range"
           min={1}
           max={maxHours}
