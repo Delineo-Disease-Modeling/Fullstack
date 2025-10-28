@@ -39,29 +39,28 @@ model ConvenienceZone {
   user              User @relation(references: [id], fields: [user_id], onDelete: Cascade)
   papdata           PaPData?
   patterns          MovementPattern?
-  simdata           SimData?
+  simdata           SimData[]
 }
 
 model MovementPattern {
-  id                Int   @id @default(autoincrement())
-  patterns          String
+  id                String   @id @default(uuid())
   created_at        DateTime @default(now())
   czone_id          Int @unique
   czone             ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)          
 }
 
 model PaPData {
-  id      Int @id @default(autoincrement())
-  papdata   String
-  czone_id  Int @unique
-  czone     ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
+  id            String @id @default(uuid())
+  czone_id      Int @unique
+  czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
 }
 
 model SimData {
-  id Int @id @default(autoincrement())
-  simdata   String
-  czone_id  Int @unique
-  czone     ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
+  id            Int @id @default(autoincrement())
+  patterns      String @unique @default(uuid())
+  simdata       String @unique @default(uuid())
+  czone_id      Int
+  czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
 }
 
 model POI {

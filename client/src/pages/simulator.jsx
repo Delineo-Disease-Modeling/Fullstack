@@ -14,11 +14,9 @@ import './simulator.css';
 export default function Simulator() {
   const settings = useSimSettings((state) => state.settings);
   const simdata = useSimData((state) => state.simdata);
-  const patterns = useSimData((state) => state.patterns);
   const papdata = useSimData((state) => state.papdata);
 
   const setSimData = useSimData((state) => state.setSimData);
-  const setPatterns = useSimData((state) => state.setPatterns);
   const setPapData = useSimData((state) => state.setPapData);
 
   const [showSim, setShowSim] = useState(false);
@@ -37,29 +35,29 @@ export default function Simulator() {
     console.log(reqbody);
 
     if (settings.usecache) {
-      try {
-        const resp = await axios.get(`${DB_URL}simdata/${settings.zone.id}`);
+      // try {
+      //   const resp = await axios.get(`${DB_URL}simdata/${settings.zone.id}`);
 
-        if (resp.status === 200 && resp.data['data']) {
-          console.log('Using cached data!');
+      //   if (resp.status === 200 && resp.data['data']) {
+      //     console.log('Using cached data!');
     
-          const data = JSON.parse(resp.data['data']);
-          const movement = data['movement'];
+      //     const data = JSON.parse(resp.data['data']);
+      //     const movement = data['movement'];
 
-          for (const key in movement) {
-            if (key > reqbody['length']) {
-              delete movement[key];
-            }
-          }
+      //     for (const key in movement) {
+      //       if (key > reqbody['length']) {
+      //         delete movement[key];
+      //       }
+      //     }
 
-          setSimData(data['result']);
-          setPatterns(movement);
+      //     setSimData(data['result']);
+      //     setPatterns(movement);
 
-          return;
-        }  
-      } catch (error) {
-        console.error(error.status);
-      }
+      //     return;
+      //   }  
+      // } catch (error) {
+      //   console.error(error.status);
+      // }
     }
 
     axios.post(`${SIM_URL}simulation/`, reqbody)
@@ -67,12 +65,16 @@ export default function Simulator() {
         if (status !== 200) {
           throw new Error('Status code mismatch');
         }
-        if (!data?.['result']) {
-          throw new Error('Invalid JSON (missing id)');
-        }
 
-        setSimData(data['result']);
-        setPatterns(data['movement']);
+        axios.get(`${DB_URL}simdata/${data['data']['id']}`)
+          .then(({ status, data }) => {
+            if (status !== 200) {
+              throw new Error('Status code mismatch');
+            }
+
+            setSimData(data['data']);
+          })
+          .catch(console.error);
       })
       .catch(console.error);
   };
@@ -80,21 +82,22 @@ export default function Simulator() {
   const sendSimulatorData = () => {
     // Reset Data
     setSimData(null);
-    setPatterns(null);
     setPapData(null);
 
     // Switch "pages"
     setShowSim(true);
     setSelectedZone(settings.zone);
     
-    fetch(`${DB_URL}patterns/${settings.zone.id}`)
+    fetch(`${DB_URL}papdata/${settings.zone.id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error();
         }
         return res.json();
       })
-      .then((json) => setPapData(json['data']['papdata']))
+      .then((json) => {
+        setPapData(json['data']);
+      })
       .catch(console.error);
 
     makePostRequest({
@@ -122,7 +125,7 @@ export default function Simulator() {
             <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
             <SimSettings sendData={sendSimulatorData} />
           </div>
-        ) : !simdata || !patterns || !papdata ? (
+        ) : !simdata || !papdata ? (
           <div>Loading simulation data...</div>
         ) : (
           <div className='sim_output px-4'>

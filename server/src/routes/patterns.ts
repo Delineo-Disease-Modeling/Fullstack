@@ -3,44 +3,53 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { PrismaClient } from "@prisma/client";
 import { streamText } from "hono/streaming";
-import { gunzip } from "zlib";
+import { createReadStream } from "fs";
+import { DB_FOLDER } from "../env.js";
+import chain from "stream-chain";
+import parser from 'stream-json';
+import StreamObject from "stream-json/streamers/StreamObject.js";
+import { saveFileStream } from "../lib/filestream.js";
 
 const patterns_route = new Hono();
 const prisma = new PrismaClient();
 
 const postPatternsSchema = z.object({
-  czone_id: z.number().nonnegative(),
-  papdata: z.string(),
-  patterns: z.string()
+  czone_id: z.coerce.number().nonnegative(),
+  papdata: z.instanceof(File),
+  patterns: z.instanceof(File)
 });
 
-const getPatternsSchema = z.object({
+const getPatternsParamSchema = z.object({
   czone_id: z.coerce.number().nonnegative()
 });
 
 const getPatternsQuerySchema = z.object({
-  stream: z.coerce.boolean().optional()
-});
+  length: z.coerce.number().positive().optional()
+})
 
 patterns_route.post(
   '/patterns', 
-  zValidator('json', postPatternsSchema),
+  zValidator('form', postPatternsSchema),
     async (c) => {
-    const { czone_id, patterns, papdata } = c.req.valid('json');
+    const { czone_id, patterns, papdata } = c.req.valid('form');
 
     const papdata_obj = await prisma.paPData.create({
       data: {
-        papdata: papdata,
         czone_id: czone_id
       }
     });
 
     const patterns_obj = await prisma.movementPattern.create({
       data: {
-        patterns: patterns,
         czone_id: czone_id
       }
     });
+
+    // Write patterns/papdata info to file
+    await Promise.all([
+      saveFileStream(patterns, DB_FOLDER + patterns_obj.id),
+      saveFileStream(papdata, DB_FOLDER + papdata_obj.id),
+    ]);
 
     return c.json({
       data: {
@@ -57,11 +66,11 @@ patterns_route.post(
 
 patterns_route.get(
   '/patterns/:czone_id',
-  zValidator('param', getPatternsSchema),
+  zValidator('param', getPatternsParamSchema),
   zValidator('query', getPatternsQuerySchema),
   async (c) => {
     const { czone_id } = c.req.valid('param');
-    const { stream } = c.req.valid('query');
+    const { length } = c.req.valid('query');
 
     const papdata_obj = await prisma.paPData.findUnique({
       where: {
@@ -84,26 +93,66 @@ patterns_route.get(
       );
     }
 
-    if (stream) {
-      return streamText(c, async (stream) => {
-        await stream.write(`${papdata_obj.papdata}\n`);
+    return streamText(c, async (stream) => {
+      const papdata = createReadStream(DB_FOLDER + papdata_obj.id);
 
-        const patterns = JSON.parse(patterns_obj.patterns);
-        const timestamps = Object.keys(patterns).sort((a, b) => +a - +b);
+      for await (const chunk of papdata) {
+        await stream.write(chunk);
+      }
 
-        for (const curtime of timestamps) {
-          await stream.write(`${JSON.stringify({ patterns: { [curtime]: patterns[curtime] } })}\n`);
+      await stream.write('\n');
+
+      const pipeline = chain([
+        createReadStream(DB_FOLDER + patterns_obj.id),
+        parser(),
+        StreamObject.streamObject()
+      ]);
+
+      for await (const { key, value } of pipeline) {
+        if (length && +key > length) {
+          continue;
         }
-      });
-    } else {
-      // Not streaming? return data as normal
-      return c.json({
-        data: {
-          papdata: JSON.parse(papdata_obj.papdata),
-          patterns: JSON.parse(patterns_obj.patterns)
-        }
-      });
+
+        await stream.write(`${JSON.stringify({ patterns: { [key]: value }})}\n`);
+      }
+
+      await stream.close();
+    });
+  }
+);
+
+patterns_route.get(
+  '/papdata/:czone_id',
+  zValidator('param', getPatternsParamSchema),
+  async (c) => {
+    const { czone_id } = c.req.valid('param');
+
+    const papdata_obj = await prisma.paPData.findUnique({
+      where: {
+        czone_id: czone_id
+      }
+    });
+
+    if (!papdata_obj) {
+      return c.json(
+        {
+          message: 'Could not find papdata'
+        },
+        404
+      );
     }
+
+    let data = '';
+
+    const papdata = createReadStream(DB_FOLDER + papdata_obj.id);
+
+    for await (const chunk of papdata) {
+      data += chunk;
+    }
+
+    return c.json({
+      data: JSON.parse(data)
+    })
   }
 );
 

@@ -2,52 +2,70 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { PrismaClient } from "@prisma/client";
+import { saveFileStream } from "../lib/filestream.js";
+import { DB_FOLDER } from "../env.js";
+import StreamObject from "stream-json/streamers/StreamObject.js";
+import parser from 'stream-json';
+import { createReadStream } from "fs";
+import chain from "stream-chain";
 
 const simdata_route = new Hono();
 const prisma = new PrismaClient();
 
 const postSimDataSchema = z.object({
   czone_id: z.coerce.number().nonnegative(),
-  simdata: z.string().nonempty()
+  simdata: z.instanceof(File),
+  patterns: z.instanceof(File)
 });
 
 const getSimDataSchema = z.object({
-  czone_id: z.coerce.number().nonnegative()
+  id: z.coerce.number().nonnegative()
+});
+
+const getChartParamSchema = z.object({
+  id: z.coerce.number().nonnegative()
+});
+
+const getChartQuerySchema = z.object({
+  type: z.enum([ 'iot', 'ages', 'sexes', 'states' ]),
+  loc_type: z.enum([ 'homes', 'places' ]).optional(),
+  loc_id: z.string().nonempty().optional()
 });
 
 simdata_route.post(
   '/simdata',
-  zValidator('json', postSimDataSchema),
+  zValidator('form', postSimDataSchema),
   async (c) => {
-    const { simdata, czone_id } = c.req.valid('json');
+    const { simdata, patterns, czone_id } = c.req.valid('form');
 
-    await prisma.simData.upsert({
-      where: {
+    const simdata_obj = await prisma.simData.create({
+      data: {
         czone_id: czone_id
-      },
-      update: {
-        simdata: simdata
-      },
-      create: {
-        czone_id: czone_id,
-        simdata: simdata
       }
     });
 
+    await Promise.all([
+      saveFileStream(simdata, DB_FOLDER + simdata_obj.simdata),
+      saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns),
+    ]);
+
     return c.json({
-      message: `Successfully added simulator cache data to zone #${czone_id}`
+      data: {
+        id: simdata_obj.id
+      }
     });
   }
 );
 
+// This returns just enough data for the model map to work
 simdata_route.get(
-  '/simdata/:czone_id',
+  '/simdata/:id',
   zValidator('param', getSimDataSchema),
   async (c) => {
-    const { czone_id } = c.req.valid('param');
+    const { id } = c.req.valid('param');
 
     const simdata = await prisma.simData.findUnique({
-      where: { czone_id: czone_id }
+      where: { id }
     });
 
     if (!simdata) {
@@ -59,10 +77,166 @@ simdata_route.get(
       );
     }
 
-    return c.json({
-      data: simdata.simdata
-    });
+    /**
+     * Each key is a facility ID
+     * Values look like:
+     * {
+     *    population: 0,
+     *    infected: 0
+     * }
+     */
+    type SimData = {
+      [time: string]: {
+        homes: {
+          [id: string]: {
+            population: number,
+            infected: number
+          }
+        },
+        places: {
+          [id: string]: {
+            population: number,
+            infected: number
+          }
+        }
+      }
+    }
+
+    const data: SimData = {};
+
+    const simdatapl = chain([
+      createReadStream(DB_FOLDER + simdata.simdata),
+      parser(),
+      StreamObject.streamObject()
+    ])[Symbol.asyncIterator]();
+
+    const patternspl = chain([
+      createReadStream(DB_FOLDER + simdata.patterns),
+      parser(),
+      StreamObject.streamObject()
+    ])[Symbol.asyncIterator]();
+
+    let spl = await simdatapl.next();
+    let ppl = await patternspl.next();
+
+    while (!spl.done && !ppl.done) {
+      const skey = spl.value.key;
+      const pkey = ppl.value.key;
+
+      if (skey !== pkey) {
+        continue;
+      }
+
+      const svalue = spl.value.value;
+      const pvalue = ppl.value.value;
+
+      data[skey] = {'homes': {}, 'places': {}};
+
+      const curinfected = [...new Set(Object.values(svalue).map((people) => Object.keys(people as any)).flat())];
+
+      for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
+        data[skey]['homes'][id] = {
+          population: pop.length,
+          infected: pop.filter(v => curinfected.includes(v)).length
+        };
+      }
+
+      for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
+        data[skey]['places'][id] = {
+          population: pop.length,
+          infected: pop.filter(v => curinfected.includes(v)).length
+        };
+      }
+
+      spl = await simdatapl.next();
+      ppl = await patternspl.next();
+    }
+
+    return c.json({ data });
   }
 );
+
+// This returns just enough data for each chart type
+simdata_route.get(
+  '/simdata/:id/chartdata',
+  zValidator('param', getChartParamSchema),
+  zValidator('query', getChartQuerySchema),
+  async (c) => {
+    return c.json({ message: 'WIP' });
+
+    // const { id } = c.req.valid('param');
+    // const { type, loc_type, loc_id } = c.req.valid('query');
+
+    // const simdata = await prisma.simData.findUnique({
+    //   where: { id }
+    // });
+
+    // if (!simdata) {
+    //   return c.json(
+    //     {
+    //       message: 'Could not find associated simdata'
+    //     },
+    //     404
+    //   );
+    // }
+
+    // type ChartData = {
+    //   time: number,
+    //   [key: string]: number;
+    // };
+
+    // const data: ChartData[] = [];
+
+    // const simdatapl = chain([
+    //   createReadStream(DB_FOLDER + simdata.simdata),
+    //   parser(),
+    //   StreamObject.streamObject()
+    // ])[Symbol.asyncIterator]();
+
+    // const patternspl = chain([
+    //   createReadStream(DB_FOLDER + simdata.patterns),
+    //   parser(),
+    //   StreamObject.streamObject()
+    // ])[Symbol.asyncIterator]();
+
+    // let spl = await simdatapl.next();
+    // let ppl = await patternspl.next();
+
+    // while (!spl.done && !ppl.done) {
+    //   const skey = spl.value.key;
+    //   const pkey = ppl.value.key;
+
+    //   if (skey !== pkey) {
+    //     continue;
+    //   }
+
+    //   const svalue = spl.value.value;
+    //   const pvalue = ppl.value.value;
+
+    //   data[skey] = {'homes': {}, 'places': {}};
+
+    //   const curinfected = [...new Set(Object.values(svalue).map((people) => Object.keys(people as any)).flat())];
+
+    //   for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
+    //     data[skey]['homes'][id] = {
+    //       population: pop.length,
+    //       infected: pop.filter(v => curinfected.includes(v)).length
+    //     };
+    //   }
+
+    //   for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
+    //     data[skey]['places'][id] = {
+    //       population: pop.length,
+    //       infected: pop.filter(v => curinfected.includes(v)).length
+    //     };
+    //   }
+
+    //   spl = await simdatapl.next();
+    //   ppl = await patternspl.next();
+    // }
+
+    // return c.json({ data });
+  }
+)
 
 export default simdata_route;

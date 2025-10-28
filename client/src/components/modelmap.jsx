@@ -99,10 +99,8 @@ const createClusterCustomIcon = function (cluster) {
 
 var household_locs = {};
 
-function updateIcons(curtime, type, mapCenter, patterns, sim_data, pap_data, callback, hotspots) {
+function updateIcons(type, mapCenter, sim_data, pap_data, callback, hotspots) {
   var new_icons = [];
-
-  curtime = (curtime * 60).toString();
 
   for (const [index, data] of Object.entries(pap_data[type])) {
     if (type === 'homes') {
@@ -119,43 +117,24 @@ function updateIcons(curtime, type, mapCenter, patterns, sim_data, pap_data, cal
       data['longitude'] = household_locs[index][1];
     }
 
-    var new_marker = null;
-    var peopleAtFacility = patterns[curtime]?.[type]?.[index];
-
-    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0, Object.keys(hotspots).includes(index));
-    var label_text = `Pop:Inf: 0:0`;
-
-    if (peopleAtFacility) {
-      var numInfected = 0.0;
-      var curData = sim_data[curtime];
-
-      if (curData) {
-        for (const variant of Object.keys(curData)) {
-          for (const id of Object.keys(curData[variant])) {
-            if (peopleAtFacility.indexOf(id) !== -1) {
-              numInfected += 1.0;
-            }
-          }
-        }
-      }
-
-      label_text = `Population: ${peopleAtFacility.length}\nInfected: ${numInfected}`;
-
-      const map_range = (value, low1, high1, low2, high2) => {
-        return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
-      }
-
-      const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
-      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, Object.keys(hotspots).includes(index));
-
-      new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
-    } else {
-      new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, 0.0);
+    const map_range = (value, low1, high1, low2, high2) => {
+      return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
     }
 
-    if (new_marker?.length) {
-      new_icons.push(new_marker);
-    }
+    const pop = (type === 'homes' ? sim_data['homes'][index] : sim_data['places'][index]) ?? { population: 0, infected: 0 };
+    const ratio = map_range(Math.min(pop.infected / pop.population, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
+    const icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, Object.keys(hotspots).includes(index));
+
+    const new_marker = createFacilityMarker(
+      index,
+      [data.latitude, data.longitude],
+      data.label,
+      `Pop:Inf ${pop.population}:${pop.infected}`,
+      icon,
+      pop.infected / pop.population
+    );
+
+    new_icons.push(new_marker);
   }
 
   callback(new_icons);
@@ -217,7 +196,6 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
 
 export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone }) {
   const sim_data = useSimData((state) => state.simdata);
-  const move_patterns = useSimData((state) => state.patterns);
   const pap_data = useSimData((state) => state.papdata);
 
   const [publicFacilities, setPublicFacilities] = useState([]);
@@ -236,40 +214,20 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
 
     // Calculate "hotspot" locations (facilities only)
     for (const index of Object.keys(pap_data['places'])) {
-      const timestamps = Object.keys(move_patterns).sort();
+      const timestamps = Object.keys(sim_data).sort();
 
       for (let i = 1; i < timestamps.length; i++) {
-        const prevpeople = move_patterns[timestamps[i - 1]]?.['places']?.[index];
-        const curpeople = move_patterns[timestamps[i]]?.['places']?.[index];
+        const prevpeople = sim_data[timestamps[i - 1]]?.['places']?.[index];
+        const curpeople = sim_data[timestamps[i]]?.['places']?.[index];
 
         if (!prevpeople || !curpeople) {
           continue;
         }
 
-        let previnfected = 0;
-        let curinfected = 0;
+        let previnfected = prevpeople.infected ?? 0;
+        let curinfected = curpeople.infected ?? 0;
 
-        if (sim_data[timestamps[i-1]]) {
-          for (const variant of Object.keys(sim_data[timestamps[i-1]])) {
-            for (const id of Object.keys(sim_data[timestamps[i-1]][variant])) {
-              if (prevpeople.indexOf(id) !== -1) {
-                previnfected += 1;
-              }
-            }
-          }
-        }  
-  
-        if (sim_data[timestamps[i]]) {
-          for (const variant of Object.keys(sim_data[timestamps[i]])) {
-            for (const id of Object.keys(sim_data[timestamps[i]][variant])) {
-              if (curpeople.indexOf(id) !== -1) {
-                curinfected += 1;
-              }
-            }
-          }
-        }  
-
-        if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 7.5) {
+        if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 5) {
           setHotspots((hs) => {
             if (hs[index]) {
               hs[index] = [ ...hs[index], timestamps[i] / 60 ];
@@ -283,14 +241,14 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
       }
     }
 
-    setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
+    setMaxHours(Math.max(...Object.keys(sim_data)) / 60);
 
     setHotspots((hs) => {
-      updateIcons(1, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hs);
-      updateIcons(1, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hs);  
+      updateIcons('places', mapCenter, sim_data['60'], pap_data, setPublicFacilities, hs);
+      updateIcons('homes', mapCenter, sim_data['60'], pap_data, setHouseholds, hs);  
       return hs;
     });
-  }, [sim_data, move_patterns, pap_data, mapCenter]);
+  }, [sim_data, pap_data, mapCenter]);
 
   return (
     <div>
@@ -319,8 +277,8 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
             setTimestamp(newTimestamp);
-            updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-            updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
+            updateIcons('places', mapCenter, sim_data[(newTimestamp * 60).toString()], pap_data, setPublicFacilities, hotspots);
+            updateIcons('homes', mapCenter, sim_data[(newTimestamp * 60).toString()], pap_data, setHouseholds, hotspots);
           }}
         />
         <div className='mt-3 text-center'>
@@ -346,8 +304,8 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
             setTimestamp(newTimestamp);
-            updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-            updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
+            updateIcons('places', mapCenter, sim_data[(newTimestamp * 60).toString()], pap_data, setPublicFacilities, hotspots);
+            updateIcons('homes', mapCenter, sim_data[(newTimestamp * 60).toString()], pap_data, setHouseholds, hotspots);
           }}
         />
       </div>
