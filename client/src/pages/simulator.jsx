@@ -124,7 +124,7 @@ export default function Simulator() {
   };
 
   useEffect(() => {
-    if (!patterns || Object.keys(patterns).length === 0) return; // ⛔ don’t run early
+    if (!patterns || Object.keys(patterns).length === 0) return;
     let interval;
   
     if (isPlaying) {

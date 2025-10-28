@@ -161,7 +161,7 @@ function updateIcons(curtime, type, mapCenter, patterns, sim_data, pap_data, cal
   callback(new_icons);
 }
 
-function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMarkerClick, hotspots }) {
+function ClusteredMap({ currentTime, mapCenter, publicFacilities, households, onMarkerClick, hotspots }) {
   const marker_icon_component = (type, addr, index) => {
     //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
     const selectedIcon = addr[0]; //isSelected ? marker_icon('selected_category', 0.0) : addr[0];
@@ -205,7 +205,7 @@ function ClusteredMap({ timestamp, mapCenter, publicFacilities, households, onMa
           chunkedLoading
           iconCreateFunction={createClusterCustomIcon}
           maxClusterRadius={150}
-          key={timestamp}
+          key={currentTime}
         >
           {publicFacilities.map((addr, index) => marker_icon_component('places', addr, index))}
           {households.map((addr, index) => marker_icon_component('homes', addr, index))}
@@ -226,7 +226,6 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
   const [maxHours, setMaxHours] = useState(1);
   const [hotspots, setHotspots] = useState({});
 
-  const [timestamp, setTimestamp] = useState(1); // State for zoom level and map slider
 
   const mapCenter = useMemo(() => [ selectedZone.latitude, selectedZone.longitude ], [selectedZone]);
 
@@ -297,7 +296,6 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
     if (!currentTime || !move_patterns || !sim_data || !pap_data) return;
     if (currentTime > maxHours) return;
 
-    setTimestamp(currentTime);
     updateIcons(currentTime, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
     updateIcons(currentTime, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
   }, [currentTime]);
@@ -309,7 +307,7 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
 
       {/* Map Container */}
       <ClusteredMap
-        timestamp={timestamp}
+        currentTime={currentTime}
         mapCenter={mapCenter}
         publicFacilities={publicFacilities}
         households={households}
@@ -325,9 +323,8 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           className="bg-[#70B4D4] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
           onClick={() => 
             {
-              if(timestamp >= maxHours) {
+              if(currentTime >= maxHours) {
               setCurrentTime(1);
-              setTimestamp(currentTime);
               updateIcons(currentTime, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
               updateIcons(currentTime, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
            
@@ -343,17 +340,16 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           type="range"
           min={1}
           max={maxHours}
-          value={timestamp}
+          value={currentTime}
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
-            setTimestamp(newTimestamp);
             setCurrentTime(newTimestamp);
             updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
             updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
         />
         <div className='mt-3 text-center'>
-          {new Date(new Date(selectedZone.start_date).getTime() + timestamp * 60 * 60 * 1000).toLocaleString('en-US', {
+          {new Date(new Date(selectedZone.start_date).getTime() + currentTime * 60 * 60 * 1000).toLocaleString('en-US', {
             day: 'numeric',
             month: 'long',
             year: 'numeric',
@@ -371,10 +367,10 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           type="number"
           min={1}
           max={maxHours}
-          value={timestamp}
+          value={currentTime}
           onChange={(e) => {
             const newTimestamp = parseInt(e.target.value);
-            setTimestamp(newTimestamp);
+            setCurrentTime(newTimestamp);
             updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
             updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
           }}
