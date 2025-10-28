@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DB_URL, SIM_URL } from '../env';
 import axios from 'axios';
 import useSimSettings from '../stores/simsettings';
@@ -30,6 +30,11 @@ export default function Simulator() {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  const timeRef = useRef(currentTime);
+  useEffect(() => {
+    timeRef.current = currentTime;
+  }, [currentTime]);
 
   const makePostRequest = async () => {
     const reqbody = {
@@ -119,20 +124,25 @@ export default function Simulator() {
   };
 
   useEffect(() => {
+    if (!patterns || Object.keys(patterns).length === 0) return; // ⛔ don’t run early
     let interval;
+  
     if (isPlaying) {
       interval = setInterval(() => {
-        setCurrentTime((prev) => {
-          const next = prev + 1;
-          if (next >= Object.keys(patterns).length) {
-            clearInterval(interval);
-            setIsPlaying(false);
-            return prev;
-          }
-          return next;
-        });
-      }, 200); // speed (ms between frames)
+        const max = Object.keys(patterns).length;
+        const next = Math.min(timeRef.current + 1, max);
+  
+        // if reached end, stop playback
+        if (next >= max) {
+          clearInterval(interval);
+          setIsPlaying(false);
+        }
+  
+        setCurrentTime(next);
+        timeRef.current = next;
+      }, 200);
     }
+  
     return () => clearInterval(interval);
   }, [isPlaying, patterns]);
 
@@ -159,6 +169,7 @@ export default function Simulator() {
                 selectedZone={selectedZone}
                 onMarkerClick={handleMarkerClick}
                 currentTime={currentTime}
+                setCurrentTime={setCurrentTime}
                 isPlaying={isPlaying}
                 setIsPlaying={setIsPlaying}
               />
