@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { DB_URL, SIM_URL } from '../env';
 import axios from 'axios';
 import useSimSettings from '../stores/simsettings';
@@ -27,14 +27,6 @@ export default function Simulator() {
 
   const [selectedId, setSelectedId] = useState(null);
   const [isHousehold, setIsHousehold] = useState(false);
-
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const timeRef = useRef(currentTime);
-  useEffect(() => {
-    timeRef.current = currentTime;
-  }, [currentTime]);
 
   const makePostRequest = async () => {
     const reqbody = {
@@ -123,30 +115,6 @@ export default function Simulator() {
     setIsHousehold(null);
   };
 
-  useEffect(() => {
-    if (!patterns || Object.keys(patterns).length === 0) return;
-    let interval;
-  
-    if (isPlaying) {
-      interval = setInterval(() => {
-        const max = Object.keys(patterns).length;
-        const next = Math.min(timeRef.current + 1, max);
-  
-        // if reached end, stop playback
-        if (next >= max) {
-          clearInterval(interval);
-          setIsPlaying(false);
-        }
-  
-        setCurrentTime(next);
-        timeRef.current = next;
-      }, 200);
-    }
-  
-    return () => clearInterval(interval);
-  }, [isPlaying, patterns]);
-
-
   return (
     <div>
       <div className='sim_container'>
@@ -168,10 +136,6 @@ export default function Simulator() {
               <ModelMap
                 selectedZone={selectedZone}
                 onMarkerClick={handleMarkerClick}
-                currentTime={currentTime}
-                setCurrentTime={setCurrentTime}
-                isPlaying={isPlaying}
-                setIsPlaying={setIsPlaying}
               />
             </div>
             
@@ -181,7 +145,6 @@ export default function Simulator() {
               poi_id={selectedId}
               is_household={isHousehold}
               onReset={onReset}
-              currentTime={currentTime}
             />
           </div>
         )}

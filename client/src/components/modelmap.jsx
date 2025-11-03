@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'; 
+import { useState, useEffect, useMemo, useRef } from 'react'; 
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from 'leaflet';
@@ -215,7 +215,7 @@ function ClusteredMap({ currentTime, mapCenter, publicFacilities, households, on
   );
 }
 
-export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone, currentTime, setCurrentTime, isPlaying, setIsPlaying })
+export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone })
  {
   const sim_data = useSimData((state) => state.simdata);
   const move_patterns = useSimData((state) => state.patterns);
@@ -226,6 +226,38 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
   const [maxHours, setMaxHours] = useState(1);
   const [hotspots, setHotspots] = useState({});
 
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const timeRef = useRef(currentTime);
+  useEffect(() => {
+    timeRef.current = currentTime;
+  }, [currentTime]);
+
+    useEffect(() => {
+      if (!move_patterns || Object.keys(move_patterns).length === 0) return;
+      let interval;
+    
+      if (isPlaying) {
+        interval = setInterval(() => {
+          const max = Object.keys(move_patterns).length;
+          const next = Math.min(timeRef.current + 1, max);
+    
+          // if reached end, stop playback
+          if (next >= max) {
+            clearInterval(interval);
+            setIsPlaying(false);
+          }
+    
+          setCurrentTime(next);
+          updateIcons(next, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+          updateIcons(next, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
+          timeRef.current = next;
+        }, 800);
+      }
+    
+      return () => clearInterval(interval);
+    }, [isPlaying, move_patterns]);
 
   const mapCenter = useMemo(() => [ selectedZone.latitude, selectedZone.longitude ], [selectedZone]);
 
@@ -290,16 +322,7 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
       updateIcons(1, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hs);  
       return hs;
     });
-  }, [sim_data, move_patterns, pap_data, mapCenter]);
-  
-  useEffect(() => {
-    if (!currentTime || !move_patterns || !sim_data || !pap_data) return;
-    if (currentTime > maxHours) return;
-
-    updateIcons(currentTime, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-    updateIcons(currentTime, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
-  }, [currentTime]);
-
+  }, [sim_data, move_patterns, pap_data, mapCenter]); 
 
   return (
     <div>
@@ -324,10 +347,9 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           onClick={() => 
             {
               if(currentTime >= maxHours) {
-              setCurrentTime(1);
-              updateIcons(currentTime, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-              updateIcons(currentTime, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
-           
+                setCurrentTime(1);
+                updateIcons(1, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
+                updateIcons(1, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
               }
               setIsPlaying(!isPlaying)
             }}
