@@ -46,8 +46,8 @@ interface SimDataStore {
   patterns: MovePatterns | null;
   papdata: PapData | null;
 
-  setSimData: (simdata: PapData) => void;
-  setPatterns: (patterns: PapData) => void;
+  setSimData: (simdata: SimData) => void;
+  setPatterns: (patterns: MovePatterns) => void;
   setPapData: (papdata: PapData) => void;
 }
 

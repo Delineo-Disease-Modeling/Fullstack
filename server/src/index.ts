@@ -2,10 +2,11 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { trimTrailingSlash } from 'hono/trailing-slash';
-import { PORT } from './env.js';
+import { DB_FOLDER, PORT } from './env.js';
 import { HTTPException } from 'hono/http-exception';
 import { auth } from './middleware/auth.js';
 import { bodyLimit } from 'hono/body-limit';
+import { mkdir } from 'fs/promises';
 
 import auth_route from './routes/auth.js';
 import lookup_route from './routes/lookup.js';
@@ -60,6 +61,8 @@ app.get('/', async (c) => {
     message: 'Hello, World!'
   });
 });
+
+await mkdir(DB_FOLDER, { recursive: true });
 
 const port = +PORT;
 serve({ fetch: app.fetch, port });

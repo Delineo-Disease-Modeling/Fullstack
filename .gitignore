@@ -158,3 +158,6 @@ sketch
 
 # Cached data
 client/public/data/cache/
+
+# db files
+db/

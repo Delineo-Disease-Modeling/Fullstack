@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'; 
+import { useState, useEffect, useMemo } from 'react'; 
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from 'leaflet';
@@ -67,11 +67,6 @@ const marker_icon = (category, percent, pulse) => {
   })
 }
 
-// Function to create markers for public facilities
-function createFacilityMarker(id, position, name, label, icon, proportion) {
-  return [icon, name, label, position, proportion, id];
-};
-
 const createClusterCustomIcon = function (cluster) {
   // Check if any marker in the cluster has a `proportion > 0.0` (used as pulsing markers in your setup)
   //const hasPulsingMarkers = cluster.getAllChildMarkers().some(marker => marker.options.proportion > 0.0);
@@ -99,100 +94,55 @@ const createClusterCustomIcon = function (cluster) {
 
 var household_locs = {};
 
-function updateIcons(curtime, type, mapCenter, patterns, sim_data, pap_data, callback, hotspots) {
-  var new_icons = [];
+function updateIcons(mapCenter, sim_data, pap_data, hotspots) {
+  const icons = [];
 
-  curtime = (curtime * 60).toString();
+  const types = ['homes', 'places'];
 
-  for (const [index, data] of Object.entries(pap_data[type])) {
-    if (type === 'homes') {
-      data.label = `Home #${index}`;
+  for (const type of types) {
+    for (const [index, data] of Object.entries(pap_data[type])) {
+      if (type === 'homes') {
+        data.label = `Home #${index}`;
 
-      if (!(index in household_locs)) {
-        household_locs[index] = [
-          mapCenter[0] + (Math.random() * 0.06 - 0.03),
-          mapCenter[1] + (Math.random() * 0.06 - 0.03)
-        ];
-      }
-
-      data['latitude'] = household_locs[index][0];
-      data['longitude'] = household_locs[index][1];
-    }
-
-    var new_marker = null;
-    var peopleAtFacility = patterns[curtime]?.[type]?.[index];
-
-    var icon = type === 'homes' ? marker_icon("Home", 0.0) : marker_icon(pap_data[type][index]['top_category'], 0.0, Object.keys(hotspots).includes(index));
-    var label_text = `Pop:Inf: 0:0`;
-
-    if (peopleAtFacility) {
-      var numInfected = 0.0;
-      var curData = sim_data[curtime];
-
-      if (curData) {
-        for (const variant of Object.keys(curData)) {
-          for (const id of Object.keys(curData[variant])) {
-            if (peopleAtFacility.indexOf(id) !== -1) {
-              numInfected += 1.0;
-            }
-          }
+        if (!(index in household_locs)) {
+          household_locs[index] = [
+            mapCenter[0] + (Math.random() * 0.06 - 0.03),
+            mapCenter[1] + (Math.random() * 0.06 - 0.03)
+          ];
         }
-      }
 
-      label_text = `Population: ${peopleAtFacility.length}\nInfected: ${numInfected}`;
+        data['latitude'] = household_locs[index][0];
+        data['longitude'] = household_locs[index][1];
+      }
 
       const map_range = (value, low1, high1, low2, high2) => {
         return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
       }
 
-      const ratio = map_range(Math.min(numInfected / peopleAtFacility.length, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
-      icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, Object.keys(hotspots).includes(index));
+      const pop = (type === 'homes' ? sim_data['homes'][index] : sim_data['places'][index]) ?? { population: 0, infected: 0 };
+      const ratio = map_range(Math.min(pop.infected / pop.population, 0.3) * 5.0, 0.0, 0.3, 0.0, 1.0);
+      const icon = type === 'homes' ? marker_icon("Home", ratio) : marker_icon(pap_data[type][index]['top_category'], ratio, Object.keys(hotspots).includes(index));
 
-      new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, numInfected / peopleAtFacility.length)
-    } else {
-      new_marker = createFacilityMarker(index, [data.latitude, data.longitude], data.label, label_text, icon, 0.0);
-    }
+      const marker = {
+        'type': type,
+        'id': index,
+        'latitude': data.latitude,
+        'longitude': data.longitude,
+        'label': data.label,
+        'description': `Pop:Inf ${pop.population}:${pop.infected}`,
+        'icon': icon,
+        'population': pop.population,
+        'infected': pop.infected
+      }
 
-    if (new_marker?.length) {
-      new_icons.push(new_marker);
+      icons.push(marker);
     }
   }
 
-  callback(new_icons);
+  return icons;
 }
 
-function ClusteredMap({ currentTime, mapCenter, publicFacilities, households, onMarkerClick, hotspots }) {
-  const marker_icon_component = (type, addr, index) => {
-    //const isSelected = selectedId === addr[5] && ((type === 'homes') === isHousehold);
-    const selectedIcon = addr[0]; //isSelected ? marker_icon('selected_category', 0.0) : addr[0];
-
-    return (
-      <Marker
-        icon={selectedIcon}
-        key={index}
-        position={addr[3]}
-        title={addr[1]}
-        proportion={addr[4]}
-        pulsing={type === 'places' && Object.keys(hotspots).includes(addr[5])}
-        eventHandlers={{
-          click: () => {
-            onMarkerClick(addr[5], type === 'homes'); // Notify parent on click
-          },
-        }}
-      >
-        <Popup key={type + '_' + addr[5]}>
-          <div className='w-36 whitespace-pre-line font-[Poppins]'>
-            <header className='text-sm'>{addr[1]}</header>
-            <p className='text-xs'>{addr[2]}</p>
-            {type === 'places' && Object.keys(hotspots).includes(addr[5]) && (
-              <p className='text-xs font-medium'>Hotspot at hour{hotspots[addr[5]].length === 1 ? '' : 's'}: {hotspots[addr[5]].join(', ')}</p>
-            )}
-          </div>
-        </Popup>
-      </Marker>
-    );
-  };
-
+function ClusteredMap({ currentTime, mapCenter, pois, onMarkerClick, hotspots }) {
   return (
     <div className='mapcontainer outline-solid outline-2 outline-[#70B4D4]'>
       <MapContainer className="size-full" center={mapCenter} zoom={13} scrollWheelZoom={true} zoomControl={false}>
@@ -205,10 +155,32 @@ function ClusteredMap({ currentTime, mapCenter, publicFacilities, households, on
           chunkedLoading
           iconCreateFunction={createClusterCustomIcon}
           maxClusterRadius={150}
-          key={currentTime}
         >
-          {publicFacilities.map((addr, index) => marker_icon_component('places', addr, index))}
-          {households.map((addr, index) => marker_icon_component('homes', addr, index))}
+          {pois.map((data, index) => (
+            <Marker
+              icon={data.icon}
+              key={`${index}-${currentTime}`}
+              position={[data.latitude, data.longitude]}
+              title={data.label}
+              proportion={data.infected / data.population}
+              pulsing={data.type === 'places' && Object.keys(hotspots).includes(data.id)}
+              eventHandlers={{
+                click: () => {
+                  onMarkerClick(data.id, data.type === 'homes');
+                },
+              }}
+            >
+              <Popup>
+                <div className='w-36 whitespace-pre-line font-[Poppins]'>
+                  <header className='text-sm'>{data.label}</header>
+                  <p className='text-xs'>{data.description}</p>
+                  {data.type === 'places' && Object.keys(hotspots).includes(data.id) && (
+                    <p className='text-xs font-medium'>Hotspot at hour{hotspots[data.id].length === 1 ? '' : 's'}: {hotspots[data.id].join(', ')}</p>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
         </MarkerClusterGroup>
       </MapContainer>       
     </div>
@@ -218,111 +190,59 @@ function ClusteredMap({ currentTime, mapCenter, publicFacilities, households, on
 export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone })
  {
   const sim_data = useSimData((state) => state.simdata);
-  const move_patterns = useSimData((state) => state.patterns);
   const pap_data = useSimData((state) => state.papdata);
 
-  const [publicFacilities, setPublicFacilities] = useState([]);
-  const [households, setHouseholds] = useState([]);
+  // const [pois, setPois] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
   const [hotspots, setHotspots] = useState({});
 
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const timeRef = useRef(currentTime);
-  useEffect(() => {
-    timeRef.current = currentTime;
-  }, [currentTime]);
-
-    useEffect(() => {
-      if (!move_patterns || Object.keys(move_patterns).length === 0) return;
-      let interval;
-    
-      if (isPlaying) {
-        interval = setInterval(() => {
-          const max = Object.keys(move_patterns).length;
-          const next = Math.min(timeRef.current + 1, max);
-    
-          // if reached end, stop playback
-          if (next >= max) {
-            clearInterval(interval);
-            setIsPlaying(false);
-          }
-    
-          setCurrentTime(next);
-          updateIcons(next, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-          updateIcons(next, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
-          timeRef.current = next;
-        }, 800);
-      }
-    
-      return () => clearInterval(interval);
-    }, [isPlaying, move_patterns]);
-
   const mapCenter = useMemo(() => [ selectedZone.latitude, selectedZone.longitude ], [selectedZone]);
+  const pois = useMemo(() => {
+    return updateIcons(mapCenter, sim_data[(currentTime * 60).toString()], pap_data, hotspots);
+  }, [currentTime, hotspots, mapCenter, pap_data, sim_data]);
 
   useEffect(() => {
-    setHotspots(() => { return {}; });
+    const interval = setInterval(() => {
+      if (!isPlaying) {
+        return;
+      }
 
-    household_locs = {};
+      setCurrentTime(prev => (prev < maxHours ? prev + 1 : prev));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, maxHours]);
+
+  useEffect(() => {
+    const new_hotspots = {};
 
     // Calculate "hotspot" locations (facilities only)
     for (const index of Object.keys(pap_data['places'])) {
-      const timestamps = Object.keys(move_patterns).sort();
+      const timestamps = Object.keys(sim_data).sort();
 
       for (let i = 1; i < timestamps.length; i++) {
-        const prevpeople = move_patterns[timestamps[i - 1]]?.['places']?.[index];
-        const curpeople = move_patterns[timestamps[i]]?.['places']?.[index];
+        const prevpeople = sim_data[timestamps[i - 1]]?.['places']?.[index];
+        const curpeople = sim_data[timestamps[i]]?.['places']?.[index];
 
         if (!prevpeople || !curpeople) {
           continue;
         }
 
-        let previnfected = 0;
-        let curinfected = 0;
+        let previnfected = prevpeople.infected ?? 0;
+        let curinfected = curpeople.infected ?? 0;
 
-        if (sim_data[timestamps[i-1]]) {
-          for (const variant of Object.keys(sim_data[timestamps[i-1]])) {
-            for (const id of Object.keys(sim_data[timestamps[i-1]][variant])) {
-              if (prevpeople.indexOf(id) !== -1) {
-                previnfected += 1;
-              }
-            }
-          }
-        }  
-  
-        if (sim_data[timestamps[i]]) {
-          for (const variant of Object.keys(sim_data[timestamps[i]])) {
-            for (const id of Object.keys(sim_data[timestamps[i]][variant])) {
-              if (curpeople.indexOf(id) !== -1) {
-                curinfected += 1;
-              }
-            }
-          }
-        }  
-
-        if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 7.5) {
-          setHotspots((hs) => {
-            if (hs[index]) {
-              hs[index] = [ ...hs[index], timestamps[i] / 60 ];
-            } else {
-              hs[index] = [ timestamps[i] / 60 ];
-            }
-
-            return hs;
-          });
+        if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 5) {
+          new_hotspots[index] = [ ...(new_hotspots[index] ?? []), timestamps[i] / 60 ];
         }
       }
     }
 
-    setMaxHours(Math.max(...Object.keys(move_patterns)) / 60);
-
-    setHotspots((hs) => {
-      updateIcons(1, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hs);
-      updateIcons(1, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hs);  
-      return hs;
-    });
-  }, [sim_data, move_patterns, pap_data, mapCenter]); 
+    setMaxHours(Math.max(...Object.keys(sim_data)) / 60);
+    setHotspots(new_hotspots);
+  }, [sim_data, pap_data, mapCenter]);
 
   return (
     <div>
@@ -332,8 +252,7 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
       <ClusteredMap
         currentTime={currentTime}
         mapCenter={mapCenter}
-        publicFacilities={publicFacilities}
-        households={households}
+        pois={pois}
         onMarkerClick={onMarkerClick}
         selectedId={selectedId}
         isHousehold={isHousehold}
@@ -344,15 +263,7 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
       <div className="flex items-center justify-center gap-3 mt-5">
         <button
           className="bg-[#70B4D4] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
-          onClick={() => 
-            {
-              if(currentTime >= maxHours) {
-                setCurrentTime(1);
-                updateIcons(1, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-                updateIcons(1, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
-              }
-              setIsPlaying(!isPlaying)
-            }}
+          onClick={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? 'Pause' : 'Play'}
         </button>
@@ -363,12 +274,7 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           min={1}
           max={maxHours}
           value={currentTime}
-          onChange={(e) => {
-            const newTimestamp = parseInt(e.target.value);
-            setCurrentTime(newTimestamp);
-            updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-            updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
-          }}
+          onChange={(e) => setCurrentTime(parseInt(e.target.value))}
         />
         <div className='mt-3 text-center'>
           {new Date(new Date(selectedZone.start_date).getTime() + currentTime * 60 * 60 * 1000).toLocaleString('en-US', {
@@ -390,12 +296,7 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
           min={1}
           max={maxHours}
           value={currentTime}
-          onChange={(e) => {
-            const newTimestamp = parseInt(e.target.value);
-            setCurrentTime(newTimestamp);
-            updateIcons(newTimestamp, 'places', mapCenter, move_patterns, sim_data, pap_data, setPublicFacilities, hotspots);
-            updateIcons(newTimestamp, 'homes', mapCenter, move_patterns, sim_data, pap_data, setHouseholds, hotspots);
-          }}
+          onChange={(e) => setCurrentTime(parseInt(e.target.value))}
         />
       </div>
     </div>
