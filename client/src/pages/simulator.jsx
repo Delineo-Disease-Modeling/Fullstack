@@ -45,6 +45,8 @@ export default function Simulator() {
 
         setSettings({ sim_id: json['data']['sim_id'] });
         setSimData(json['data']['sim_data']);
+
+        return;
       } catch (error) {
         console.error(error);
       }
