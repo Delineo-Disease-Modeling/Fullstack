@@ -2,6 +2,7 @@ div.mapcontainer {
   width: 56rem;
   height: 32rem;
   max-width: 90vw;
+  position: relative;
   z-index: 0;
 }
 
