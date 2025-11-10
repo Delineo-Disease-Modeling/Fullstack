@@ -19,12 +19,13 @@ export default function SimSettings({ sendData }) {
         />
 
         <SimParameter
-          label={'Length (Hours)'}
+          label={'Length'}
           value={settings.hours}
           callback={(hours) => setSettings({ hours })}
           min={24}
           max={settings.zone?.length ?? 168}
           percent={false}
+          units=' hours'
         />
         <SimBoolean 
           label={'Random Seed'}
@@ -32,7 +33,8 @@ export default function SimSettings({ sendData }) {
           callback={(randseed) => setSettings({ randseed })}
         />
         <SimBoolean 
-          label={'Use Cached Data (faster)'}
+          label={'Use Cached Data'}
+          description={'uses pre-computed simulation data'}
           value={settings.usecache}
           callback={(usecache) => setSettings({ usecache })}
         />

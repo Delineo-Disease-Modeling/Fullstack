@@ -1,11 +1,11 @@
 import './settings-components.css';
 
 // Slider
-export function SimParameter({label, value, callback, min=0, max=100, percent=true}) {
+export function SimParameter({label, value, callback, min=0, max=100, percent=true, units=''}) {
   return (
     <div className='simset_slider'>
       <div className='simset_slider_label'>
-        {label}: {percent ? Math.ceil(value * 100) : value}{percent ? '%' : ''}
+        {label}: {percent ? Math.ceil(value * 100) : value}{percent ? '%' : units}
       </div>
 
       <input type='range' className='simset_slider_input w-[300px]'
@@ -19,16 +19,19 @@ export function SimParameter({label, value, callback, min=0, max=100, percent=tr
 }
 
 // Checkbox
-export function SimBoolean({label, value, callback}) {
+export function SimBoolean({label, description, value, callback}) {
   return (
     <div className='simset_checkbox'>
-      <div className='flex items-center justify-center gap-x-2 flex-nowrap'>
+      <div className='flex items-start justify-center gap-x-2 flex-nowrap'>
         <input type='checkbox'
           className='w-6 h-6'
           checked={value}
           onChange={(e) => callback(e.target.checked)}
         />
-        <div>{label}</div>
+        <div>
+          {label}
+          {description && <p className='text-gray-400 italic max-w-72'>{description}</p>}
+        </div>
       </div>
     </div>
   );

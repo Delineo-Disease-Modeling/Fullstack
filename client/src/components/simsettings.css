@@ -18,7 +18,7 @@ div.simset_params {
 
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: start;
   flex-wrap: wrap;
 
   column-gap: 75px;

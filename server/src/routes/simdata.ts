@@ -32,6 +32,99 @@ const getChartQuerySchema = z.object({
   loc_id: z.string().nonempty().optional()
 });
 
+const getSimDataCacheSchema = z.object({
+  czone_id: z.coerce.number().nonnegative()
+});
+
+async function getSimData(id: number) {
+  const simdata = await prisma.simData.findUnique({
+    where: { id }
+  });
+
+  if (!simdata) {
+    throw new HTTPException(404, {
+      message: 'Could not find associated simdata'
+    });
+  }
+
+  /**
+   * Each key is a facility ID
+   * Values look like:
+   * {
+   *    population: 0,
+   *    infected: 0
+   * }
+   */
+  type SimData = {
+    [time: string]: {
+      homes: {
+        [id: string]: {
+          population: number,
+          infected: number
+        }
+      },
+      places: {
+        [id: string]: {
+          population: number,
+          infected: number
+        }
+      }
+    }
+  }
+
+  const data: SimData = {};
+
+  const simdatapl = chain([
+    createReadStream(DB_FOLDER + simdata.simdata),
+    parser(),
+    StreamObject.streamObject()
+  ])[Symbol.asyncIterator]();
+
+  const patternspl = chain([
+    createReadStream(DB_FOLDER + simdata.patterns),
+    parser(),
+    StreamObject.streamObject()
+  ])[Symbol.asyncIterator]();
+
+  let spl = await simdatapl.next();
+  let ppl = await patternspl.next();
+
+  while (!spl.done && !ppl.done) {
+    const skey = spl.value.key;
+    const pkey = ppl.value.key;
+
+    if (skey !== pkey) {
+      continue;
+    }
+
+    const svalue = spl.value.value;
+    const pvalue = ppl.value.value;
+
+    data[skey] = {'homes': {}, 'places': {}};
+
+    const curinfected = [...new Set(Object.values(svalue).map((people) => Object.keys(people as any)).flat())];
+
+    for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
+      data[skey]['homes'][id] = {
+        population: pop.length,
+        infected: pop.filter(v => curinfected.includes(v)).length
+      };
+    }
+
+    for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
+      data[skey]['places'][id] = {
+        population: pop.length,
+        infected: pop.filter(v => curinfected.includes(v)).length
+      };
+    }
+
+    spl = await simdatapl.next();
+    ppl = await patternspl.next();
+  }
+
+  return data;
+}
+
 simdata_route.post(
   '/simdata',
   zValidator('form', postSimDataSchema),
@@ -64,95 +157,51 @@ simdata_route.get(
   async (c) => {
     const { id } = c.req.valid('param');
 
-    const simdata = await prisma.simData.findUnique({
-      where: { id }
-    });
-
-    if (!simdata) {
-      return c.json(
-        {
-          message: 'Could not find associated simdata'
-        },
-        404
-      );
-    }
-
-    /**
-     * Each key is a facility ID
-     * Values look like:
-     * {
-     *    population: 0,
-     *    infected: 0
-     * }
-     */
-    type SimData = {
-      [time: string]: {
-        homes: {
-          [id: string]: {
-            population: number,
-            infected: number
-          }
-        },
-        places: {
-          [id: string]: {
-            population: number,
-            infected: number
-          }
-        }
-      }
-    }
-
-    const data: SimData = {};
-
-    const simdatapl = chain([
-      createReadStream(DB_FOLDER + simdata.simdata),
-      parser(),
-      StreamObject.streamObject()
-    ])[Symbol.asyncIterator]();
-
-    const patternspl = chain([
-      createReadStream(DB_FOLDER + simdata.patterns),
-      parser(),
-      StreamObject.streamObject()
-    ])[Symbol.asyncIterator]();
-
-    let spl = await simdatapl.next();
-    let ppl = await patternspl.next();
-
-    while (!spl.done && !ppl.done) {
-      const skey = spl.value.key;
-      const pkey = ppl.value.key;
-
-      if (skey !== pkey) {
-        continue;
-      }
-
-      const svalue = spl.value.value;
-      const pvalue = ppl.value.value;
-
-      data[skey] = {'homes': {}, 'places': {}};
-
-      const curinfected = [...new Set(Object.values(svalue).map((people) => Object.keys(people as any)).flat())];
-
-      for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
-        data[skey]['homes'][id] = {
-          population: pop.length,
-          infected: pop.filter(v => curinfected.includes(v)).length
-        };
-      }
-
-      for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
-        data[skey]['places'][id] = {
-          population: pop.length,
-          infected: pop.filter(v => curinfected.includes(v)).length
-        };
-      }
-
-      spl = await simdatapl.next();
-      ppl = await patternspl.next();
-    }
+    const data = await getSimData(id);
 
     return c.json({ data });
+  }
+);
+
+simdata_route.get('/simdata/cache/:czone_id',
+  zValidator('param', getSimDataCacheSchema),
+  async (c) => {
+    const { czone_id } = c.req.valid('param');
+
+    const czone = await prisma.convenienceZone.findUnique({
+      where: {
+        id: czone_id
+      },
+      include: {
+        simdata: {
+          orderBy: {
+            id: 'desc'
+          },
+          take: 1
+        }
+      }
+    });
+
+    if (!czone) {
+      throw new HTTPException(404, {
+        message: `Could not find convenience zone #${czone_id}`
+      });
+    }
+
+    if (!czone.simdata.length) {
+      throw new HTTPException(404, {
+        message: 'Could not find previous simulator run'
+      });
+    }
+
+    const data = await getSimData(czone.simdata[0].id);
+
+    return c.json({
+      'data': {
+        sim_id: czone.simdata[0].id,
+        sim_data: data
+      }
+    });
   }
 );
 
@@ -347,6 +396,6 @@ simdata_route.get(
 
     return c.json({ data });
   }
-)
+);
 
 export default simdata_route;

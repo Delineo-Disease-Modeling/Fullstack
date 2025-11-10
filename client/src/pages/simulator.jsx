@@ -34,29 +34,20 @@ export default function Simulator() {
     console.log(reqbody);
 
     if (settings.usecache) {
-      // try {
-      //   const resp = await axios.get(`${DB_URL}simdata/${settings.zone.id}`);
+      try {
+        const res = await fetch(`${DB_URL}simdata/cache/${settings.zone.id}`);
 
-      //   if (resp.status === 200 && resp.data['data']) {
-      //     console.log('Using cached data!');
-    
-      //     const data = JSON.parse(resp.data['data']);
-      //     const movement = data['movement'];
+        if (!res.ok) {
+          throw new Error(`Invalid cache response ${res.status}`);
+        }
 
-      //     for (const key in movement) {
-      //       if (key > reqbody['length']) {
-      //         delete movement[key];
-      //       }
-      //     }
+        const json = await res.json();
 
-      //     setSimData(data['result']);
-      //     setPatterns(movement);
-
-      //     return;
-      //   }  
-      // } catch (error) {
-      //   console.error(error.status);
-      // }
+        setSettings({ sim_id: json['data']['sim_id'] });
+        setSimData(json['data']['sim_data']);
+      } catch (error) {
+        console.error(error);
+      }
     }
 
     axios.post(`${SIM_URL}simulation/`, reqbody)
