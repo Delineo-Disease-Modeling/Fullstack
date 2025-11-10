@@ -230,7 +230,7 @@ simdata_route.get(
       const pvalue = ppl.value.value;
 
       const data_point: ChartData = {
-        time: +skey
+        time: +skey / 60
       };
 
       if (loc_id) {

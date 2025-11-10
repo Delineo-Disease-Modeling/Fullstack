@@ -37,6 +37,10 @@ var household_locs = {};
 function updateIcons(mapCenter, sim_data, pap_data, hotspots) {
   const icons = [];
 
+  if (!sim_data) {
+    return icons;
+  }
+
   const types = ['homes', 'places'];
 
   for (const type of types) {
