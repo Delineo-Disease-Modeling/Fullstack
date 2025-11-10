@@ -7,6 +7,7 @@ import useAuth from "../stores/auth";
 
 import zip_cbg_json from '../data/zip_to_cbg.json';
 
+import 'leaflet/dist/leaflet.css';
 import './cz-generation.css';
 
 function InteractiveMap({ onLocationSelect, disabled }) {
