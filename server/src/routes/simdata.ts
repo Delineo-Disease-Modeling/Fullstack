@@ -156,86 +156,113 @@ simdata_route.get(
   }
 );
 
+// const age_ranges = [
+//   [0, 20],
+//   [21, 40],
+//   [41, 60],
+//   [61, 80],
+//   [81, 99]
+// ];
+
+// const infection_states = {
+//   'Susceptible': 0,
+//   'Infected': 1,
+//   'Infectious': 2,
+//   'Symptomatic': 4,
+//   'Hospitalized': 8,
+//   'Recovered': 16,
+//   'Removed': 32
+// };
+
 // This returns just enough data for each chart type
 simdata_route.get(
   '/simdata/:id/chartdata',
   zValidator('param', getChartParamSchema),
   zValidator('query', getChartQuerySchema),
   async (c) => {
-    return c.json({ message: 'WIP' });
+    const { id } = c.req.valid('param');
+    const { type, loc_type, loc_id } = c.req.valid('query');
 
-    // const { id } = c.req.valid('param');
-    // const { type, loc_type, loc_id } = c.req.valid('query');
+    const simdata = await prisma.simData.findUnique({
+      where: { id }
+    });
 
-    // const simdata = await prisma.simData.findUnique({
-    //   where: { id }
-    // });
+    if (!simdata) {
+      return c.json(
+        {
+          message: 'Could not find associated simdata'
+        },
+        404
+      );
+    }
 
-    // if (!simdata) {
-    //   return c.json(
-    //     {
-    //       message: 'Could not find associated simdata'
-    //     },
-    //     404
-    //   );
-    // }
+    type ChartData = {
+      time: number,
+      [key: string]: number;
+    };
 
-    // type ChartData = {
-    //   time: number,
-    //   [key: string]: number;
-    // };
+    const data: ChartData[] = [];
 
-    // const data: ChartData[] = [];
+    const simdatapl = chain([
+      createReadStream(DB_FOLDER + simdata.simdata),
+      parser(),
+      StreamObject.streamObject()
+    ])[Symbol.asyncIterator]();
 
-    // const simdatapl = chain([
-    //   createReadStream(DB_FOLDER + simdata.simdata),
-    //   parser(),
-    //   StreamObject.streamObject()
-    // ])[Symbol.asyncIterator]();
+    const patternspl = chain([
+      createReadStream(DB_FOLDER + simdata.patterns),
+      parser(),
+      StreamObject.streamObject()
+    ])[Symbol.asyncIterator]();
 
-    // const patternspl = chain([
-    //   createReadStream(DB_FOLDER + simdata.patterns),
-    //   parser(),
-    //   StreamObject.streamObject()
-    // ])[Symbol.asyncIterator]();
+    let spl = await simdatapl.next();
+    let ppl = await patternspl.next();
 
-    // let spl = await simdatapl.next();
-    // let ppl = await patternspl.next();
+    while (!spl.done && !ppl.done) {
+      const skey = spl.value.key;
+      const pkey = ppl.value.key;
 
-    // while (!spl.done && !ppl.done) {
-    //   const skey = spl.value.key;
-    //   const pkey = ppl.value.key;
+      if (skey !== pkey) {
+        continue;
+      }
 
-    //   if (skey !== pkey) {
-    //     continue;
-    //   }
+      const svalue = spl.value.value;
+      const pvalue = ppl.value.value;
 
-    //   const svalue = spl.value.value;
-    //   const pvalue = ppl.value.value;
+      const data_point: ChartData = {
+        time: +skey
+      };
 
-    //   data[skey] = {'homes': {}, 'places': {}};
+      if (loc_id) {
+        data_point['Total'] = 0;
 
-    //   const curinfected = [...new Set(Object.values(svalue).map((people) => Object.keys(people as any)).flat())];
+        if (loc_type === 'homes') {
+          data_point['Total'] += pvalue['homes'][loc_id]?.length ?? 0;
 
-    //   for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
-    //     data[skey]['homes'][id] = {
-    //       population: pop.length,
-    //       infected: pop.filter(v => curinfected.includes(v)).length
-    //     };
-    //   }
+          for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
+            data_point[disease] = Object.keys(people).filter(element => pvalue['homes'][loc_id]?.includes(element)).length;
+          }
+        } else if (loc_type === 'places') {
+          data_point['Total'] += pvalue['places'][loc_id]?.length ?? 0;
 
-    //   for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
-    //     data[skey]['places'][id] = {
-    //       population: pop.length,
-    //       infected: pop.filter(v => curinfected.includes(v)).length
-    //     };
-    //   }
+          for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
+            data_point[disease] = Object.keys(people).filter(element => pvalue['places'][loc_id]?.includes(element)).length;
+          }
+        }
+      } else {
+        // IoT
+        for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
+          data_point[disease] = Object.keys(people).length;
+        }
+      }
 
-    //   spl = await simdatapl.next();
-    //   ppl = await patternspl.next();
-    // }
+      data.push(data_point);
 
-    // return c.json({ data });
+      spl = await simdatapl.next();
+      ppl = await patternspl.next();
+    }
+
+    return c.json({ data });
   }
 )
 

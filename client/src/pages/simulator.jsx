@@ -11,20 +11,18 @@ import InstructionBanner from '../components/instruction-banner.jsx';
 
 import './simulator.css';
 
-
 export default function Simulator() {
   const settings = useSimSettings((state) => state.settings);
   const simdata = useSimData((state) => state.simdata);
   const papdata = useSimData((state) => state.papdata);
 
+  const setSettings = useSimSettings((state) => state.setSettings);
   const setSimData = useSimData((state) => state.setSimData);
   const setPapData = useSimData((state) => state.setPapData);
 
   const [showSim, setShowSim] = useState(false);
   const [selectedZone, setSelectedZone] = useState(null);
-
-  const [selectedId, setSelectedId] = useState(null);
-  const [isHousehold, setIsHousehold] = useState(false);
+  const [selectedLoc, setSelectedLoc] = useState(null);
 
   const makePostRequest = async () => {
     const reqbody = {
@@ -67,6 +65,8 @@ export default function Simulator() {
           throw new Error('Status code mismatch');
         }
 
+        setSettings({ sim_id: data['data']['id'] });
+
         axios.get(`${DB_URL}simdata/${data['data']['id']}`)
           .then(({ status, data }) => {
             if (status !== 200) {
@@ -108,14 +108,12 @@ export default function Simulator() {
     });
   };
 
-  const handleMarkerClick = (id, isHome) => {
-    setSelectedId(id);
-    setIsHousehold(isHome);
+  const handleMarkerClick = ({id, label, type}) => {
+    setSelectedLoc({ id, label, type });
   };
 
   const onReset = () => {
-    setSelectedId(null);
-    setIsHousehold(null);
+    setSelectedLoc(null);
   };
 
   return (
@@ -145,8 +143,7 @@ export default function Simulator() {
             <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
 
             <OutputGraphs
-              poi_id={selectedId}
-              is_household={isHousehold}
+              selected_loc={selectedLoc}
               onReset={onReset}
             />
           </div>

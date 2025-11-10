@@ -25,6 +25,7 @@ type Interventions = {
 };
 
 type SimSettings = {
+  sim_id: number | null;
   zone: ConvenienceZone | null;
   hours: number;
   randseed: boolean;
@@ -52,6 +53,7 @@ const default_interventions: Interventions = {
 };
 
 const default_settings: SimSettings = {
+  sim_id: null,
   zone: null,
   hours: 84,
   randseed: true,

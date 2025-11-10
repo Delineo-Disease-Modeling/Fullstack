@@ -57,7 +57,7 @@ function updateIcons(mapCenter, sim_data, pap_data, hotspots) {
 
       const pop = (type === 'homes' ? sim_data['homes'][index] : sim_data['places'][index]) ?? { population: 0, infected: 0 };
 
-      let description = `Pop:Inf ${pop.population}:${pop.infected}`;
+      let description = `${pop.population} people\n${pop.infected} infected`;
       if (type === 'places' && Object.keys(hotspots).includes(data.id)) {
         description += `\n\nHotspot at hour${hotspots[data.id].length === 1 ? '' : 's'}: ${hotspots[data.id].join(', ')}`;
       }
@@ -191,13 +191,7 @@ function makeGeoJSON(pois) {
     features: pois.map((poi) => ({
       type: "Feature",
       properties: {
-        label: poi.label,
-        description: poi.description,
-        icon: poi.icon,
-        type: poi.type,
-        id: poi.id,
-        population: poi.population,
-        infected: poi.infected,
+        ...poi,
         infection_ratio: poi.population > 0 ? poi.infected / poi.population : 0,
       },
       geometry: {
@@ -208,15 +202,43 @@ function makeGeoJSON(pois) {
   };
 }
 
-function ClusteredMap({ mapCenter, pois, hotspots }) {
+function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick }) {
   const mapRef = useRef();
   const [mapInstance, setMapInstance] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
-  const [fadeInPhase, setFadeInPhase] = useState(false);
+  const [fadeCircle, setFadeCircle] = useState(1);
+  const [fadeLabel, setFadeLabel] = useState(1);
 
-  const handleMapLoad = (event) => setMapInstance(event.target);
+  const handleMapLoad = (event) => {
+    const map = event.target;
+    setMapInstance(map);
 
-  // Update geojson when POIs change
+    // when zoom/pan ends → fade back to 1 (no fade-out)
+    map.on("moveend", () => {
+      const start = performance.now();
+      const initialCircle = fadeCircle;
+      const initialLabel = fadeLabel;
+      const duration = 350; // total fade length
+
+      const animate = (now) => {
+        const t = Math.min((now - start) / duration, 1);
+        // cubic ease-out
+        const eased = 1 - Math.pow(1 - t, 3);
+
+        // label fades a bit faster, circle lags ~0.15s
+        const labelEase = Math.min(eased * 1.1, 1);
+        const circleEase = Math.min(eased * 0.85 + 0.15, 1);
+
+        setFadeLabel(initialLabel + (1 - initialLabel) * labelEase);
+        setFadeCircle(initialCircle + (1 - initialCircle) * circleEase);
+
+        if (t < 1) requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    });
+  };
+
+  // update GeoJSON when POIs change
   useEffect(() => {
     if (!mapInstance) return;
     const frame = requestAnimationFrame(() => {
@@ -226,144 +248,46 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
     return () => cancelAnimationFrame(frame);
   }, [pois, mapInstance]);
 
+  useEffect(() => {
+    setPopupInfo(null);
+  }, [currentTime]);
+
+  // toggle label visibility when too faint
+  useEffect(() => {
+    if (!mapInstance) return;
+    const visibility = fadeLabel < 0.20 ? "none" : "visible";
+    if (mapInstance.getLayer("cluster-count")) {
+      mapInstance.setLayoutProperty("cluster-count", "visibility", visibility);
+    }
+  }, [fadeLabel, mapInstance]);
+
   const geojson = makeGeoJSON(pois);
 
-  /** 🎇 Main cluster burst animation + smart sub-explode */
-  function animateClusterExpansion(map, clusterFeature) {
-    const clusterId = clusterFeature.properties.cluster_id;
-    const source = map.getSource("points");
-    if (!source || !source.getClusterLeaves) return;
-
-    const canvas = document.querySelector(".emoji-overlay-canvas");
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    source.getClusterLeaves(clusterId, 100, 0, (err, leaves) => {
-      if (err || !leaves?.length) return;
-
-      const clusterCenter = clusterFeature.geometry.coordinates;
-      const endPositions = leaves
-        .map(f => f.geometry.coordinates)
-        .filter(c => Array.isArray(c) && c.length === 2 && !isNaN(c[0]) && !isNaN(c[1]));
-
-      const duration = 1000;
-      const start = performance.now();
-      let zoomStarted = false;
-      let zoomTarget = null;
-
-      // Ask for expansion zoom
-      source.getClusterExpansionZoom(clusterId, (err, expansionZoom) => {
-        if (!err) zoomTarget = expansionZoom + 0.5;
-      });
-
-      const safeArc = (x, y, r, color, alpha = 1) => {
-        const radius = Math.max(0.1, isFinite(r) ? r : 0.1);
-        if (radius > 0) {
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
-          ctx.fillStyle = color.includes("hsla") ? color : `rgba(255,255,255,${alpha})`;
-          ctx.fill();
-        }
-      };
-
-      function frame(now) {
-        const t = Math.min((now - start) / duration, 1);
-        const ease = t * (2 - t);
-        const { width, height } = canvas;
-        ctx.clearRect(0, 0, width, height);
-        const clusterPoint = map.project(clusterCenter);
-        if (!clusterPoint) return;
-
-        // --- Shockwave ring ---
-        const ringRadius = Math.max(0, 40 * ease);
-        ctx.beginPath();
-        ctx.arc(clusterPoint.x, clusterPoint.y, ringRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255,200,0,${0.4 * (1 - t)})`;
-        ctx.lineWidth = Math.max(0, 3 * (1 - t));
-        ctx.stroke();
-
-        // --- Particles ---
-        endPositions.forEach((end, i) => {
-          const projected = map.project(end);
-          if (!projected) return;
-          const x = clusterPoint.x + (projected.x - clusterPoint.x) * ease;
-          const y = clusterPoint.y + (projected.y - clusterPoint.y) * ease;
-          const hue = 25 + (i * 25) % 80;
-          safeArc(x, y, 5 + 4 * (1 - t), `hsla(${hue},100%,55%,${1 - t})`);
-        });
-
-        // --- Trigger zoom mid-animation ---
-        if (!zoomStarted && t > 0.35 && zoomTarget) {
-          zoomStarted = true;
-          map.easeTo({
-            center: clusterCenter,
-            zoom: zoomTarget,
-            duration: 1200,
-            essential: true,
-          });
-
-          // After zoom completes, check visible clusters
-          map.once("moveend", () => {
-            const visible = map.queryRenderedFeatures(undefined, { source: "points" });
-            const clusters = visible.filter(f => f.properties?.cluster);
-            const ratio = visible.length > 0 ? clusters.length / visible.length : 0;
-
-            // --- Secondary explosion if still mostly clusters ---
-            if (ratio > 0.6 && clusters.length > 1) {
-              const subStart = performance.now();
-              const { width: w, height: h } = canvas;
-
-              function explodeFrame(now2) {
-                const t2 = Math.min((now2 - subStart) / 800, 1);
-                const ease2 = 1 - Math.pow(1 - t2, 2);
-                ctx.clearRect(0, 0, w, h);
-
-                clusters.forEach((f, i) => {
-                  const p = map.project(f.geometry.coordinates);
-                  if (!p) return;
-                  const angle = (i / clusters.length) * 2 * Math.PI;
-                  const offset = 20 * ease2;
-                  const x = p.x + Math.cos(angle) * offset;
-                  const y = p.y + Math.sin(angle) * offset;
-                  safeArc(x, y, 8 * (1 - 0.5 * t2), "rgba(255,150,0,0.6)");
-                });
-
-                if (t2 < 1) requestAnimationFrame(explodeFrame);
-                else ctx.clearRect(0, 0, w, h);
-              }
-
-              requestAnimationFrame(explodeFrame);
-            } else {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-
-            // Always fade in new icons after zoom completes
-            setFadeInPhase(true);
-            setTimeout(() => setFadeInPhase(false), 600);
-          });
-        }
-
-        if (t < 1) requestAnimationFrame(frame);
-        else ctx.clearRect(0, 0, width, height);
-      }
-
-      requestAnimationFrame(frame);
-    });
-  }
-
-  /** 🖱 Handle clicks */
   const handleClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     const map = event.target;
 
     if (feature.properties.cluster) {
-      animateClusterExpansion(map, feature);
+      const clusterId = feature.properties.cluster_id;
+      const source = map.getSource("points");
+      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) return;
+        map.easeTo({
+          center: feature.geometry.coordinates,
+          zoom: zoom + 0.5,
+          duration: 1000,
+        });
+      });
       return;
     }
 
-    // Non-clustered click → zoom + popup
+    onMarkerClick({
+      id: feature.properties.id,
+      label: feature.properties.label,
+      type: feature.properties.type
+    });
+
     const coords = feature.geometry.coordinates;
     const targetZoom = Math.max(map.getZoom(), 15);
     setPopupInfo(null);
@@ -378,7 +302,7 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
         icon: feature.properties.icon,
         id: feature.properties.id,
       });
-    }, 200);
+    }, 250);
   };
 
   return (
@@ -400,7 +324,6 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
         ]}
         onClick={handleClick}
       >
-        {/* 🔹 Clustered points source */}
         <Source
           id="points"
           type="geojson"
@@ -434,6 +357,7 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
                 ["get", "point_count"],
                 22, 10, 28, 25, 34,
               ],
+              "circle-opacity": fadeCircle,
               "circle-stroke-width": 1,
               "circle-stroke-color": "#fff",
             }}
@@ -454,7 +378,10 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
               "text-size": 12,
               "text-allow-overlap": true,
             }}
-            paint={{ "text-color": "#fff" }}
+            paint={{
+              "text-color": "#fff",
+              "text-opacity": fadeLabel,
+            }}
           />
 
           {/* 🧍 Unclustered point circles */}
@@ -473,9 +400,7 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
                 0.35, "#FF9800",
                 0.5, "#F44336",
               ],
-              "circle-opacity": fadeInPhase
-                ? ["interpolate", ["linear"], ["zoom"], 0, 0, 1, 1]
-                : 1,
+              "circle-opacity": fadeCircle,
               "circle-stroke-color": "#fff",
               "circle-stroke-width": 1,
             }}
@@ -494,7 +419,7 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
             }}
             paint={{
               "text-color": "#000000",
-              "text-opacity": fadeInPhase ? 0 : 1,
+              "text-opacity": fadeCircle,
             }}
           />
         </Source>
@@ -509,22 +434,21 @@ function ClusteredMap({ mapCenter, pois, hotspots }) {
             onClose={() => setPopupInfo(null)}
             style={{ zIndex: 10 }}
           >
-            <div className="max-w-36 whitespace-pre-line font-[Poppins]">
-              <div style={{ fontSize: "22px" }}>{popupInfo.icon}</div>
-              <header className="text-sm font-bold">{popupInfo.label}</header>
+            <div className="max-w-36 whitespace-pre-line font-[Poppins] text-center">
+              <div className='text-2xl mb-0.5'>{popupInfo.icon}</div>
+              <header className="text-sm font-bold mb-0.5">{popupInfo.label}</header>
               <p className="text-xs">{popupInfo.description}</p>
             </div>
           </Popup>
         )}
       </Map>
 
-      {/* 🧩 Emoji overlay canvas */}
       {mapInstance && <EmojiOverlay map={mapInstance} hotspots={hotspots} />}
     </div>
   );
 }
 
-export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selectedZone })
+export default function ModelMap({ onMarkerClick, selectedZone })
 {
   const sim_data = useSimData((state) => state.simdata);
   const pap_data = useSimData((state) => state.papdata);
@@ -592,8 +516,6 @@ export default function ModelMap({ onMarkerClick, selectedId, isHousehold, selec
         pois={pois}
         hotspots={hotspots}
         onMarkerClick={onMarkerClick}
-        selectedId={selectedId}
-        isHousehold={isHousehold}
       />
 
       <div className='mt-3 text-center w-full'>
