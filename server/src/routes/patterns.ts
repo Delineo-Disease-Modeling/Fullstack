@@ -152,7 +152,7 @@ patterns_route.get(
 
     return c.json({
       data: JSON.parse(data)
-    })
+    });
   }
 );
 

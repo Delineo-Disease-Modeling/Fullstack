@@ -19,10 +19,9 @@ export default function OutputGraphs({ selected_loc, onReset }) {
   const [chartData, setChartData] = useState();
 
   useEffect(() => {
-    const url = new URL(`${DB_URL}simdata/${settings.sim_id}/chartdata`);
-    console.log(chartType)
+    setChartData(null);
 
-    url.searchParams.append('type', chartType);
+    const url = new URL(`${DB_URL}simdata/${settings.sim_id}/chartdata`);
 
     if (selected_loc) {
       url.searchParams.append('loc_type', selected_loc.type);
@@ -41,11 +40,7 @@ export default function OutputGraphs({ selected_loc, onReset }) {
         setChartData(json['data']);
       })
       .catch(console.error);
-  }, [settings.sim_id, chartType, selected_loc]);
-
-  if (!chartData) {
-    return;
-  }
+  }, [settings.sim_id, selected_loc]);
 
   return (
     <div className='outputgraphs_container'>
@@ -65,28 +60,29 @@ export default function OutputGraphs({ selected_loc, onReset }) {
 
       {/* Chart Areas */}
       <div className='relative outputgraph_chart'>
-        {/* {noInfectionsAtFacility() && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center bg-white bg-opacity-75">
-            <p className="text-lg font-semibold">No infections occurred at this location during the simulation.</p>
-            <p className="mt-2 text-sm">Try selecting another location or generating a new simulation.</p>
-          </div>
-        )} */}
         <h6 className='text-center font-bold pb-4'>
           Infection Distribution Over Time
           {selected_loc && <span> for {selected_loc.label}</span>}
         </h6>
-        <ResponsiveContainer width='100%' height='100%'>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-            <YAxis label={{ value: 'Total', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={CustomTooltip} />
-            <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
-            {Object.keys(chartData[0]).filter((key) => key !== 'time').map((key, index) => (
-              <Line type="monotone" key={key} dataKey={key} stroke={COLORS[index % COLORS.length]} dot={false} />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        {!chartData ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center">
+            <p className="text-lg">Loading...</p>
+            {/* <p className="mt-2 text-sm">Try selecting another location or generating a new simulation.</p> */}
+          </div>
+        ) : (
+          <ResponsiveContainer width='100%' height='100%'>
+            <LineChart data={chartData[chartType]}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
+              <YAxis label={{ value: 'Total', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={CustomTooltip} />
+              <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
+              {Object.keys(chartData[chartType][0]).filter((key) => key !== 'time').map((key, index) => (
+                <Line type="monotone" key={key} dataKey={key} stroke={COLORS[index % COLORS.length]} dot={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {selected_loc && (
