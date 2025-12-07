@@ -8,8 +8,8 @@ div.home_shapes {
 
 span.home_shape {
   position: absolute;
-  background-color: #F0F0F090;
-  border-radius: 50px;
+  transform-origin: center;
+  pointer-events: none;
 }
 
 @keyframes scroll {
@@ -18,5 +18,14 @@ span.home_shape {
   }
   100% {
     left: 100%;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(720deg); 
   }
 }

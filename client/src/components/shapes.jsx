@@ -2,22 +2,29 @@ import { useEffect, useState, useRef } from 'react';
 
 import './shapes.css';
 
-function Shape(key) {
+function Shape() {
   const y = Math.floor(Math.random() * 101);
-  const r = Math.floor(Math.random() * 15) + 25;
-  const t = Math.floor(Math.random() * 20) + 10;
+  const s = 20;
+  const t = Math.floor(Math.random() * 10) + 10;
   const d = Math.floor(Math.random() * (t + 1));
 
+  const hue = Math.floor(Math.random() * 10);        
+  const saturation = Math.floor(Math.random() * 25) + 60; 
+  const lightness = Math.floor(Math.random() * 20) + 45; 
+
+  const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+
   const shapeStyle = {
-    width: `${r * 8}px`,
-    height: `${r}px`,
     top: `${y}%`,
-    animation: `scroll ${t}s linear infinite`,
+    borderLeft: `${s}px solid transparent`,
+    borderRight: `${s}px solid transparent`,
+    borderBottom: `${s * 1.8}px solid ${color}`,
+    animation: `scroll ${t}s linear infinite, spin ${t * 0.2}s linear infinite`,
     animationDelay: `${-d}s`
   };
 
   return (
-    <span className='home_shape' key={key} style={shapeStyle}></span>
+    <span className='home_shape' style={shapeStyle}></span>
   );
 }
 

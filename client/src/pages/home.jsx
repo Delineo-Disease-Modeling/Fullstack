@@ -10,6 +10,7 @@ export default function Home() {
       <div className='main' data-aos='fade-up'>
         <Shapes />
         <div className='left'>
+          <div className="bubble"></div>
           <h1 className='title'>Delineo Project</h1>
           <h2 className='title'>Small-town disease simulation</h2>
           <NavLink to='/simulator'>
