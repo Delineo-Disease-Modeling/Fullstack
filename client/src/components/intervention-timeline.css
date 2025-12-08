@@ -19,17 +19,25 @@ input.iv_timeline::-moz-range-track {
 
 input.iv_timeline::-webkit-slider-thumb {
   pointer-events: auto;
-  width: 8px !important;
-  border-radius: 4px !important;
+  width: 0.85rem !important;
+  height: 1.75rem !important;
+  -webkit-appearance: none;
+  margin-top: -0.75rem; /* Centers thumb since track height is 0 */
+  border-radius: 0.25rem !important;
+  background-color: #909090;
+  border: 1px solid #505050;
 }
 
 input.iv_timeline::-moz-range-thumb {
   pointer-events: auto;
-  width: 10px !important;
-  border-radius: 4px !important;
+  width: 0.625rem !important;
+  height: 1.5rem !important;
+  border-radius: 0.25rem !important;
+  background-color: #909090;
+  border: 1px solid #505050;
 }
 
-input.iv_timeline.current::webkit-slider-thumb {
+input.iv_timeline.current::-webkit-slider-thumb {
   background-color: #f0f0f0;
 }
 
