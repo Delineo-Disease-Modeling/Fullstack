@@ -91,13 +91,13 @@ export default function InterventionTimeline() {
       >
         {/* Background slider */}
         <div
-          className='absolute w-full h-2 bg-[#5D576B] rounded-md outline-0'
+          className='absolute top-0 left-0 w-full h-2 bg-[#5D576B] rounded-md outline-0'
         />
 
         {values.map((value, i) => (
           <input
             key={i}
-            className={'iv_timeline absolute w-full h-1.5 '
+            className={'iv_timeline absolute top-0 left-0 w-full h-1.5 '
               + (curtime === value ? 'current ' : '')
             }
             type="range"
