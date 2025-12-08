@@ -28,7 +28,10 @@ export default function OutputGraphs({ selected_loc, onReset }) {
       url.searchParams.append('loc_id', selected_loc.id);
     }
 
-    fetch(url)
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
+    fetch(url, { signal })
       .then((res) => {
         if (!res.ok) {
           throw new Error();
@@ -40,6 +43,10 @@ export default function OutputGraphs({ selected_loc, onReset }) {
         setChartData(json['data']);
       })
       .catch(console.error);
+
+    return () => {
+      abortController.abort();
+    };
   }, [settings.sim_id, selected_loc]);
 
   return (

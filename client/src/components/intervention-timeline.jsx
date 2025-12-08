@@ -160,7 +160,7 @@ export default function InterventionTimeline() {
             }}
             disabled={values.length >= 10}
           >
-            + Add Intervention
+            + Add
           </button>
         </div>
         <button
@@ -174,7 +174,9 @@ export default function InterventionTimeline() {
       {/* Information & Buttons*/}
       <div className='flex flex-col gap-4'>
         <h4 className='text-center text-lg'>
-          Hour #{curtime.toString().padStart(3, '0')} - {' '}
+          Intervention #{values.findIndex((v) => v === curtime) + 1} - Hour #{curtime.toString().padStart(3, '0')}
+        </h4>
+        <h4 className='text-center text-lg'>
           {settings.zone && new Date(new Date(settings.zone.start_date).getTime() + curtime * 60 * 60 * 1000).toLocaleString('en-US', {
             day: 'numeric',
             month: 'long',

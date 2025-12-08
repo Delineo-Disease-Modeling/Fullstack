@@ -15,14 +15,41 @@ export default function Simulator() {
   const settings = useSimSettings((state) => state.settings);
   const simdata = useSimData((state) => state.simdata);
   const papdata = useSimData((state) => state.papdata);
+  const runName = useSimData((state) => state.name);
 
   const setSettings = useSimSettings((state) => state.setSettings);
   const setSimData = useSimData((state) => state.setSimData);
   const setPapData = useSimData((state) => state.setPapData);
+  const setRunName = useSimData((state) => state.setName);
 
   const [showSim, setShowSim] = useState(false);
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedLoc, setSelectedLoc] = useState(null);
+
+  const handleRename = async () => {
+    if (!settings.sim_id || !runName || runName.length < 2) return;
+
+    try {
+      const res = await fetch(`${DB_URL}simdata/${settings.sim_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: runName })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to rename');
+      }
+
+      const json = await res.json();
+      if (json.data && json.data.name) {
+        setRunName(json.data.name);
+      }
+    } catch (error) {
+      console.error('Rename failed:', error);
+    }
+  };
 
   const makePostRequest = async () => {
     const reqbody = {
@@ -33,19 +60,18 @@ export default function Simulator() {
 
     console.log(reqbody);
 
-    if (settings.usecache) {
+    if (settings.sim_id !== null) {
       try {
-        const res = await fetch(`${DB_URL}simdata/cache/${settings.zone.id}`);
+        const res = await fetch(`${DB_URL}simdata/${settings.sim_id}`);
 
         if (!res.ok) {
-          throw new Error(`Invalid cache response ${res.status}`);
+          throw new Error(`Invalid simdata response ${res.status}`);
         }
 
         const json = await res.json();
 
-        setSettings({ sim_id: json['data']['sim_id'] });
-        setSimData(json['data']['sim_data']);
-
+        setSimData(json['data']['simdata']);
+        setRunName(json['data']['name']);
         return;
       } catch (error) {
         console.error(error);
@@ -66,7 +92,8 @@ export default function Simulator() {
               throw new Error('Status code mismatch');
             }
 
-            setSimData(data['data']);
+            setSimData(data['data']['simdata']);
+            setRunName(data['data']['name']);
           })
           .catch(console.error);
       })
@@ -77,11 +104,12 @@ export default function Simulator() {
     // Reset Data
     setSimData(null);
     setPapData(null);
+    setRunName('');
 
     // Switch "pages"
     setShowSim(true);
     setSelectedZone(settings.zone);
-    
+
     fetch(`${DB_URL}papdata/${settings.zone.id}`)
       .then((res) => {
         if (!res.ok) {
@@ -101,7 +129,7 @@ export default function Simulator() {
     });
   };
 
-  const handleMarkerClick = ({id, label, type}) => {
+  const handleMarkerClick = ({ id, label, type }) => {
     setSelectedLoc({ id, label, type });
   };
 
@@ -127,12 +155,63 @@ export default function Simulator() {
                 <h2 className='text-xl font-semibold'>Convenience Zone: {selectedZone.name}</h2>
                 <p className='text-sm text-gray-600'>Created on: {new Date(selectedZone.created_at).toLocaleDateString()}</p>
               </div>
+              <div className='flex items-center justify-between gap-2'>
+                <div className='flex gap-2 items-center'>
+                  <label htmlFor='run-name' className='text-sm text-gray-700'>Run Name:</label>
+                  <input
+                    id='run-name'
+                    type='text'
+                    value={runName || ''}
+                    onChange={(e) => setRunName(e.target.value)}
+                    onBlur={handleRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRename();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    className='rounded px-2 py-1 text-sm bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]'
+                    placeholder='Untitled Run'
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to delete this run? This action cannot be undone.')) {
+                      try {
+                        const res = await fetch(`${DB_URL}simdata/${settings.sim_id}`, {
+                          method: 'DELETE'
+                        });
+
+                        if (!res.ok) {
+                          throw new Error('Failed to delete');
+                        }
+
+                        // Reset Data
+                        setSimData(null);
+                        setPapData(null);
+                        setRunName('');
+                        setSettings({ sim_id: null });
+
+                        // Switch "pages"
+                        setShowSim(false);
+                        setSelectedZone(null);
+                      } catch (error) {
+                        console.error('Delete failed:', error);
+                        alert('Failed to delete run');
+                      }
+                    }
+                  }}
+                  className='bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded'
+                >
+                  Delete Run
+                </button>
+              </div>
               <ModelMap
                 selectedZone={selectedZone}
                 onMarkerClick={handleMarkerClick}
               />
             </div>
-            
+
             <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
 
             <OutputGraphs

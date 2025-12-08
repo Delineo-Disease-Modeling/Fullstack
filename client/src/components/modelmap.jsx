@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react'; 
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { Map, Popup, Source, Layer } from "react-map-gl/maplibre";
 import useSimData from '../stores/simdata';
 
@@ -29,7 +29,7 @@ const icon_lookup = {
   "Coating, Engraving, Heat Treating, and Allied Activities": "🏢",
   "Building Material and Supplies Dealers": "🏢",
   "Postal Service": "📬",
-  "Home": "🏠" 
+  "Home": "🏠"
 }
 
 var household_locs = {};
@@ -452,8 +452,7 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
   );
 }
 
-export default function ModelMap({ onMarkerClick, selectedZone })
-{
+export default function ModelMap({ onMarkerClick, selectedZone }) {
   const sim_data = useSimData((state) => state.simdata);
   const pap_data = useSimData((state) => state.papdata);
 
@@ -464,7 +463,7 @@ export default function ModelMap({ onMarkerClick, selectedZone })
   const [currentTime, setCurrentTime] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const mapCenter = useMemo(() => [ selectedZone.latitude, selectedZone.longitude ], [selectedZone]);
+  const mapCenter = useMemo(() => [selectedZone.latitude, selectedZone.longitude], [selectedZone]);
   const pois = useMemo(() => {
     return updateIcons(mapCenter, sim_data[(currentTime * 60).toString()], pap_data, hotspots);
   }, [currentTime, hotspots, mapCenter, pap_data, sim_data]);
@@ -500,7 +499,7 @@ export default function ModelMap({ onMarkerClick, selectedZone })
         let curinfected = curpeople.infected ?? 0;
 
         if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 5) {
-          new_hotspots[index] = [ ...(new_hotspots[index] ?? []), timestamps[i] / 60 ];
+          new_hotspots[index] = [...(new_hotspots[index] ?? []), timestamps[i] / 60];
         }
       }
     }
@@ -539,7 +538,7 @@ export default function ModelMap({ onMarkerClick, selectedZone })
           className="bg-[#70B4D4] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
           onClick={() => setIsPlaying(!isPlaying)}
         >
-          {isPlaying ? 'Pause' : 'Play'}
+          {isPlaying ? <i className='bi bi-pause-fill' /> : <i className='bi bi-play-fill' />}
         </button>
 
         <input

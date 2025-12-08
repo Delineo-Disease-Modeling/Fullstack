@@ -1,7 +1,7 @@
 import CzDict from './czdict';
 import useSimSettings from '../stores/simsettings';
 import InterventionTimeline from './intervention-timeline';
-import { SimParameter, SimBoolean, SimFile } from './settings-components';
+import { SimParameter, SimBoolean, SimFile, SimRunSelector } from './settings-components';
 
 import './simsettings.css';
 
@@ -32,12 +32,6 @@ export default function SimSettings({ sendData }) {
           value={settings.randseed}
           callback={(randseed) => setSettings({ randseed })}
         />
-        <SimBoolean 
-          label={'Use Cached Data'}
-          description={'uses pre-computed simulation data'}
-          value={settings.usecache}
-          callback={(usecache) => setSettings({ usecache })}
-        />
         {/* <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/> */}
         <SimFile 
           label={'Custom DMP Matrix Files'}
@@ -47,6 +41,18 @@ export default function SimSettings({ sendData }) {
       </div>
 
       <InterventionTimeline />
+
+      <div className="relative flex items-center my-8 w-96 max-w-[90vw]">
+        <div className="flex-grow border-t border-[#222629]"></div>
+        <span className="mx-4">or</span>
+        <div className="flex-grow border-t border-[#222629]"></div>
+      </div>
+
+      <SimRunSelector
+        czone_id={settings.zone?.id}
+        sim_id={settings.sim_id}
+        callback={(sim_id) => setSettings({ sim_id })}
+      />
       
       <button
         className='simset_button w-32'

@@ -42,10 +42,12 @@ type PapData = {
 };
 
 interface SimDataStore {
+  name: string;
   simdata: SimData | null;
   patterns: MovePatterns | null;
   papdata: PapData | null;
 
+  setName: (name: string) => void;
   setSimData: (simdata: SimData) => void;
   setPatterns: (patterns: MovePatterns) => void;
   setPapData: (papdata: PapData) => void;
@@ -53,12 +55,23 @@ interface SimDataStore {
 
 const useSimData = create<SimDataStore>(
   (set) => ({
+    name: '',
     simdata: null,
     patterns: null,
     papdata: null,
 
-    setSimData: (simdata) => {
-      set({ simdata });
+    setName: (name) => {
+      set({ name });
+    },
+
+    setSimData: (newSimData) => {
+      if (newSimData === null) {
+        set({ simdata: null });
+        return;
+      }
+      set((state) => ({
+        simdata: state.simdata ? { ...state.simdata, ...newSimData } : (newSimData as SimData)
+      }));
     },
 
     setPatterns: (patterns) => {

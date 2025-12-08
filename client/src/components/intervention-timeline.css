@@ -42,6 +42,7 @@ button.iv_timeline {
   transition: all 200ms ease-in-out;
   outline: solid 1px #fffff2;
   padding: 0.25rem 2rem;
+  text-wrap: nowrap;
   border-radius: var(--radius-lg);
   color: #F0F0F0;
 }

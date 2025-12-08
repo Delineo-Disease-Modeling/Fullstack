@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { DB_URL } from '../env';
 import useAuth from '../stores/auth';
 import InstructionBanner from './instruction-banner';
+import useSimSettings from '../stores/simsettings';
 
 export default function CzDict({ zone, setZone }) {
   const navigate = useNavigate();
   const user = useAuth((state) => state.user);
+  const setSettings = useSimSettings((state) => state.setSettings);
 
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState([]);
@@ -57,7 +59,7 @@ export default function CzDict({ zone, setZone }) {
           {locations.filter((loc) => tab === 0 ? true : loc.user_id === user?.id).map((loc) => (
             <div
               key={loc.id}
-              className='flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative'
+              className='flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none'
               style={
                 !loc.ready
                   ? { background: '#11111140', color: 'white', cursor: 'not-allowed' }
@@ -65,7 +67,13 @@ export default function CzDict({ zone, setZone }) {
                     ? { background: '#70B4D4', color: 'white' }
                     : undefined
               }
-              onClick={() => loc.ready && setZone(loc)}
+              onClick={() => {
+                if (loc.ready) {
+                  setZone(loc);
+                }
+
+                setSettings({ sim_id: null });
+              }}
               onMouseEnter={() => setHoveredLocId(loc.id)}
               onMouseLeave={() => setHoveredLocId(null)}
             >
@@ -99,7 +107,7 @@ export default function CzDict({ zone, setZone }) {
           + Generate Zone
         </button>
       ) : (
-        <InstructionBanner text='Login to generate a Convenience Zone'/>
+        <InstructionBanner text='Login to generate a Convenience Zone' />
       )}
     </div>
   );

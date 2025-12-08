@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import Shapes from '../components/shapes.jsx';
 import './home.css';
 
-
 export default function Home() {
   return (
     <div>

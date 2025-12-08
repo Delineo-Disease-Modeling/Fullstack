@@ -41,11 +41,8 @@ app.use(
 
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
-    console.log(error);
     return c.json({ message: error.message }, error.status);
   }
-
-  console.log(error);
 
   return c.json({ message: 'An unknown error has occurred' }, 500);
 });

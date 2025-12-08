@@ -7,6 +7,7 @@ import { DB_FOLDER } from "../env.js";
 import StreamObject from "stream-json/streamers/StreamObject.js";
 import parser from 'stream-json';
 import { createReadStream } from "fs";
+import { unlink } from "fs/promises";
 import chain from "stream-chain";
 import { HTTPException } from "hono/http-exception";
 
@@ -34,6 +35,15 @@ const getChartQuerySchema = z.object({
 
 const getSimDataCacheSchema = z.object({
   czone_id: z.coerce.number().nonnegative()
+});
+
+const getSimDataRunCacheSchema = z.object({
+  czone_id: z.coerce.number().nonnegative(),
+  sim_id: z.coerce.number().nonnegative()
+});
+
+const updateSimDataSchema = z.object({
+  name: z.string().min(2).optional()
 });
 
 async function getSimData(id: number) {
@@ -150,6 +160,69 @@ simdata_route.post(
   }
 );
 
+simdata_route.patch(
+  '/simdata/:id',
+  zValidator('param', getSimDataSchema),
+  zValidator('json', updateSimDataSchema),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const { name } = c.req.valid('json');
+
+    if (!name) {
+      return c.json({ message: 'Nothing to update' }, 400);
+    }
+
+    try {
+      const simdata = await prisma.simData.update({
+        where: { id },
+        data: { name }
+      });
+
+      return c.json({ data: simdata });
+    } catch (e) {
+      throw new HTTPException(404, {
+        message: `Could not find simdata #${id}`
+      });
+    }
+  }
+);
+
+simdata_route.delete(
+  '/simdata/:id',
+  zValidator('param', getSimDataSchema),
+  async (c) => {
+    const { id } = c.req.valid('param');
+
+    const simdata = await prisma.simData.findUnique({
+      where: { id }
+    });
+
+    if (!simdata) {
+      throw new HTTPException(404, {
+        message: `Could not find simdata #${id}`
+      });
+    }
+
+    try {
+      await Promise.all([
+        unlink(DB_FOLDER + simdata.simdata).catch(console.error),
+        unlink(DB_FOLDER + simdata.patterns).catch(console.error)
+      ]);
+
+      await prisma.simData.delete({
+        where: { id }
+      });
+
+      return c.json({ message: 'Deleted successfully' });
+    } catch (e) {
+      console.error(e);
+      throw new HTTPException(500, {
+        message: 'Failed to delete simdata'
+      });
+    }
+  }
+);
+
 // This returns just enough data for the model map to work
 simdata_route.get(
   '/simdata/:id',
@@ -157,9 +230,24 @@ simdata_route.get(
   async (c) => {
     const { id } = c.req.valid('param');
 
+    const simdata = await prisma.simData.findUnique({
+      where: { id }
+    });
+
+    if (!simdata) {
+      throw new HTTPException(404, {
+        message: `Could not find simdata #${id}`
+      });
+    }
+
     const data = await getSimData(id);
 
-    return c.json({ data });
+    return c.json({
+      'data': {
+        'simdata': data,
+        name: simdata.name
+      }
+    });
   }
 );
 
@@ -176,8 +264,7 @@ simdata_route.get('/simdata/cache/:czone_id',
         simdata: {
           orderBy: {
             id: 'desc'
-          },
-          take: 1
+          }
         }
       }
     });
@@ -188,19 +275,12 @@ simdata_route.get('/simdata/cache/:czone_id',
       });
     }
 
-    if (!czone.simdata.length) {
-      throw new HTTPException(404, {
-        message: 'Could not find previous simulator run'
-      });
-    }
-
-    const data = await getSimData(czone.simdata[0].id);
-
     return c.json({
-      'data': {
-        sim_id: czone.simdata[0].id,
-        sim_data: data
-      }
+      data: czone.simdata.map((simdata) => ({
+        'name': simdata.name,
+        'created_at': simdata.created_at,
+        'sim_id': simdata.id
+      }))
     });
   }
 );
@@ -342,26 +422,15 @@ simdata_route.get(
       let infected_list = svalue;
 
       if (loc_id && loc_type) {
-        iot_data['All People'] = 0;
+        iot_data['All People'] = pvalue[loc_type][loc_id]?.length ?? 0;
 
         for (const disease of Object.keys(svalue) as string[]) {
           iot_data[disease] = 0;
         }
         
-        if (loc_type === 'homes') {
-          iot_data['All People'] += pvalue['homes'][loc_id]?.length ?? 0;
-
-          for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
-            infected_list[disease] = Object.fromEntries(Object.entries(people)
-              .filter(([k, v]) => pvalue['homes'][loc_id]?.includes(k)));
-          }
-        } else if (loc_type === 'places') {
-          iot_data['All People'] += pvalue['places'][loc_id]?.length ?? 0;
-
-          for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
-            infected_list[disease] = Object.fromEntries(Object.entries(people)
-              .filter(([k, v]) => pvalue['places'][loc_id]?.includes(k)));
-          }
+        for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
+          infected_list[disease] = Object.fromEntries(Object.entries(people)
+            .filter(([k, v]) => pvalue[loc_type][loc_id]?.includes(k)));
         }
       }
 
