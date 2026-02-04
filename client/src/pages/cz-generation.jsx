@@ -139,7 +139,7 @@ export default function CZGeneration() {
       console.log(core_cbg);
 
       const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
-        name: location['city'],
+        name: location?.['city'] ?? formdata.get('location'),
         description: formdata.get('description'),
         cbg: core_cbg,
         start_date: new Date(formdata.get('start_date')).toISOString(),
