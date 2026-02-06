@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import useSimSettings from '../stores/simsettings';
 
-import './intervention-timeline.css';
+import '../styles/intervention-timeline.css';
 import Interventions from './interventions';
 
 export default function InterventionTimeline() {
@@ -97,7 +97,7 @@ export default function InterventionTimeline() {
         onDoubleClick={addThumb}
       >
         {/* Background slider */}
-        <div className="absolute top-0 left-0 w-full h-2 bg-[#5D576B] rounded-md outline-0" />
+        <div className="absolute top-0 left-0 w-full h-2 bg-[var(--color-text-main)] rounded-md outline-0" />
 
         {values.map((value, i) => (
           <input
@@ -139,7 +139,7 @@ export default function InterventionTimeline() {
       {/* Buttons */}
       <div className="flex w-full items-center justify-center gap-2">
         <button
-          className="iv_timeline bg-[#222629] disabled:bg-stone-600 px-4!"
+          className="iv_timeline bg-[var(--color-bg-dark)] disabled:bg-stone-600 px-4!"
           onClick={moveLeft}
         >
           &lt;
@@ -155,7 +155,7 @@ export default function InterventionTimeline() {
         </div>
         <div className={values.length >= 10 ? 'cursor-not-allowed' : ''}>
           <button
-            className="iv_timeline bg-[#222629] disabled:bg-stone-600"
+            className="iv_timeline bg-[var(--color-bg-dark)] disabled:bg-stone-600"
             onClick={() => {
               const newvalue = Array.from(
                 { length: hours },
@@ -172,7 +172,7 @@ export default function InterventionTimeline() {
           </button>
         </div>
         <button
-          className="iv_timeline bg-[#222629] disabled:bg-stone-600 px-4!"
+          className="iv_timeline bg-[var(--color-bg-dark)] disabled:bg-stone-600 px-4!"
           onClick={moveRight}
         >
           &gt;

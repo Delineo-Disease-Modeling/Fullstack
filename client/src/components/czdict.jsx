@@ -14,6 +14,8 @@ export default function CzDict({ zone, setZone }) {
   const [locations, setLocations] = useState([]);
   const [hoveredLocId, setHoveredLocId] = useState(null);
 
+  const hasUserZones = user && locations.some((loc) => loc.user_id === user.id);
+
   useEffect(() => {
     fetch(`${import.meta.env.VITE_DB_URL}convenience-zones`)
       .then((res) => res.json())
@@ -27,36 +29,51 @@ export default function CzDict({ zone, setZone }) {
       .catch(console.error);
   }, [zone, setZone]);
 
+  useEffect(() => {
+    if (!hasUserZones) {
+      setTab(0);
+    }
+  }, [hasUserZones]);
+
   return (
     <div className="flex flex-col items-center w-full gap-4">
-      <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2]">
+      <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[var(--color-primary-blue)] bg-[var(--color-bg-ivory)]">
         {/* Tabs */}
-        <div className="flex h-6">
-          <div
-            className="bg-[#70B4D4] text-center text-white flex-1 h-full hover:cursor-pointer"
-            style={tab === 0 ? { filter: 'brightness(0.8)' } : undefined}
-            onClick={() => setTab(0)}
-          >
-            All Zones
+        {hasUserZones ? (
+          <div className="flex h-6">
+            <div
+              className="bg-[var(--color-primary-blue)] text-center text-white flex-1 h-full hover:cursor-pointer"
+              style={tab === 0 ? { filter: 'brightness(0.8)' } : undefined}
+              onClick={() => setTab(0)}
+            >
+              All Zones
+            </div>
+            <div
+              className="bg-[var(--color-primary-blue)] text-center text-white flex-1 h-full hover:cursor-pointer"
+              style={tab === 1 ? { filter: 'brightness(0.8)' } : undefined}
+              onClick={() => setTab(1)}
+            >
+              My Zones
+            </div>
           </div>
-          <div
-            className="bg-[#70B4D4] text-center text-white flex-1 h-full hover:cursor-pointer"
-            style={tab === 1 ? { filter: 'brightness(0.8)' } : undefined}
-            onClick={() => setTab(1)}
-          >
-            My Zones
+        ) : (
+          <div className="flex items-center justify-center h-6 text-white bg-[var(--color-primary-blue)]">
+            Convenience Zones
           </div>
-        </div>
+        )}
 
         {/* Header Row */}
-        <div className="flex px-1 justify-between text-xs font-semibold bg-[#70B4D4] text-white py-1">
+        <div className="flex px-1 justify-between text-xs font-semibold bg-[var(--color-primary-blue)] text-white py-1">
           <p className="flex-1">Name</p>
           <p className="flex-1 text-center">Population Size</p>
           <p className="flex-1 text-right">Created Date</p>
         </div>
 
         {/* List */}
-        <div className="relative flex flex-col h-auto overflow-y-scroll gap-y-1">
+        <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1">
+          {locations.length === 0 && (
+            <p className="text-center my-auto">No zones found, create one to get started!</p>
+          )}
           {locations
             .filter((loc) => (tab === 0 ? true : loc.user_id === user?.id))
             .map((loc) => (
@@ -71,7 +88,7 @@ export default function CzDict({ zone, setZone }) {
                       cursor: 'not-allowed'
                     }
                     : zone.id === loc.id
-                      ? { background: '#70B4D4', color: 'white' }
+                      ? { background: 'var(--color-primary-blue)', color: 'white' }
                       : undefined
                 }
                 onClick={() => {
@@ -102,7 +119,7 @@ export default function CzDict({ zone, setZone }) {
 
       {/* Description of current zone */}
       {zone && (
-        <div className="w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2] italic whitespace-pre-line">
+        <div className="w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-[var(--color-primary-blue)] bg-[var(--color-bg-ivory)] italic whitespace-pre-line">
           {zone.description}
         </div>
       )}

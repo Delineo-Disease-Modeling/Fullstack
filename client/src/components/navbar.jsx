@@ -4,7 +4,7 @@ import { useSession, signOut } from '../lib/auth-client';
 import Modal from 'react-modal';
 import LoginModal from './login-modal';
 
-import './navbar.css';
+import '../styles/navbar.css';
 
 Modal.setAppElement(document.getElementById('root'));
 
@@ -76,9 +76,9 @@ export default function Navbar() {
             transform: 'translate(-50%, -50%)',
             maxWidth: '80vw',
             borderRadius: '0.5rem',
-            background: '#222629',
-            border: '1px solid #F0F0F0',
-            color: '#F0F0F0',
+            background: 'var(--color-bg-dark)',
+            border: '1px solid var(--color-border-light)',
+            color: 'var(--color-text-light)',
             maxHeight: '90vh',
             overflowY: 'scroll'
           }

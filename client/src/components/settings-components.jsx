@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import './settings-components.css';
+import '../styles/settings-components.css';
 
 // Slider
 export function SimParameter({
@@ -101,14 +101,14 @@ export function SimRunSelector({ czone_id, sim_id, callback }) {
 
   return (
     <div className="flex flex-col items-center w-full gap-4">
-      <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2]">
+      <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[var(--color-primary-blue)] bg-[var(--color-bg-ivory)]">
         {/* Title */}
-        <div className="bg-[#70B4D4] text-center text-white w-full h-6">
+        <div className="bg-[var(--color-primary-blue)] text-center text-white w-full h-6">
           Visit a Previous Run
         </div>
 
         {/* Header Row */}
-        <div className="flex px-1 justify-between text-xs font-semibold bg-[#70B4D4] text-white py-1">
+        <div className="flex px-1 justify-between text-xs font-semibold bg-[var(--color-primary-blue)] text-white py-1">
           <p className="flex-1">Name</p>
           <p className="flex-1 text-right">Created Date</p>
         </div>
@@ -121,7 +121,7 @@ export function SimRunSelector({ czone_id, sim_id, callback }) {
               className="flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none"
               style={
                 run.sim_id === sim_id
-                  ? { background: '#70B4D4', color: 'white' }
+                  ? { background: 'var(--color-primary-blue)', color: 'white' }
                   : undefined
               }
               onClick={() =>

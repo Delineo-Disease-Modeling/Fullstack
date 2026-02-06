@@ -6,7 +6,7 @@ import axios from 'axios';
 import { useSession } from '../lib/auth-client';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import './cz-generation.css';
+import '../styles/cz-generation.css';
 
 function InteractiveMap({ onLocationSelect, disabled }) {
   const [markerPosition, setMarkerPosition] = useState(null);
@@ -32,13 +32,11 @@ function InteractiveMap({ onLocationSelect, disabled }) {
       <NavigationControl position="top-left" />
 
       {markerPosition && (
-        <>
-          <Marker
-            longitude={markerPosition.lng}
-            latitude={markerPosition.lat}
-            color="red"
-          />
-        </>
+        <Marker
+          longitude={markerPosition.lng}
+          latitude={markerPosition.lat}
+          color="red"
+        />
       )}
     </Map>
   );
@@ -261,7 +259,7 @@ export default function CZGeneration() {
           value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
           onClick={() => iframeHTML && navigate('/simulator')}
           disabled={loading}
-          className="bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
+          className="bg-[var(--color-bg-dark)] text-[var(--color-text-light)] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
         />
       </form>
     </div>

@@ -8,7 +8,7 @@ import {
   SimRunSelector
 } from './settings-components';
 
-import './simsettings.css';
+import '../styles/simsettings.css';
 
 export default function SimSettings({ sendData }) {
   const zone = useSimSettings((state) => state.zone);
@@ -51,9 +51,9 @@ export default function SimSettings({ sendData }) {
       <InterventionTimeline />
 
       <div className="relative flex items-center my-8 w-96 max-w-[90vw]">
-        <div className="flex-grow border-t border-[#222629]"></div>
+        <div className="flex-grow border-t border-[var(--color-border-dark)]"></div>
         <span className="mx-4">or</span>
-        <div className="flex-grow border-t border-[#222629]"></div>
+        <div className="flex-grow border-t border-[var(--color-border-dark)]"></div>
       </div>
 
       <SimRunSelector

@@ -40,7 +40,7 @@ function FormData({ curTab, closeModal }) {
           id="email"
           name="email"
           type="email"
-          className="rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]"
+          className="rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)]"
           required
         />
       </div>
@@ -51,7 +51,7 @@ function FormData({ curTab, closeModal }) {
             id="name"
             name="name"
             type="text"
-            className="rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]"
+            className="rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)]"
             required
           />
         </div>
@@ -62,7 +62,7 @@ function FormData({ curTab, closeModal }) {
           id="password"
           name="password"
           type="password"
-          className="rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]"
+          className="rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)]"
           required
         />
       </div>
@@ -74,7 +74,7 @@ function FormData({ curTab, closeModal }) {
               id="organization"
               name="organization"
               type="text"
-              className="rounded-md px-2 py-0.5 text-[#222629] bg-[#F0F0F0]"
+              className="rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)]"
               required
             />
           </div>
@@ -111,9 +111,9 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           transform: 'translate(-50%, -50%)',
           maxWidth: '80vw',
           borderRadius: '0.5rem',
-          background: '#222629',
-          border: '1px solid #F0F0F0',
-          color: '#F0F0F0',
+          background: 'var(--color-bg-dark)',
+          border: '1px solid var(--color-border-light)',
+          color: 'var(--color-text-light)',
           maxHeight: '90vh',
           overflowY: 'scroll'
         }
@@ -128,7 +128,7 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           <button
             onClick={() => setCurTab(0)}
             data-tab={curTab}
-            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-[#70B4D4] hover:bg-slate-700"
+            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-[var(--color-primary-blue)] hover:bg-slate-700"
             style={{ boxShadow: 'inset 0 -1px 0 0 #313131' }}
           >
             Login
@@ -136,7 +136,7 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           <button
             onClick={() => setCurTab(1)}
             data-tab={curTab}
-            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-[#70B4D4] hover:bg-slate-700"
+            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-[var(--color-primary-blue)] hover:bg-slate-700"
           >
             Register
           </button>

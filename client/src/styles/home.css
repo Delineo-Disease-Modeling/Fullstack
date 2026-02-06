@@ -1,7 +1,7 @@
 div.main {
   width: 100%;
   min-height: calc(100vh - 30px);
-  background-color: #fffae3;
+  background-color: var(--color-bg-cream);
   background-image:
     repeating-linear-gradient(45deg,
       rgba(120, 160, 255, 0.25) 0px,
@@ -34,12 +34,10 @@ div.main {
 h1.title {
   font-size: 48px;
   font-weight: 500;
-  color: #222629;
   padding-bottom: 20px;
 }
 
 h2.title {
-  color: #222629;
   padding-bottom: 60px;
 }
 
@@ -48,8 +46,8 @@ button.app {
   border-radius: 25px;
   width: 120px;
   padding: 14px;
-  background-color: #f05464;
-  color: #f0f0f0;
+  background-color: var(--color-accent-red);
+  color: var(--color-text-light);
   text-decoration: none;
   font-size: 16px;
   font-family: "Poppins";
@@ -72,10 +70,11 @@ img.logo {
   aspect-ratio: 1 / 1;
 }
 
-@media screen and (max-width: 828px) {
+@media screen and (max-width: 900px) {
   div.main {
     padding-top: 40px;
     padding-bottom: 40px;
+    flex-direction: column-reverse;
   }
 
   div.left {
@@ -84,7 +83,7 @@ img.logo {
 }
 
 div.featurelist {
-  background-color: #fffae3;
+  background-color: var(--color-bg-cream);
   width: 70%;
   margin: auto;
   overflow: hidden;
@@ -140,11 +139,7 @@ p.feature {
   border-radius: 80%;
   pointer-events: none;
   z-index: -1;
-  background: radial-gradient(circle, #ff6b81, #f05464, #b84050);
+  background: radial-gradient(circle, #ff9bb0, #ff8593, #e07080);
   filter: blur(80px);
   opacity: 0.6;
-}
-
-.left {
-  position: relative;
 }

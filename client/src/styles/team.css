@@ -63,7 +63,7 @@ img.member {
   border-radius: 15%;
   object-fit: cover;
   aspect-ratio: 1 / 1;
-  outline: 2px solid #70b4d4;
+  outline: 2px solid var(--color-primary-blue);
 }
 
 h1.name {

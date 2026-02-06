@@ -8,7 +8,7 @@ import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 import InstructionBanner from '../components/instruction-banner.jsx';
 
-import './simulator.css';
+import '../styles/simulator.css';
 
 export default function Simulator() {
   const sim_id = useSimSettings((state) => state.sim_id);
@@ -180,7 +180,7 @@ export default function Simulator() {
                       e.currentTarget.blur();
                     }
                   }}
-                  className="rounded px-2 py-1 text-sm bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]"
+                  className="rounded px-2 py-1 text-sm bg-[var(--color-bg-ivory)] outline-solid outline-2 outline-[var(--color-primary-blue)]"
                   placeholder="Untitled Run"
                 />
               </div>

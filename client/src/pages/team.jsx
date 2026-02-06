@@ -1,5 +1,5 @@
 import 'animate.css';
-import './team.css';
+import '../styles/team.css';
 
 const teamData = {
   professors: [
@@ -78,7 +78,7 @@ export default function Team() {
       {team.map((member) => (
         <div className="member" key={member.name}>
           <img
-            className="member bg-[#88D2D8]"
+            className="member bg-[var(--color-accent-teal)]"
             onError={(e) => (e.target.src = './delineo.svg')}
             src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`}
             alt={member.name}

@@ -1,15 +1,15 @@
 import { NavLink } from 'react-router-dom';
+import DiseaseGraph from '../components/disease-graph';
 
-import Shapes from '../components/shapes.jsx';
-import './home.css';
+import '../styles/home.css';
 
 export default function Home() {
   return (
     <div>
       <div className="main" data-aos="fade-up">
-        <Shapes />
-        <div className="left">
-          <div className="bubble"></div>
+        <DiseaseGraph />
+        <div className="left relative">
+          <div className="bubble" />
           <h1 className="title">Delineo Project</h1>
           <h2 className="title">Small-town disease simulation</h2>
           <NavLink to="/simulator">

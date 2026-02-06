@@ -12,7 +12,7 @@ import {
 import { CustomTooltip } from './customtooltip';
 import useSimSettings from '../stores/simsettings';
 
-import './outputgraphs.css';
+import '../styles/outputgraphs.css';
 
 const COLORS = [
   '#8884d8',
@@ -65,7 +65,7 @@ export default function OutputGraphs({ selected_loc, onReset }) {
       <div className="p-2.5">
         <label>Select Chart Type: </label>
         <select
-          className="px-1 outline-2 outline-solid bg-[#fffff2] outline-[#70B4D4]"
+          className="px-1 outline-2 outline-solid bg-[var(--color-bg-ivory)] outline-[var(--color-primary-blue)]"
           value={chartType}
           onChange={(e) => setChartType(e.target.value)}
         >

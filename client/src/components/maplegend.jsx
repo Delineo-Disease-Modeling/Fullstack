@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import './maplegend.css';
+import '../styles/maplegend.css';
 
 export default function MapLegend({ icon_lookup }) {
   const [hovered, setHovered] = useState(null);

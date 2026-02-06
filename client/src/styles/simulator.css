@@ -39,7 +39,7 @@ input[type="range"] {
   display: block;
   appearance: none;
   -webkit-appearance: none;
-  background-color: #5d576b;
+  background-color: var(--color-text-main);
   height: 5px;
   border-radius: 5px;
   outline: 0;
@@ -48,11 +48,11 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  background-color: #70b4d4;
+  background-color: var(--color-primary-blue);
   width: 25px;
   height: 25px;
   border-radius: 50%;
-  border: 2px solid #5d576b;
+  border: 2px solid var(--color-text-main);
   cursor: pointer;
   transition: 0.3s ease-in-out;
 }
@@ -68,11 +68,11 @@ input[type="range"]::-webkit-slider-thumb:active {
 input[type="range"]::-moz-range-thumb {
   appearance: none;
   -webkit-appearance: none;
-  background-color: #70b4d4;
+  background-color: var(--color-primary-blue);
   width: 25px;
   height: 25px;
   border-radius: 50%;
-  border: 2px solid #5d576b;
+  border: 2px solid var(--color-text-main);
   cursor: pointer;
   transition: 0.3s ease-in-out;
 }
