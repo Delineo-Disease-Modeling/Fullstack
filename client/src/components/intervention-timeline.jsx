@@ -19,10 +19,9 @@ export default function InterventionTimeline() {
   const [curtime, setCurtime] = useState(0);
 
   useEffect(() => {
-    const unused = Array.from(
-      { length: hours },
-      (_, i) => i + 1
-    ).filter((v) => !values.includes(v));
+    const unused = Array.from({ length: hours }, (_, i) => i + 1).filter(
+      (v) => !values.includes(v)
+    );
 
     for (let i = 0; i < values.length; i++) {
       if (values[i] > hours) {
@@ -90,7 +89,7 @@ export default function InterventionTimeline() {
   };
 
   return (
-    <div className="flex flex-col w-full p-4 gap-4">
+    <div className="flex flex-col w-full gap-4">
       {/* Timeline bar */}
       <div
         className="relative flex items-center w-full h-6 select-none"
@@ -188,8 +187,7 @@ export default function InterventionTimeline() {
         <h4 className="text-center text-lg">
           {zone &&
             new Date(
-              new Date(zone.start_date).getTime() +
-              curtime * 60 * 60 * 1000
+              new Date(zone.start_date).getTime() + curtime * 60 * 60 * 1000
             ).toLocaleString('en-US', {
               day: 'numeric',
               month: 'long',

@@ -32,7 +32,9 @@ export default function OutputGraphs({ selected_loc, onReset }) {
   useEffect(() => {
     setChartData(null);
 
-    const url = new URL(`${import.meta.env.VITE_DB_URL}simdata/${sim_id}/chartdata`);
+    const url = new URL(
+      `${import.meta.env.VITE_DB_URL}simdata/${sim_id}/chartdata`
+    );
 
     if (selected_loc) {
       url.searchParams.append('loc_type', selected_loc.type);

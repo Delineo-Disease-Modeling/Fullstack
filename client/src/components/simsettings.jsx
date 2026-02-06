@@ -8,9 +8,7 @@ import {
   SimRunSelector
 } from './settings-components';
 
-import '../styles/simsettings.css';
-
-export default function SimSettings({ sendData }) {
+export default function SimSettings({ sendData, error, loading }) {
   const zone = useSimSettings((state) => state.zone);
   const hours = useSimSettings((state) => state.hours);
   const randseed = useSimSettings((state) => state.randseed);
@@ -18,14 +16,11 @@ export default function SimSettings({ sendData }) {
   const setSettings = useSimSettings((state) => state.setSettings);
 
   return (
-    <div className="simset_settings">
-      <div className="simset_params">
-        {/* Pass setSelectedZone to SimLocation, so we get the full object */}
-        <CzDict
-          zone={zone}
-          setZone={(zone) => setSettings({ zone })}
-        />
+    <div className="flex flex-col items-center gap-16">
+      {/* Pass setSelectedZone to SimLocation, so we get the full object */}
+      <CzDict zone={zone} setZone={(zone) => setSettings({ zone })} />
 
+      <div className="flex flex-wrap justify-center gap-8">
         <SimParameter
           label={'Length'}
           value={hours}
@@ -50,7 +45,7 @@ export default function SimSettings({ sendData }) {
 
       <InterventionTimeline />
 
-      <div className="relative flex items-center my-8 w-96 max-w-[90vw]">
+      <div className="relative flex items-center w-96 max-w-[90vw]">
         <div className="flex-grow border-t border-[var(--color-border-dark)]"></div>
         <span className="mx-4">or</span>
         <div className="flex-grow border-t border-[var(--color-border-dark)]"></div>
@@ -62,20 +57,28 @@ export default function SimSettings({ sendData }) {
         callback={(sim_id) => setSettings({ sim_id })}
       />
 
-      <button
-        className="simset_button w-32"
-        onClick={() => {
-          if (!zone?.ready) {
-            alert('Please pick a valid convenience zone first!');
-            return;
-          }
+      <div className="flex flex-col items-center gap-2">
+        <button
+          className="simset_button w-32 disabled:bg-gray-400! disabled:pointer-events-none"
+          disabled={loading}
+          onClick={() => {
+            if (!zone?.ready) {
+              alert('Please pick a valid convenience zone first!');
+              return;
+            }
 
-          // Now pass the zone's name & full object to the parent
-          sendData();
-        }}
-      >
-        Simulate
-      </button>
+            // Now pass the zone's name & full object to the parent
+            sendData();
+          }}
+        >
+          {loading ? 'Loading...' : 'Simulate'}
+        </button>
+        {error && (
+          <div className="text-red-500 text-sm font-semibold max-w-md text-center">
+            {error}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

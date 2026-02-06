@@ -242,7 +242,10 @@ simdata_route.get(
     const { id } = c.req.valid('param');
 
     const simdata = await prisma.simData.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        czone: true
+      }
     });
 
     if (!simdata) {
@@ -256,7 +259,9 @@ simdata_route.get(
     return c.json({
       data: {
         simdata: data,
-        name: simdata.name
+        simdata: data,
+        name: simdata.name,
+        zone: simdata.czone
       }
     });
   }

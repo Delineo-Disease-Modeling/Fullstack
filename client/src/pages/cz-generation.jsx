@@ -103,6 +103,7 @@ export default function CZGeneration() {
   const [description, setDescription] = useState('');
   const [iframeHTML, setIframeHTML] = useState();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (isPending) {
     return <div className="text-white text-center mt-20">Loading...</div>;
@@ -112,8 +113,6 @@ export default function CZGeneration() {
     navigate('/simulator');
     return null;
   }
-
-
 
   const lookupLocation = async (location) => {
     const resp = await fetch(`${import.meta.env.VITE_DB_URL}lookup-location`, {
@@ -139,20 +138,26 @@ export default function CZGeneration() {
 
       if (!locationData || !locationData.cbg) {
         console.error('Could not find location or CBG');
+        setError(
+          'Could not find location or CBG. Please try a different location.'
+        );
         return;
       }
 
       console.log(locationData);
 
-      const { status, data } = await axios.post(`${import.meta.env.VITE_ALG_URL}generate-cz`, {
-        name: locationData.city || formdata.get('location'),
-        description: formdata.get('description'),
-        cbg: locationData.cbg,
-        start_date: new Date(formdata.get('start_date')).toISOString(),
-        length: +formdata.get('length') * 24, // Days turn to hours
-        min_pop: +formdata.get('min_pop'),
-        user_id: user.id
-      });
+      const { status, data } = await axios.post(
+        `${import.meta.env.VITE_ALG_URL}generate-cz`,
+        {
+          name: locationData.city || formdata.get('location'),
+          description: formdata.get('description'),
+          cbg: locationData.cbg,
+          start_date: new Date(formdata.get('start_date')).toISOString(),
+          length: +formdata.get('length') * 24, // Days turn to hours
+          min_pop: +formdata.get('min_pop'),
+          user_id: user.id
+        }
+      );
 
       if (status !== 200) {
         throw new Error('Status code mismatch');
@@ -169,9 +174,13 @@ export default function CZGeneration() {
       return;
     }
 
+    setError('');
     setLoading(true);
     func_body(formdata)
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e);
+        setError('Failed to generate Convenience Zone. Please try again.');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -254,6 +263,11 @@ export default function CZGeneration() {
             </div>
           )}
         </div>
+        {error && (
+          <div className="text-red-500 font-bold mb-4 text-center mx-4">
+            {error}
+          </div>
+        )}
         <input
           type={!iframeHTML ? 'submit' : 'button'}
           value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}

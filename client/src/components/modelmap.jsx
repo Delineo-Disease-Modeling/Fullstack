@@ -572,7 +572,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
       <div className="mt-3 text-center w-full">
         {new Date(
           new Date(selectedZone.start_date).getTime() +
-          currentTime * 60 * 60 * 1000
+            currentTime * 60 * 60 * 1000
         ).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',

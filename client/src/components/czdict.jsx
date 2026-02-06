@@ -36,7 +36,7 @@ export default function CzDict({ zone, setZone }) {
   }, [hasUserZones]);
 
   return (
-    <div className="flex flex-col items-center w-full gap-4">
+    <div className="flex flex-col items-center gap-4">
       <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[var(--color-primary-blue)] bg-[var(--color-bg-ivory)]">
         {/* Tabs */}
         {hasUserZones ? (
@@ -72,7 +72,9 @@ export default function CzDict({ zone, setZone }) {
         {/* List */}
         <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1">
           {locations.length === 0 && (
-            <p className="text-center my-auto">No zones found, create one to get started!</p>
+            <p className="text-center my-auto">
+              No zones found, create one to get started!
+            </p>
           )}
           {locations
             .filter((loc) => (tab === 0 ? true : loc.user_id === user?.id))
@@ -83,12 +85,15 @@ export default function CzDict({ zone, setZone }) {
                 style={
                   !loc.ready
                     ? {
-                      background: '#11111140',
-                      color: 'white',
-                      cursor: 'not-allowed'
-                    }
+                        background: '#11111140',
+                        color: 'white',
+                        cursor: 'not-allowed'
+                      }
                     : zone.id === loc.id
-                      ? { background: 'var(--color-primary-blue)', color: 'white' }
+                      ? {
+                          background: 'var(--color-primary-blue)',
+                          color: 'white'
+                        }
                       : undefined
                 }
                 onClick={() => {

@@ -2,8 +2,8 @@
 
 :root {
   /* Theme Colors */
-  --color-primary-blue: #70B4D4;
-  --color-accent-teal: #88D2D8;
+  --color-primary-blue: #70b4d4;
+  --color-accent-teal: #88d2d8;
   --color-accent-red: #f05464;
 
   /* Backgrounds */
@@ -12,10 +12,10 @@
   --color-bg-dark: #222629;
 
   /* Text & Borders */
-  --color-text-main: #5D576B;
-  --color-text-light: #F0F0F0;
+  --color-text-main: #5d576b;
+  --color-text-light: #f0f0f0;
   --color-border-dark: #222629;
-  --color-border-light: #F0F0F0;
+  --color-border-light: #f0f0f0;
 
   /* Grays */
   --color-gray-mid: #909090;
@@ -31,7 +31,6 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
-
   *,
   ::after,
   ::before,
