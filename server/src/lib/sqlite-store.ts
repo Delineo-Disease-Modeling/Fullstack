@@ -3,6 +3,7 @@ import { createReadStream } from 'fs';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { createGunzip, gzipSync, gunzipSync } from 'zlib';
 
 export class SimDatabase {
   private db: Database.Database;
@@ -20,7 +21,7 @@ export class SimDatabase {
         location_type TEXT,
         population INTEGER,
         infected INTEGER,
-        infected_list TEXT,
+        infected_list BLOB,
         PRIMARY KEY (location_id, time)
       );
       
@@ -35,7 +36,11 @@ export class SimDatabase {
     `);
 
     const insertMany = this.db.transaction((data) => {
-      for (const row of data) insert.run(row);
+      for (const row of data) {
+        // Compress infected_list
+        row.infected_list = gzipSync(row.infected_list);
+        insert.run(row);
+      }
     });
 
     insertMany(rows);
@@ -49,10 +54,22 @@ export class SimDatabase {
       ORDER BY time ASC
     `);
 
-    return stmt.all(locationId).map((row: any) => ({
-      ...row,
-      infected_list: JSON.parse(row.infected_list)
-    }));
+    return stmt.all(locationId).map((row: any) => {
+      let infected_list = {};
+      try {
+        if (row.infected_list instanceof Buffer) {
+           infected_list = JSON.parse(gunzipSync(row.infected_list).toString());
+        } else {
+           infected_list = JSON.parse(row.infected_list);
+        }
+      } catch (e) {
+        console.error("Failed to parse infected_list", e);
+      }
+      return {
+        ...row,
+        infected_list
+      };
+    });
   }
 
   public close() {
@@ -60,7 +77,7 @@ export class SimDatabase {
   }
 }
 
-export async function ingestSimData(
+export async function processSimData(
   simdataPath: string,
   patternsPath: string,
   dbPath: string
@@ -68,17 +85,18 @@ export async function ingestSimData(
   const simDb = new SimDatabase(dbPath);
 
   // Streaming Logic (similar to sim-stats but inserting into DB)
-  const simdatapl = chain([
-    createReadStream(simdataPath),
-    parser(),
-    StreamObject.streamObject()
-  ])[Symbol.asyncIterator]();
+  // Streaming Logic
+  const simChain: any[] = [createReadStream(simdataPath)];
+  if (simdataPath.endsWith('.gz')) simChain.push(createGunzip());
+  simChain.push(parser(), StreamObject.streamObject());
 
-  const patternspl = chain([
-    createReadStream(patternsPath),
-    parser(),
-    StreamObject.streamObject()
-  ])[Symbol.asyncIterator]();
+  const simdatapl = chain(simChain)[Symbol.asyncIterator]();
+
+  const patChain: any[] = [createReadStream(patternsPath)];
+  if (patternsPath.endsWith('.gz')) patChain.push(createGunzip());
+  patChain.push(parser(), StreamObject.streamObject());
+  
+  const patternspl = chain(patChain)[Symbol.asyncIterator]();
 
   let spl = await simdatapl.next();
   let ppl = await patternspl.next();

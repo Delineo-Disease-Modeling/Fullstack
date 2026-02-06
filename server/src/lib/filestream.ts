@@ -1,7 +1,31 @@
 import { createWriteStream } from 'fs';
-import { Writable } from 'stream';
+import { Readable } from 'stream';
+import { createGzip } from 'zlib';
 
-export const saveFileStream = async (file: File, filePath: string) => {
+export const saveFileStream = async (
+  file: File,
+  filePath: string,
+  compress = false
+) => {
+  console.log(`Saving ${filePath}, compress=${compress}`);
   const writeStream = createWriteStream(filePath);
-  await file.stream().pipeTo(Writable.toWeb(writeStream));
+  const readStream = Readable.fromWeb(file.stream() as any); // Cast to any to avoid type mismatch with DOM streams if needed
+
+  if (compress) {
+    const gzip = createGzip();
+    await new Promise((resolve, reject) => {
+        readStream
+            .pipe(gzip)
+            .pipe(writeStream)
+            .on('finish', resolve)
+            .on('error', reject);
+    });
+  } else {
+    await new Promise((resolve, reject) => {
+        readStream
+            .pipe(writeStream)
+            .on('finish', resolve)
+            .on('error', reject);
+    });
+  }
 };

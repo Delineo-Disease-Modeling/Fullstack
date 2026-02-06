@@ -1,9 +1,10 @@
-import { createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
 import { writeFile } from 'fs/promises';
 import { DB_FOLDER } from '../env.js';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { createGunzip, gunzipSync } from 'zlib';
 
 const age_ranges = [
   [0, 20],
@@ -38,11 +39,22 @@ export async function generateGlobalStats(
   papDataPath: string,
   outputPath: string
 ) {
-  // Read PapData first
+  // Read PapData (handle compressed)
   const papDataRaw = await import('fs/promises').then((fs) =>
-    fs.readFile(papDataPath, 'utf8')
+    fs.readFile(papDataPath)
   );
-  const papdata = JSON.parse(papDataRaw);
+  let papdata: any;
+  try {
+     if (papDataPath.endsWith('.gz')) {
+        papdata = JSON.parse(gunzipSync(papDataRaw).toString());
+     } else {
+        papdata = JSON.parse(papDataRaw.toString());
+     }
+  } catch(e) {
+      console.error("Failed to parse PapData:", e);
+      // Fallback or re-throw
+      throw e;
+  }
 
   const data: ChartData = {
     iot: [],
@@ -51,17 +63,17 @@ export async function generateGlobalStats(
     states: []
   };
 
-  const simdatapl = chain([
-    createReadStream(simdataPath),
-    parser(),
-    StreamObject.streamObject()
-  ])[Symbol.asyncIterator]();
+  const simChain: any[] = [createReadStream(simdataPath)];
+  if (simdataPath.endsWith('.gz')) simChain.push(createGunzip());
+  simChain.push(parser(), StreamObject.streamObject());
 
-  const patternspl = chain([
-    createReadStream(patternsPath),
-    parser(),
-    StreamObject.streamObject()
-  ])[Symbol.asyncIterator]();
+  const simdatapl = chain(simChain)[Symbol.asyncIterator]();
+
+  const patChain: any[] = [createReadStream(patternsPath)];
+  if (patternsPath.endsWith('.gz')) patChain.push(createGunzip());
+  patChain.push(parser(), StreamObject.streamObject());
+  
+  const patternspl = chain(patChain)[Symbol.asyncIterator]();
 
   let spl = await simdatapl.next();
   let ppl = await patternspl.next();

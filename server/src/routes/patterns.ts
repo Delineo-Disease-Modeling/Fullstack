@@ -4,6 +4,9 @@ import { zValidator } from '@hono/zod-validator';
 import { prisma } from '../lib/prisma.js';
 import { streamText } from 'hono/streaming';
 import { createReadStream } from 'fs';
+import { access } from 'fs/promises';
+import { constants } from 'fs';
+import { createGunzip } from 'zlib';
 import { DB_FOLDER } from '../env.js';
 import chain from 'stream-chain';
 import parser from 'stream-json';
@@ -44,10 +47,10 @@ patterns_route.post(
       }
     });
 
-    // Write patterns/papdata info to file
+    // Write patterns/papdata info to file (Compressed!)
     await Promise.all([
-      saveFileStream(patterns, DB_FOLDER + patterns_obj.id),
-      saveFileStream(papdata, DB_FOLDER + papdata_obj.id)
+      saveFileStream(patterns, DB_FOLDER + patterns_obj.id + '.gz', true),
+      saveFileStream(papdata, DB_FOLDER + papdata_obj.id + '.gz', true)
     ]);
 
     return c.json({
@@ -93,19 +96,44 @@ patterns_route.get(
     }
 
     return streamText(c, async (stream) => {
-      const papdata = createReadStream(DB_FOLDER + papdata_obj.id);
+      // READ PAPDATA
+      let papPath = DB_FOLDER + papdata_obj.id;
+      let papIsGz = false;
+      try {
+        await access(papPath + '.gz', constants.F_OK);
+        papPath += '.gz';
+        papIsGz = true;
+      } catch {
+        // assume plain
+      }
 
-      for await (const chunk of papdata) {
+      const papChain: any[] = [createReadStream(papPath)];
+      if (papIsGz) papChain.push(createGunzip());
+
+      const papdataStream = chain(papChain);
+
+      for await (const chunk of papdataStream) {
         await stream.write(chunk);
       }
 
       await stream.write('\n');
 
-      const pipeline = chain([
-        createReadStream(DB_FOLDER + patterns_obj.id),
-        parser(),
-        StreamObject.streamObject()
-      ]);
+      // READ PATTERNS
+      let patPath = DB_FOLDER + patterns_obj.id;
+      let patIsGz = false;
+      try {
+        await access(patPath + '.gz', constants.F_OK);
+        patPath += '.gz';
+        patIsGz = true;
+      } catch {
+        // assume plain
+      }
+
+      const patChain: any[] = [createReadStream(patPath)];
+      if (patIsGz) patChain.push(createGunzip());
+      patChain.push(parser(), StreamObject.streamObject());
+
+      const pipeline = chain(patChain);
 
       for await (const { key, value } of pipeline) {
         if (length && +key > length) {
@@ -145,7 +173,20 @@ patterns_route.get(
 
     let data = '';
 
-    const papdata = createReadStream(DB_FOLDER + papdata_obj.id);
+    let papPath = DB_FOLDER + papdata_obj.id;
+    let papIsGz = false;
+    try {
+      await access(papPath + '.gz', constants.F_OK);
+      papPath += '.gz';
+      papIsGz = true;
+    } catch {
+      // assume plain
+    }
+
+    const papChain: any[] = [createReadStream(papPath)];
+    if (papIsGz) papChain.push(createGunzip());
+
+    const papdata = chain(papChain);
 
     for await (const chunk of papdata) {
       data += chunk;

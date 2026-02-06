@@ -9,11 +9,12 @@ import parser from 'stream-json';
 import { createReadStream } from 'fs';
 import { unlink, readFile, access } from 'fs/promises';
 import { constants } from 'fs';
+import { createGunzip } from 'zlib';
 import chain from 'stream-chain';
 import { HTTPException } from 'hono/http-exception';
 import { stream } from 'hono/streaming';
 import { generateGlobalStats } from '../lib/sim-stats.js';
-import { ingestSimData, SimDatabase } from '../lib/sqlite-store.js';
+import { processSimData, SimDatabase } from '../lib/sqlite-store.js';
 import type { SimData } from '@prisma/client/index-browser';
 
 const simdata_route = new Hono();
@@ -71,9 +72,12 @@ simdata_route.post(
       }
     });
 
+    const simIsGz = simdata.name.endsWith('.gz');
+    const patIsGz = patterns.name.endsWith('.gz');
+
     await Promise.all([
-      saveFileStream(simdata, DB_FOLDER + simdata_obj.simdata),
-      saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns)
+      saveFileStream(simdata, DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : '')),
+      saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''))
     ]);
 
     // Background: Get PapData Path and Trigger pre-computation
@@ -83,17 +87,26 @@ simdata_route.post(
       where: { czone_id: Number(czone_id) }
     });
     if (papdata_obj) {
+      // Check for papdata compression
+      let papPath = DB_FOLDER + papdata_obj.id;
+      try {
+        await access(papPath + '.gz', constants.F_OK);
+        papPath += '.gz';
+      } catch {
+        // assume plain
+      }
+
       generateGlobalStats(
-        DB_FOLDER + simdata_obj.simdata,
-        DB_FOLDER + simdata_obj.patterns,
-        DB_FOLDER + papdata_obj.id,
+        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
+        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
+        papPath,
         DB_FOLDER + simdata_obj.simdata + '.stats.json'
       ).catch((e) => console.error('Stats generation failed:', e));
 
       // Background: Trigger SQLite Ingestion
-      ingestSimData(
-        DB_FOLDER + simdata_obj.simdata,
-        DB_FOLDER + simdata_obj.patterns,
+      processSimData(
+        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
+        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
         DB_FOLDER + simdata_obj.simdata + '.db'
       ).catch((e) => console.error('SQLite ingestion failed:', e));
     }
@@ -190,11 +203,29 @@ simdata_route.get(
     }
 
     // Check if files exist on disk
+    let simPath = DB_FOLDER + simdata.simdata;
+    let patPath = DB_FOLDER + simdata.patterns;
+    let simIsGz = false;
+    let patIsGz = false;
+
     try {
-      await Promise.all([
-        access(DB_FOLDER + simdata.simdata, constants.F_OK),
-        access(DB_FOLDER + simdata.patterns, constants.F_OK)
-      ]);
+      // Check simdata
+      try {
+        await access(simPath + '.gz', constants.F_OK);
+        simPath += '.gz';
+        simIsGz = true;
+      } catch {
+        await access(simPath, constants.F_OK);
+      }
+
+      // Check patterns
+      try {
+        await access(patPath + '.gz', constants.F_OK);
+        patPath += '.gz';
+        patIsGz = true;
+      } catch {
+        await access(patPath, constants.F_OK);
+      }
     } catch (e) {
       // Integrity Error: Delete the metadata from DB to prevent ghosts
       await prisma.simData.delete({ where: { id: simdata.id } });
@@ -212,20 +243,31 @@ simdata_route.get(
 
       let first = true;
 
-      const simdatapl = chain([
-        createReadStream(DB_FOLDER + simdata.simdata),
-        parser(),
-        StreamObject.streamObject()
-      ])[Symbol.asyncIterator]();
+      const simChain: any[] = [createReadStream(simPath)];
+      if (simIsGz) simChain.push(createGunzip());
+      simChain.push(parser(), StreamObject.streamObject());
 
-      const patternspl = chain([
-        createReadStream(DB_FOLDER + simdata.patterns),
-        parser(),
-        StreamObject.streamObject()
-      ])[Symbol.asyncIterator]();
+      const patChain: any[] = [createReadStream(patPath)];
+      if (patIsGz) patChain.push(createGunzip());
+      patChain.push(parser(), StreamObject.streamObject());
 
-      let spl = await simdatapl.next();
-      let ppl = await patternspl.next();
+      const simdatapl = chain(simChain);
+      const patternspl = chain(patChain);
+
+      simdatapl.on('error', (err) => {
+        console.error('SimData Stream Error:', err);
+        stream.close();
+      });
+      patternspl.on('error', (err) => {
+        console.error('Patterns Stream Error:', err);
+        stream.close();
+      });
+
+      const simIter = simdatapl[Symbol.asyncIterator]();
+      const patIter = patternspl[Symbol.asyncIterator]();
+
+      let spl = await simIter.next();
+      let ppl = await patIter.next();
 
       while (!spl.done && !ppl.done) {
         const skey = spl.value.key;
@@ -233,10 +275,10 @@ simdata_route.get(
 
         if (skey !== pkey) {
           if (+skey < +pkey) {
-            spl = await simdatapl.next();
+            spl = await simIter.next();
             continue;
           } else {
-            ppl = await patternspl.next();
+            ppl = await patIter.next();
             continue;
           }
         }
@@ -292,8 +334,8 @@ simdata_route.get(
 
         await stream.write(`"${skey}":${JSON.stringify(frameData)}`);
 
-        spl = await simdatapl.next();
-        ppl = await patternspl.next();
+        spl = await simIter.next();
+        ppl = await patIter.next();
       }
 
       await stream.write('}}}');
