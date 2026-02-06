@@ -3,20 +3,16 @@ div.main {
   min-height: calc(100vh - 30px);
   background-color: #fffae3;
   background-image:
-    repeating-linear-gradient(
-      45deg,
+    repeating-linear-gradient(45deg,
       rgba(120, 160, 255, 0.25) 0px,
       rgba(120, 160, 255, 0.25) 2px,
       transparent 2px,
-      transparent 80px
-    ),
-    repeating-linear-gradient(
-      -45deg,
+      transparent 80px),
+    repeating-linear-gradient(-45deg,
       rgba(120, 160, 255, 0.25) 0px,
       rgba(120, 160, 255, 0.25) 2px,
       transparent 2px,
-      transparent 60px
-    );
+      transparent 60px);
   display: flex;
   justify-content: space-evenly;
   align-items: center;

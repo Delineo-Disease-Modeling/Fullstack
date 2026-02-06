@@ -74,7 +74,7 @@ const teamData = {
 export default function Team() {
   const renderTeamSection = (team, teamName) => (
     <div className="team" data-aos="fade-up" data-aos-once="true">
-      <header className="teamheader">{teamName}</header>
+      <h1 className="teamheader">{teamName}</h1>
       {team.map((member) => (
         <div className="member" key={member.name}>
           <img

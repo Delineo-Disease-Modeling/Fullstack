@@ -1,59 +1,46 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMapEvents
-} from 'react-leaflet';
+import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/maplibre';
+import maplibregl from 'maplibre-gl';
 import axios from 'axios';
 import { useSession } from '../lib/auth-client';
 
-
-
-import 'leaflet/dist/leaflet.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import './cz-generation.css';
 
 function InteractiveMap({ onLocationSelect, disabled }) {
   const [markerPosition, setMarkerPosition] = useState(null);
 
-  function LocationMarker() {
-    useMapEvents({
-      click(e) {
-        if (disabled) {
-          return;
-        }
-
-        setMarkerPosition(e.latlng);
-        const coords = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-        onLocationSelect(coords);
-      }
-    });
-
-    return markerPosition === null ? null : (
-      <Marker position={markerPosition}>
-        <Popup>
-          Selected Location: {markerPosition.lat.toFixed(4)},{' '}
-          {markerPosition.lng.toFixed(4)}
-        </Popup>
-      </Marker>
-    );
-  }
-
   return (
-    <MapContainer
-      center={[39.3290708, -76.6219753]}
-      zoom={10}
-      style={{ height: '100%', width: '100%' }}
+    <Map
+      mapLib={maplibregl}
+      initialViewState={{
+        longitude: -76.6219753,
+        latitude: 39.3290708,
+        zoom: 10
+      }}
+      style={{ width: '100%', height: '100%' }}
+      mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+      onClick={(e) => {
+        if (disabled) return;
+        const { lng, lat } = e.lngLat;
+        setMarkerPosition({ lat, lng });
+        const coords = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        onLocationSelect(coords);
+      }}
     >
-      <TileLayer
-        attribution="&copy; OpenStreetMap contributors"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <NavigationControl position="top-left" />
 
-      <LocationMarker />
-    </MapContainer>
+      {markerPosition && (
+        <>
+          <Marker
+            longitude={markerPosition.lng}
+            latitude={markerPosition.lat}
+            color="red"
+          />
+        </>
+      )}
+    </Map>
   );
 }
 
@@ -192,15 +179,15 @@ export default function CZGeneration() {
 
   return (
     <div className="flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]">
-      <header className="mt-28 text-3xl mx-8 text-wrap text-center">
+      <h1 className="mt-28 text-3xl mx-8 text-wrap text-center">
         Convenience Zone Creation
-      </header>
+      </h1>
 
       <form
         action={generateCZ}
         className="flex flex-col gap-8 mb-28 items-center"
       >
-        <div className="flex justify-center items-start gap-10 flex-wrap mx-4">
+        <div className="flex justify-center items-center gap-10 flex-wrap-reverse mx-4">
           <div className="flex flex-col gap-4 items-stretch">
             <FormField
               label="City, Address, or Location"
