@@ -18,9 +18,12 @@ const app = new Hono();
 
 app.use('*', trimTrailingSlash());
 app.use('*', auth);
-app.use('*', bodyLimit({
-  maxSize: 20 * 1024 * 1024 * 1024
-}));
+app.use(
+  '*',
+  bodyLimit({
+    maxSize: 20 * 1024 * 1024 * 1024
+  })
+);
 
 app.use(
   '*',
@@ -33,7 +36,12 @@ app.use(
       'http://covidweb.isi.jhu.edu'
     ],
     allowMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-    allowHeaders: ['Content-Type', 'Authorization', 'Upgrade-Insecure-Requests', 'Content-Length'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Upgrade-Insecure-Requests',
+      'Content-Length'
+    ],
     exposeHeaders: ['Set-Cookie', 'Content-Length'],
     credentials: true
   })

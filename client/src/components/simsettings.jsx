@@ -1,7 +1,12 @@
 import CzDict from './czdict';
 import useSimSettings from '../stores/simsettings';
 import InterventionTimeline from './intervention-timeline';
-import { SimParameter, SimBoolean, SimFile, SimRunSelector } from './settings-components';
+import {
+  SimParameter,
+  SimBoolean,
+  SimFile,
+  SimRunSelector
+} from './settings-components';
 
 import './simsettings.css';
 
@@ -10,8 +15,8 @@ export default function SimSettings({ sendData }) {
   const setSettings = useSimSettings((state) => state.setSettings);
 
   return (
-    <div className='simset_settings'>
-      <div className='simset_params'>
+    <div className="simset_settings">
+      <div className="simset_params">
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
         <CzDict
           zone={settings.zone}
@@ -25,15 +30,15 @@ export default function SimSettings({ sendData }) {
           min={24}
           max={settings.zone?.length ?? 168}
           percent={false}
-          units=' hours'
+          units=" hours"
         />
-        <SimBoolean 
+        <SimBoolean
           label={'Random Seed'}
           value={settings.randseed}
           callback={(randseed) => setSettings({ randseed })}
         />
         {/* <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/> */}
-        <SimFile 
+        <SimFile
           label={'Custom DMP Matrix Files'}
           // callback={setCustomFiles}
           callback={console.log}
@@ -53,9 +58,9 @@ export default function SimSettings({ sendData }) {
         sim_id={settings.sim_id}
         callback={(sim_id) => setSettings({ sim_id })}
       />
-      
+
       <button
-        className='simset_button w-32'
+        className="simset_button w-32"
         onClick={() => {
           if (!settings.zone?.ready) {
             alert('Please pick a valid convenience zone first!');

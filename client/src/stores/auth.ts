@@ -45,7 +45,7 @@ const useAuth = create(
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(formdata),
+          body: JSON.stringify(formdata)
         });
 
         const json = await res.json();
@@ -61,7 +61,7 @@ const useAuth = create(
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
-          },
+          }
         });
 
         const json = await res.json();
@@ -77,7 +77,7 @@ const useAuth = create(
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
-          },
+          }
         });
 
         if (!res.ok) {
@@ -86,10 +86,9 @@ const useAuth = create(
       }
     }),
     {
-      name: 'user',
+      name: 'user'
     }
   )
 );
-
 
 export default useAuth;

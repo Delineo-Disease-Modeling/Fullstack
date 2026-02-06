@@ -6,7 +6,7 @@ import 'aos/dist/aos.css';
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 
-import Navbar from './components/navbar.jsx'
+import Navbar from './components/navbar.jsx';
 import Footer from './components/footer.jsx';
 
 import Home from './pages/home.jsx';
@@ -25,17 +25,17 @@ function App() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [ pathname ]);
+  }, [pathname]);
 
   return (
     <div>
       <Navbar />
       <Routes>
-        <Route path='/' element={<Home />} />
-        <Route path='/simulator' element={<Simulator />} />
-        <Route path='/cz-generation' element={<CZGeneration />} />
-        <Route path='/team' element={<Team />} />
-        <Route path='/about' element={<About />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/simulator" element={<Simulator />} />
+        <Route path="/cz-generation" element={<CZGeneration />} />
+        <Route path="/team" element={<Team />} />
+        <Route path="/about" element={<About />} />
       </Routes>
       <Footer />
     </div>

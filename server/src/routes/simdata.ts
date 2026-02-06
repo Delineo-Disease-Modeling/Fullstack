@@ -1,15 +1,15 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
-import { PrismaClient } from "@prisma/client";
-import { saveFileStream } from "../lib/filestream.js";
-import { DB_FOLDER } from "../env.js";
-import StreamObject from "stream-json/streamers/StreamObject.js";
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { PrismaClient } from '@prisma/client';
+import { saveFileStream } from '../lib/filestream.js';
+import { DB_FOLDER } from '../env.js';
+import StreamObject from 'stream-json/streamers/StreamObject.js';
 import parser from 'stream-json';
-import { createReadStream } from "fs";
-import { unlink } from "fs/promises";
-import chain from "stream-chain";
-import { HTTPException } from "hono/http-exception";
+import { createReadStream } from 'fs';
+import { unlink } from 'fs/promises';
+import chain from 'stream-chain';
+import { HTTPException } from 'hono/http-exception';
 
 const simdata_route = new Hono();
 const prisma = new PrismaClient();
@@ -29,7 +29,7 @@ const getChartParamSchema = z.object({
 });
 
 const getChartQuerySchema = z.object({
-  loc_type: z.enum([ 'homes', 'places' ]).optional(),
+  loc_type: z.enum(['homes', 'places']).optional(),
   loc_id: z.string().nonempty().optional()
 });
 
@@ -69,18 +69,18 @@ async function getSimData(id: number) {
     [time: string]: {
       homes: {
         [id: string]: {
-          population: number,
-          infected: number
-        }
-      },
+          population: number;
+          infected: number;
+        };
+      };
       places: {
         [id: string]: {
-          population: number,
-          infected: number
-        }
-      }
-    }
-  }
+          population: number;
+          infected: number;
+        };
+      };
+    };
+  };
 
   const data: SimData = {};
 
@@ -110,21 +110,33 @@ async function getSimData(id: number) {
     const svalue = spl.value.value;
     const pvalue = ppl.value.value;
 
-    data[skey] = {'homes': {}, 'places': {}};
+    data[skey] = { homes: {}, places: {} };
 
-    const curinfected = [...new Set(Object.values(svalue).map((people) => Object.keys(people as any)).flat())];
+    const curinfected = [
+      ...new Set(
+        Object.values(svalue)
+          .map((people) => Object.keys(people as any))
+          .flat()
+      )
+    ];
 
-    for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
+    for (const [id, pop] of Object.entries(pvalue['homes']) as [
+      string,
+      string[]
+    ][]) {
       data[skey]['homes'][id] = {
         population: pop.length,
-        infected: pop.filter(v => curinfected.includes(v)).length
+        infected: pop.filter((v) => curinfected.includes(v)).length
       };
     }
 
-    for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
+    for (const [id, pop] of Object.entries(pvalue['places']) as [
+      string,
+      string[]
+    ][]) {
       data[skey]['places'][id] = {
         population: pop.length,
-        infected: pop.filter(v => curinfected.includes(v)).length
+        infected: pop.filter((v) => curinfected.includes(v)).length
       };
     }
 
@@ -149,7 +161,7 @@ simdata_route.post(
 
     await Promise.all([
       saveFileStream(simdata, DB_FOLDER + simdata_obj.simdata),
-      saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns),
+      saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns)
     ]);
 
     return c.json({
@@ -243,15 +255,16 @@ simdata_route.get(
     const data = await getSimData(id);
 
     return c.json({
-      'data': {
-        'simdata': data,
+      data: {
+        simdata: data,
         name: simdata.name
       }
     });
   }
 );
 
-simdata_route.get('/simdata/cache/:czone_id',
+simdata_route.get(
+  '/simdata/cache/:czone_id',
   zValidator('param', getSimDataCacheSchema),
   async (c) => {
     const { czone_id } = c.req.valid('param');
@@ -277,9 +290,9 @@ simdata_route.get('/simdata/cache/:czone_id',
 
     return c.json({
       data: czone.simdata.map((simdata) => ({
-        'name': simdata.name,
-        'created_at': simdata.created_at,
-        'sim_id': simdata.id
+        name: simdata.name,
+        created_at: simdata.created_at,
+        sim_id: simdata.id
       }))
     });
   }
@@ -294,13 +307,13 @@ const age_ranges = [
 ];
 
 const infection_states = {
-  'Susceptible': 0,
-  'Infected': 1,
-  'Infectious': 2,
-  'Symptomatic': 4,
-  'Hospitalized': 8,
-  'Recovered': 16,
-  'Removed': 32
+  Susceptible: 0,
+  Infected: 1,
+  Infectious: 2,
+  Symptomatic: 4,
+  Hospitalized: 8,
+  Recovered: 16,
+  Removed: 32
 };
 
 async function getPapData(czone_id: number) {
@@ -350,7 +363,7 @@ simdata_route.get(
     const papdata = await getPapData(simdata.czone_id);
 
     type DataPoint = {
-      time: number,
+      time: number;
       [key: string]: number;
     };
 
@@ -359,10 +372,10 @@ simdata_route.get(
     };
 
     const data: ChartData = {
-      'iot': [],
-      'ages': [],
-      'sexes': [],
-      'states': []
+      iot: [],
+      ages: [],
+      sexes: [],
+      states: []
     };
 
     const simdatapl = chain([
@@ -427,18 +440,29 @@ simdata_route.get(
         for (const disease of Object.keys(svalue) as string[]) {
           iot_data[disease] = 0;
         }
-        
-        for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
-          infected_list[disease] = Object.fromEntries(Object.entries(people)
-            .filter(([k, v]) => pvalue[loc_type][loc_id]?.includes(k)));
+
+        for (const [disease, people] of Object.entries(svalue) as [
+          string,
+          object
+        ][]) {
+          infected_list[disease] = Object.fromEntries(
+            Object.entries(people).filter(([k, v]) =>
+              pvalue[loc_type][loc_id]?.includes(k)
+            )
+          );
         }
       }
 
-      for (const [disease, people] of Object.entries(infected_list) as [string, object][]) {
+      for (const [disease, people] of Object.entries(infected_list) as [
+        string,
+        object
+      ][]) {
         iot_data[disease] = Object.keys(people).length;
 
         for (const [state, value] of Object.entries(infection_states)) {
-          states_data[state] += Object.values(people).filter((s) => s & value).length;
+          states_data[state] += Object.values(people).filter(
+            (s) => s & value
+          ).length;
         }
 
         Object.keys(people).forEach((id) => {
@@ -447,7 +471,10 @@ simdata_route.get(
           sexes_data[person_data['sex'] == 0 ? 'Male' : 'Female'] += 1;
 
           for (const range of age_ranges) {
-            if (person_data['age'] >= range[0] && person_data['age'] <= range[1]) {
+            if (
+              person_data['age'] >= range[0] &&
+              person_data['age'] <= range[1]
+            ) {
               ages_data[range.join('-')] += 1;
             }
           }

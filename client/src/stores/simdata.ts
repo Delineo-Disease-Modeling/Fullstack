@@ -1,36 +1,36 @@
 import { create } from 'zustand';
 
 type SimData = {
-  [ time: number ]: {
-    [ variant: string ] : {
-      [ person_id: number ]: number;
-    }
-  }
+  [time: number]: {
+    [variant: string]: {
+      [person_id: number]: number;
+    };
+  };
 };
 
 type MovePatterns = {
-  [ time: number ]: {
-    homes: { [ id: number ]: string[]; }
-    places: { [ id: number ]: string[]; }
-  } 
+  [time: number]: {
+    homes: { [id: number]: string[] };
+    places: { [id: number]: string[] };
+  };
 };
 
 type PapData = {
   people: {
-    [ id: number ]: {
+    [id: number]: {
       sex: number;
       age: number;
       home: string;
     };
   };
   homes: {
-    [ id: number ]: {
+    [id: number]: {
       cbg: string;
       members: number;
     };
   };
   places: {
-    [ id: number ]: {
+    [id: number]: {
       placekey: string;
       label: string;
       latitude: number;
@@ -53,35 +53,35 @@ interface SimDataStore {
   setPapData: (papdata: PapData) => void;
 }
 
-const useSimData = create<SimDataStore>(
-  (set) => ({
-    name: '',
-    simdata: null,
-    patterns: null,
-    papdata: null,
+const useSimData = create<SimDataStore>((set) => ({
+  name: '',
+  simdata: null,
+  patterns: null,
+  papdata: null,
 
-    setName: (name) => {
-      set({ name });
-    },
+  setName: (name) => {
+    set({ name });
+  },
 
-    setSimData: (newSimData) => {
-      if (newSimData === null) {
-        set({ simdata: null });
-        return;
-      }
-      set((state) => ({
-        simdata: state.simdata ? { ...state.simdata, ...newSimData } : (newSimData as SimData)
-      }));
-    },
-
-    setPatterns: (patterns) => {
-      set({ patterns });
-    },
-
-    setPapData: (papdata) => {
-      set({ papdata });
+  setSimData: (newSimData) => {
+    if (newSimData === null) {
+      set({ simdata: null });
+      return;
     }
-  })
-);
+    set((state) => ({
+      simdata: state.simdata
+        ? { ...state.simdata, ...newSimData }
+        : (newSimData as SimData)
+    }));
+  },
+
+  setPatterns: (patterns) => {
+    set({ patterns });
+  },
+
+  setPapData: (papdata) => {
+    set({ papdata });
+  }
+}));
 
 export default useSimData;

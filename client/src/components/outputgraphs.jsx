@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { DB_URL } from '../env';
 import {
   LineChart,
-  Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer
 } from 'recharts';
 import { CustomTooltip } from './customtooltip';
@@ -10,7 +15,14 @@ import useSimSettings from '../stores/simsettings';
 
 import './outputgraphs.css';
 
-const COLORS = ["#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "#ff954f", "#4fd0ff"];
+const COLORS = [
+  '#8884d8',
+  '#82ca9d',
+  '#d54df7',
+  '#ffdc4f',
+  '#ff954f',
+  '#4fd0ff'
+];
 
 export default function OutputGraphs({ selected_loc, onReset }) {
   const settings = useSimSettings((state) => state.settings);
@@ -50,11 +62,11 @@ export default function OutputGraphs({ selected_loc, onReset }) {
   }, [settings.sim_id, selected_loc]);
 
   return (
-    <div className='outputgraphs_container'>
-      <div className='p-2.5'>
+    <div className="outputgraphs_container">
+      <div className="p-2.5">
         <label>Select Chart Type: </label>
         <select
-          className='px-1 outline-2 outline-solid bg-[#fffff2] outline-[#70B4D4]'
+          className="px-1 outline-2 outline-solid bg-[#fffff2] outline-[#70B4D4]"
           value={chartType}
           onChange={(e) => setChartType(e.target.value)}
         >
@@ -66,8 +78,8 @@ export default function OutputGraphs({ selected_loc, onReset }) {
       </div>
 
       {/* Chart Areas */}
-      <div className='relative outputgraph_chart'>
-        <h6 className='text-center font-bold pb-4'>
+      <div className="relative outputgraph_chart">
+        <h6 className="text-center font-bold pb-4">
           Infection Distribution Over Time
           {selected_loc && <span> for {selected_loc.label}</span>}
         </h6>
@@ -77,16 +89,33 @@ export default function OutputGraphs({ selected_loc, onReset }) {
             {/* <p className="mt-2 text-sm">Try selecting another location or generating a new simulation.</p> */}
           </div>
         ) : (
-          <ResponsiveContainer width='100%' height='100%'>
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData[chartType]}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis label={{ value: 'Time (h)', position: 'bottom' }} type="number" dataKey="time" tickCount={20} />
-              <YAxis label={{ value: 'Total', angle: -90, position: 'insideLeft' }} />
+              <XAxis
+                label={{ value: 'Time (h)', position: 'bottom' }}
+                type="number"
+                dataKey="time"
+                tickCount={20}
+              />
+              <YAxis
+                label={{ value: 'Total', angle: -90, position: 'insideLeft' }}
+              />
               <Tooltip content={CustomTooltip} />
-              <Legend wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }} />
-              {Object.keys(chartData[chartType][0]).filter((key) => key !== 'time').map((key, index) => (
-                <Line type="monotone" key={key} dataKey={key} stroke={COLORS[index % COLORS.length]} dot={false} />
-              ))}
+              <Legend
+                wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }}
+              />
+              {Object.keys(chartData[chartType][0])
+                .filter((key) => key !== 'time')
+                .map((key, index) => (
+                  <Line
+                    type="monotone"
+                    key={key}
+                    dataKey={key}
+                    stroke={COLORS[index % COLORS.length]}
+                    dot={false}
+                  />
+                ))}
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -94,7 +123,10 @@ export default function OutputGraphs({ selected_loc, onReset }) {
 
       {selected_loc && (
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <button onClick={onReset} className="px-4 py-2 mt-4 text-white bg-red-500 rounded-sm hover:bg-red-600">
+          <button
+            onClick={onReset}
+            className="px-4 py-2 mt-4 text-white bg-red-500 rounded-sm hover:bg-red-600"
+          >
             Reset Selection
           </button>
         </div>

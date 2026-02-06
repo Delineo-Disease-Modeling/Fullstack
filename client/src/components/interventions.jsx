@@ -1,4 +1,4 @@
-import useSimSettings from "../stores/simsettings";
+import useSimSettings from '../stores/simsettings';
 import { SimParameter } from './settings-components';
 
 export default function Interventions({ time }) {
@@ -12,7 +12,7 @@ export default function Interventions({ time }) {
   }
 
   return (
-    <div className='flex flex-wrap max-w-[90vw] justify-center gap-8'>
+    <div className="flex flex-wrap max-w-[90vw] justify-center gap-8">
       <SimParameter
         label={'Percent Masking'}
         value={interventions.mask}

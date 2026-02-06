@@ -1,7 +1,10 @@
 import { sha256 } from '@oslojs/crypto/sha2';
 import { setCookie } from 'hono/cookie';
 import { PrismaClient, type Session, type User } from '@prisma/client';
-import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from '@oslojs/encoding';
+import {
+  encodeBase32LowerCaseNoPadding,
+  encodeHexLowerCase
+} from '@oslojs/encoding';
 import type { Context } from 'hono';
 
 const prisma = new PrismaClient();
@@ -23,14 +26,14 @@ export async function createSession(
       id: sessionId,
       user_id: userId
     }
-  })
+  });
 
   return session;
 }
 
 export async function validateSessionToken(
   token: string
-): Promise<Session & { user: User } | null> {
+): Promise<(Session & { user: User }) | null> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 
   const session = await prisma.session.findUnique({
@@ -67,10 +70,7 @@ export async function invalidateSession(sessionId: string): Promise<void> {
   });
 }
 
-export function setSessionTokenCookie(
-  context: Context,
-  token: string,
-): void {
+export function setSessionTokenCookie(context: Context, token: string): void {
   setCookie(context, 'session', token, {
     httpOnly: true,
     sameSite: 'none',

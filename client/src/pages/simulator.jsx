@@ -78,7 +78,8 @@ export default function Simulator() {
       }
     }
 
-    axios.post(`${SIM_URL}simulation/`, reqbody)
+    axios
+      .post(`${SIM_URL}simulation/`, reqbody)
       .then(({ status, data }) => {
         if (status !== 200) {
           throw new Error('Status code mismatch');
@@ -86,7 +87,8 @@ export default function Simulator() {
 
         setSettings({ sim_id: data['data']['id'] });
 
-        axios.get(`${DB_URL}simdata/${data['data']['id']}`)
+        axios
+          .get(`${DB_URL}simdata/${data['data']['id']}`)
           .then(({ status, data }) => {
             if (status !== 200) {
               throw new Error('Status code mismatch');
@@ -139,28 +141,35 @@ export default function Simulator() {
 
   return (
     <div>
-      <div className='sim_container'>
+      <div className="sim_container">
         {!showSim ? (
-          <div className='sim_settings px-4'>
+          <div className="sim_settings px-4">
             <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
             <SimSettings sendData={sendSimulatorData} />
           </div>
         ) : !simdata || !papdata ? (
           <div>Loading simulation data...</div>
         ) : (
-          <div className='sim_output px-4'>
+          <div className="sim_output px-4">
             <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
-            <div className='flex flex-col gap-4'>
-              <div className='flex items-center justify-between gap-4 text-center'>
-                <h2 className='text-xl font-semibold'>Convenience Zone: {selectedZone.name}</h2>
-                <p className='text-sm text-gray-600'>Created on: {new Date(selectedZone.created_at).toLocaleDateString()}</p>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 text-center">
+                <h2 className="text-xl font-semibold">
+                  Convenience Zone: {selectedZone.name}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Created on:{' '}
+                  {new Date(selectedZone.created_at).toLocaleDateString()}
+                </p>
               </div>
-              <div className='flex items-center justify-between gap-2'>
-                <div className='flex gap-2 items-center'>
-                  <label htmlFor='run-name' className='text-sm text-gray-700'>Run Name:</label>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex gap-2 items-center">
+                  <label htmlFor="run-name" className="text-sm text-gray-700">
+                    Run Name:
+                  </label>
                   <input
-                    id='run-name'
-                    type='text'
+                    id="run-name"
+                    type="text"
                     value={runName || ''}
                     onChange={(e) => setRunName(e.target.value)}
                     onBlur={handleRename}
@@ -170,17 +179,24 @@ export default function Simulator() {
                         e.currentTarget.blur();
                       }
                     }}
-                    className='rounded px-2 py-1 text-sm bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]'
-                    placeholder='Untitled Run'
+                    className="rounded px-2 py-1 text-sm bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]"
+                    placeholder="Untitled Run"
                   />
                 </div>
                 <button
                   onClick={async () => {
-                    if (window.confirm('Are you sure you want to delete this run? This action cannot be undone.')) {
+                    if (
+                      window.confirm(
+                        'Are you sure you want to delete this run? This action cannot be undone.'
+                      )
+                    ) {
                       try {
-                        const res = await fetch(`${DB_URL}simdata/${settings.sim_id}`, {
-                          method: 'DELETE'
-                        });
+                        const res = await fetch(
+                          `${DB_URL}simdata/${settings.sim_id}`,
+                          {
+                            method: 'DELETE'
+                          }
+                        );
 
                         if (!res.ok) {
                           throw new Error('Failed to delete');
@@ -201,7 +217,7 @@ export default function Simulator() {
                       }
                     }
                   }}
-                  className='bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded'
+                  className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded"
                 >
                   Delete Run
                 </button>
@@ -214,10 +230,7 @@ export default function Simulator() {
 
             <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
 
-            <OutputGraphs
-              selected_loc={selectedLoc}
-              onReset={onReset}
-            />
+            <OutputGraphs selected_loc={selectedLoc} onReset={onReset} />
           </div>
         )}
       </div>

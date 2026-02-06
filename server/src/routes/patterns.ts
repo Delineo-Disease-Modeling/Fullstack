@@ -1,14 +1,14 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
-import { PrismaClient } from "@prisma/client";
-import { streamText } from "hono/streaming";
-import { createReadStream } from "fs";
-import { DB_FOLDER } from "../env.js";
-import chain from "stream-chain";
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { PrismaClient } from '@prisma/client';
+import { streamText } from 'hono/streaming';
+import { createReadStream } from 'fs';
+import { DB_FOLDER } from '../env.js';
+import chain from 'stream-chain';
 import parser from 'stream-json';
-import StreamObject from "stream-json/streamers/StreamObject.js";
-import { saveFileStream } from "../lib/filestream.js";
+import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { saveFileStream } from '../lib/filestream.js';
 
 const patterns_route = new Hono();
 const prisma = new PrismaClient();
@@ -25,12 +25,12 @@ const getPatternsParamSchema = z.object({
 
 const getPatternsQuerySchema = z.object({
   length: z.coerce.number().positive().optional()
-})
+});
 
 patterns_route.post(
-  '/patterns', 
+  '/patterns',
   zValidator('form', postPatternsSchema),
-    async (c) => {
+  async (c) => {
     const { czone_id, patterns, papdata } = c.req.valid('form');
 
     const papdata_obj = await prisma.paPData.create({
@@ -48,7 +48,7 @@ patterns_route.post(
     // Write patterns/papdata info to file
     await Promise.all([
       saveFileStream(patterns, DB_FOLDER + patterns_obj.id),
-      saveFileStream(papdata, DB_FOLDER + papdata_obj.id),
+      saveFileStream(papdata, DB_FOLDER + papdata_obj.id)
     ]);
 
     return c.json({
@@ -113,7 +113,9 @@ patterns_route.get(
           continue;
         }
 
-        await stream.write(`${JSON.stringify({ patterns: { [key]: value }})}\n`);
+        await stream.write(
+          `${JSON.stringify({ patterns: { [key]: value } })}\n`
+        );
       }
 
       await stream.close();

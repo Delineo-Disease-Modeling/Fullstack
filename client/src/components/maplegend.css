@@ -4,16 +4,16 @@ div.modelmap_legend_div {
   background-color: #fffff2;
   margin: 10px;
   padding: 5px;
-  outline: 2px solid #70B4D4;
+  outline: 2px solid #70b4d4;
 
   overflow-y: scroll;
   overflow-x: hidden;
   font-size: 10px;
-  
+
   transition: all 0.25s ease-in-out;
 
   -ms-overflow-style: none;
-  scrollbar-width: none; 
+  scrollbar-width: none;
 }
 
 div.modelmap_legend_div::-webkit-scrollbar {

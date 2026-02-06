@@ -52,7 +52,7 @@ button.iv_timeline {
   padding: 0.25rem 2rem;
   text-wrap: nowrap;
   border-radius: var(--radius-lg);
-  color: #F0F0F0;
+  color: #f0f0f0;
 }
 
 button.iv_timeline:hover {

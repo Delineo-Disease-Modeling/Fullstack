@@ -1,7 +1,7 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
-import { GOOGLE_API_KEY } from "../env.js";
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { GOOGLE_API_KEY } from '../env.js';
 
 const lookup_route = new Hono();
 
@@ -19,15 +19,15 @@ interface GeocodeResponse {
     };
   }[];
   status: string;
-};
+}
 
 const postLookupZipSchema = z.object({
   location: z.string().nonempty()
 });
 
 lookup_route.post(
-  "/lookup-zip",
-  zValidator("json", postLookupZipSchema),
+  '/lookup-zip',
+  zValidator('json', postLookupZipSchema),
   async (c) => {
     const { location } = c.req.valid('json');
 
@@ -106,7 +106,7 @@ lookup_route.post(
         city: cityComponent ? cityComponent.long_name : ''
       });
     }
-  },
+  }
 );
 
 export default lookup_route;

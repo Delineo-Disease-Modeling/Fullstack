@@ -8,14 +8,18 @@ export default function InterventionTimeline() {
   const settings = useSimSettings((state) => state.settings);
   const addInterventions = useSimSettings((state) => state.addInterventions);
   const setInterventions = useSimSettings((state) => state.setInterventions);
-  const deleteInterventions = useSimSettings((state) => state.deleteInterventions);
+  const deleteInterventions = useSimSettings(
+    (state) => state.deleteInterventions
+  );
 
   const [values, setValues] = useState([0]);
   const [curtime, setCurtime] = useState(0);
 
   useEffect(() => {
-    const unused = Array.from({ length: settings.hours }, (_, i) => i + 1)
-      .filter((v) => !values.includes(v));
+    const unused = Array.from(
+      { length: settings.hours },
+      (_, i) => i + 1
+    ).filter((v) => !values.includes(v));
 
     for (let i = 0; i < values.length; i++) {
       if (values[i] > settings.hours) {
@@ -50,7 +54,7 @@ export default function InterventionTimeline() {
   };
 
   const deleteThumb = (i) => {
-    // Can't delete value 0 
+    // Can't delete value 0
     if (values[i] === 0) {
       return;
     }
@@ -64,7 +68,7 @@ export default function InterventionTimeline() {
     deleteInterventions(values[i]);
     setValues(() => next);
     setCurtime(() => next[next.length - 1]);
-  }
+  };
 
   const moveLeft = () => {
     if (curtime === values.sort()[0]) {
@@ -83,22 +87,21 @@ export default function InterventionTimeline() {
   };
 
   return (
-    <div className='flex flex-col w-full p-4 gap-4'>
+    <div className="flex flex-col w-full p-4 gap-4">
       {/* Timeline bar */}
       <div
-        className='relative flex items-center w-full h-6 select-none'
+        className="relative flex items-center w-full h-6 select-none"
         onDoubleClick={addThumb}
       >
         {/* Background slider */}
-        <div
-          className='absolute top-0 left-0 w-full h-2 bg-[#5D576B] rounded-md outline-0'
-        />
+        <div className="absolute top-0 left-0 w-full h-2 bg-[#5D576B] rounded-md outline-0" />
 
         {values.map((value, i) => (
           <input
             key={i}
-            className={'iv_timeline absolute top-0 left-0 w-full h-1.5 '
-              + (curtime === value ? 'current ' : '')
+            className={
+              'iv_timeline absolute top-0 left-0 w-full h-1.5 ' +
+              (curtime === value ? 'current ' : '')
             }
             type="range"
             min={0}
@@ -131,16 +134,16 @@ export default function InterventionTimeline() {
       </div>
 
       {/* Buttons */}
-      <div className='flex w-full items-center justify-center gap-2'>
+      <div className="flex w-full items-center justify-center gap-2">
         <button
-          className='iv_timeline bg-[#222629] disabled:bg-stone-600 px-4!'
+          className="iv_timeline bg-[#222629] disabled:bg-stone-600 px-4!"
           onClick={moveLeft}
         >
           &lt;
         </button>
         <div className={values.length <= 1 ? 'cursor-not-allowed' : ''}>
           <button
-            className='iv_timeline bg-red-400 disabled:bg-red-800'
+            className="iv_timeline bg-red-400 disabled:bg-red-800"
             onClick={() => deleteThumb(values.indexOf(curtime))}
             disabled={values.length <= 1}
           >
@@ -149,10 +152,12 @@ export default function InterventionTimeline() {
         </div>
         <div className={values.length >= 10 ? 'cursor-not-allowed' : ''}>
           <button
-            className='iv_timeline bg-[#222629] disabled:bg-stone-600'
+            className="iv_timeline bg-[#222629] disabled:bg-stone-600"
             onClick={() => {
-              const newvalue = Array.from({ length: settings.hours }, (_, i) => i + 1)
-                .filter((v) => !values.includes(v))[0];
+              const newvalue = Array.from(
+                { length: settings.hours },
+                (_, i) => i + 1
+              ).filter((v) => !values.includes(v))[0];
 
               addInterventions(newvalue);
               setValues((cur) => [...cur, newvalue]);
@@ -164,7 +169,7 @@ export default function InterventionTimeline() {
           </button>
         </div>
         <button
-          className='iv_timeline bg-[#222629] disabled:bg-stone-600 px-4!'
+          className="iv_timeline bg-[#222629] disabled:bg-stone-600 px-4!"
           onClick={moveRight}
         >
           &gt;
@@ -172,19 +177,24 @@ export default function InterventionTimeline() {
       </div>
 
       {/* Information & Buttons*/}
-      <div className='flex flex-col gap-4'>
-        <h4 className='text-center text-lg'>
-          Intervention #{values.findIndex((v) => v === curtime) + 1} - Hour #{curtime.toString().padStart(3, '0')}
+      <div className="flex flex-col gap-4">
+        <h4 className="text-center text-lg">
+          Intervention #{values.findIndex((v) => v === curtime) + 1} - Hour #
+          {curtime.toString().padStart(3, '0')}
         </h4>
-        <h4 className='text-center text-lg'>
-          {settings.zone && new Date(new Date(settings.zone.start_date).getTime() + curtime * 60 * 60 * 1000).toLocaleString('en-US', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-            weekday: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
+        <h4 className="text-center text-lg">
+          {settings.zone &&
+            new Date(
+              new Date(settings.zone.start_date).getTime() +
+                curtime * 60 * 60 * 1000
+            ).toLocaleString('en-US', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              weekday: 'short',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
         </h4>
       </div>
 

@@ -8,9 +8,9 @@ function Shape() {
   const t = Math.floor(Math.random() * 10) + 10;
   const d = Math.floor(Math.random() * (t + 1));
 
-  const hue = Math.floor(Math.random() * 10);        
-  const saturation = Math.floor(Math.random() * 25) + 60; 
-  const lightness = Math.floor(Math.random() * 20) + 45; 
+  const hue = Math.floor(Math.random() * 10);
+  const saturation = Math.floor(Math.random() * 25) + 60;
+  const lightness = Math.floor(Math.random() * 20) + 45;
 
   const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 
@@ -23,26 +23,20 @@ function Shape() {
     animationDelay: `${-d}s`
   };
 
-  return (
-    <span className='home_shape' style={shapeStyle}></span>
-  );
+  return <span className="home_shape" style={shapeStyle}></span>;
 }
 
 export default function Shapes() {
-  const [ shapes, setShapes ] = useState([]);
+  const [shapes, setShapes] = useState([]);
   const called = useRef(false); // StrictMode calls useEffect twice in dev mode
 
   useEffect(() => {
     if (called.current) return;
     for (let i = 0; i < 14; i++) {
-      setShapes(x => [...x, <Shape key={i}/>]);
+      setShapes((x) => [...x, <Shape key={i} />]);
     }
     called.current = true;
   }, []);
 
-  return (
-    <div className='home_shapes'>
-      {shapes}
-    </div>
-  );
+  return <div className="home_shapes">{shapes}</div>;
 }

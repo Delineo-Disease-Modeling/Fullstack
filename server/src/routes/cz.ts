@@ -1,7 +1,7 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
-import { PrismaClient } from "@prisma/client";
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { PrismaClient } from '@prisma/client';
 
 const cz_route = new Hono();
 
@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 const getConvZonesSchema = z.object({
   user_id: z.string().optional()
-})
+});
 
 const postConvZonesSchema = z.object({
   name: z.string().nonempty(),
@@ -27,37 +27,50 @@ const deleteConvZonesSchema = z.object({
   czone_id: z.coerce.number().nonnegative()
 });
 
-cz_route.get('/convenience-zones', zValidator('query', getConvZonesSchema), async (c) => {
-  const { user_id } = c.req.valid('query');
+cz_route.get(
+  '/convenience-zones',
+  zValidator('query', getConvZonesSchema),
+  async (c) => {
+    const { user_id } = c.req.valid('query');
 
-  const zones = await prisma.convenienceZone.findMany({
-    include: {
-      papdata: {
-        select: {
-          id: true
+    const zones = await prisma.convenienceZone.findMany({
+      include: {
+        papdata: {
+          select: {
+            id: true
+          }
         }
+      },
+      where: {
+        user_id
       }
-    },
-    where: {
-      user_id
-    }
-  });
+    });
 
-  return c.json({
-    data: zones.map((zone: any) => ({
-      ...zone,
-      papdata: undefined,
-      ready: !!zone.papdata
-    }))
-  });
-});
+    return c.json({
+      data: zones.map((zone: any) => ({
+        ...zone,
+        papdata: undefined,
+        ready: !!zone.papdata
+      }))
+    });
+  }
+);
 
 cz_route.post(
   '/convenience-zones',
   zValidator('json', postConvZonesSchema),
   async (c) => {
-    const { name, description, latitude, longitude, cbg_list, start_date, length, size, user_id } =
-      c.req.valid('json');
+    const {
+      name,
+      description,
+      latitude,
+      longitude,
+      cbg_list,
+      start_date,
+      length,
+      size,
+      user_id
+    } = c.req.valid('json');
 
     const zone = await prisma.convenienceZone.create({
       data: {

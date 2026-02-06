@@ -1,9 +1,15 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import { ALG_URL, DB_URL } from "../env";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMapEvents
+} from 'react-leaflet';
+import { ALG_URL, DB_URL } from '../env';
 import axios from 'axios';
-import useAuth from "../stores/auth";
+import useAuth from '../stores/auth';
 
 import zip_cbg_json from '../data/zip_to_cbg.json';
 
@@ -11,7 +17,7 @@ import 'leaflet/dist/leaflet.css';
 import './cz-generation.css';
 
 function InteractiveMap({ onLocationSelect, disabled }) {
-  const [ markerPosition, setMarkerPosition ] = useState(null);
+  const [markerPosition, setMarkerPosition] = useState(null);
 
   function LocationMarker() {
     useMapEvents({
@@ -29,7 +35,8 @@ function InteractiveMap({ onLocationSelect, disabled }) {
     return markerPosition === null ? null : (
       <Marker position={markerPosition}>
         <Popup>
-          Selected Location: {markerPosition.lat.toFixed(4)}, {markerPosition.lng.toFixed(4)}
+          Selected Location: {markerPosition.lat.toFixed(4)},{' '}
+          {markerPosition.lng.toFixed(4)}
         </Popup>
       </Marker>
     );
@@ -39,10 +46,10 @@ function InteractiveMap({ onLocationSelect, disabled }) {
     <MapContainer
       center={[39.3290708, -76.6219753]}
       zoom={10}
-      style={{ height: '100%', width: '100%'}}
+      style={{ height: '100%', width: '100%' }}
     >
       <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
+        attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
@@ -51,13 +58,24 @@ function InteractiveMap({ onLocationSelect, disabled }) {
   );
 }
 
-function FormField({ label, name, type, placeholder, defaultValue, disabled, value, onChange, min, max }) {
+function FormField({
+  label,
+  name,
+  type,
+  placeholder,
+  defaultValue,
+  disabled,
+  value,
+  onChange,
+  min,
+  max
+}) {
   return (
-    <div className='flex flex-col gap-0.5'>
+    <div className="flex flex-col gap-0.5">
       <label htmlFor={name}>{label}</label>
       {type === 'textarea' ? (
         <textarea
-          className='formfield'
+          className="formfield"
           name={name}
           id={name}
           type={type}
@@ -67,9 +85,9 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
           onChange={onChange}
           required
         />
-      ): (
+      ) : (
         <input
-          className='formfield'
+          className="formfield"
           name={name}
           id={name}
           type={type}
@@ -91,13 +109,15 @@ export default function CZGeneration() {
   const navigate = useNavigate();
   const user = useAuth((state) => state.user);
 
-  const [ location, setLocation ] = useState('');
-  const [ minPop, setMinPop ] = useState(5000);
-  const [ startDate, setStartDate ] = useState(new Date().toISOString().slice(0, 10));
-  const [ length, setLength ] = useState(15);
-  const [ description, setDescription ] = useState('');
-  const [ iframeHTML, setIframeHTML ] = useState();
-  const [ loading, setLoading ] = useState(false);
+  const [location, setLocation] = useState('');
+  const [minPop, setMinPop] = useState(5000);
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [length, setLength] = useState(15);
+  const [description, setDescription] = useState('');
+  const [iframeHTML, setIframeHTML] = useState();
+  const [loading, setLoading] = useState(false);
 
   if (!user) {
     navigate('/simulator');
@@ -126,15 +146,17 @@ export default function CZGeneration() {
   const generateCZ = (formdata) => {
     const func_body = async (formdata) => {
       console.log(formdata);
-  
+
       const location = await loc_lookup(formdata.get('location'));
-      const core_cbg = zip_to_cbg(location?.['zip_code'] ?? formdata.get('location'));
-  
+      const core_cbg = zip_to_cbg(
+        location?.['zip_code'] ?? formdata.get('location')
+      );
+
       if (!core_cbg) {
         console.error('Could not find location');
         return;
       }
-  
+
       console.log(location);
       console.log(core_cbg);
 
@@ -143,7 +165,7 @@ export default function CZGeneration() {
         description: formdata.get('description'),
         cbg: core_cbg,
         start_date: new Date(formdata.get('start_date')).toISOString(),
-        length: +formdata.get('length') * 24,     // Days turn to hours
+        length: +formdata.get('length') * 24, // Days turn to hours
         min_pop: +formdata.get('min_pop'),
         user_id: user.id
       });
@@ -167,77 +189,80 @@ export default function CZGeneration() {
     func_body(formdata)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }
+  };
 
   return (
-    <div className='flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]'>
-      <header className='mt-28 text-3xl mx-8 text-wrap text-center'>
+    <div className="flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]">
+      <header className="mt-28 text-3xl mx-8 text-wrap text-center">
         Convenience Zone Creation
       </header>
 
-        <form action={generateCZ} className='flex flex-col gap-8 mb-28 items-center'>
-          <div className='flex justify-center items-start gap-10 flex-wrap mx-4'>
-            <div className='flex flex-col gap-4 items-stretch'>
-              <FormField 
-                label='City, Address, or Location'
-                name='location'
-                type='text'
-                placeholder='e.g. 55902'
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                disabled={loading || !!iframeHTML}
-              />
+      <form
+        action={generateCZ}
+        className="flex flex-col gap-8 mb-28 items-center"
+      >
+        <div className="flex justify-center items-start gap-10 flex-wrap mx-4">
+          <div className="flex flex-col gap-4 items-stretch">
+            <FormField
+              label="City, Address, or Location"
+              name="location"
+              type="text"
+              placeholder="e.g. 55902"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              disabled={loading || !!iframeHTML}
+            />
 
-              <FormField 
-                label='Minimum Population'
-                name='min_pop'
-                type='number'
-                value={minPop}
-                min={100}
-                max={100_000}
-                onChange={(e) => setMinPop(e.target.value)}
-                disabled={loading || !!iframeHTML}
-              />
+            <FormField
+              label="Minimum Population"
+              name="min_pop"
+              type="number"
+              value={minPop}
+              min={100}
+              max={100_000}
+              onChange={(e) => setMinPop(e.target.value)}
+              disabled={loading || !!iframeHTML}
+            />
 
-              <FormField 
-                label='Start Date'
-                name='start_date'
-                type='date'
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={loading || !!iframeHTML}
-              />
+            <FormField
+              label="Start Date"
+              name="start_date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              disabled={loading || !!iframeHTML}
+            />
 
-              <FormField 
-                label='Length (days)'
-                name='length'
-                type='number'
-                value={length}
-                min={7}
-                max={365}
-                onChange={(e) => setLength(e.target.value)}
-                disabled={loading || !!iframeHTML}
-              />
+            <FormField
+              label="Length (days)"
+              name="length"
+              type="number"
+              value={length}
+              min={7}
+              max={365}
+              onChange={(e) => setLength(e.target.value)}
+              disabled={loading || !!iframeHTML}
+            />
 
-              <FormField
-                label='Description'
-                name='description'
-                type='textarea'
-                placeholder='a short description for this convenience zone...'
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={loading || !!iframeHTML}
-              />
-            </div>
+            <FormField
+              label="Description"
+              name="description"
+              type="textarea"
+              placeholder="a short description for this convenience zone..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={loading || !!iframeHTML}
+            />
+          </div>
 
           {iframeHTML ? (
             <iframe
               srcDoc={iframeHTML}
-              title='Generated Convenience Zone'
-              className='h-72 w-140 max-w-[85vw]'
+              title="Generated Convenience Zone"
+              className="h-72 w-140 max-w-[85vw]"
             />
           ) : (
-            <div className='h-72 w-140 max-w-[85vw]'>
+            <div className="h-72 w-140 max-w-[85vw]">
               <InteractiveMap
                 onLocationSelect={setLocation}
                 disabled={loading}
@@ -250,7 +275,7 @@ export default function CZGeneration() {
           value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
           onClick={() => iframeHTML && navigate('/simulator')}
           disabled={loading}
-          className='bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500'
+          className="bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
         />
       </form>
     </div>

@@ -63,7 +63,7 @@ img.member {
   border-radius: 15%;
   object-fit: cover;
   aspect-ratio: 1 / 1;
-  outline: 2px solid #70B4D4;
+  outline: 2px solid #70b4d4;
 }
 
 h1.name {
@@ -89,7 +89,6 @@ h2.gradYear {
   font-size: 13px;
   width: 100%;
   max-width: 150px;
-  
 }
 
 i.socials {

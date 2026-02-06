@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import './maplegend.css'
+import { useState } from 'react';
+import './maplegend.css';
 
 export default function MapLegend({ icon_lookup }) {
-  const [ hovered, setHovered ] = useState(null);
+  const [hovered, setHovered] = useState(null);
 
   var timeout = 0;
 
@@ -21,7 +21,7 @@ export default function MapLegend({ icon_lookup }) {
     const legend = document.getElementById('modelmap_legend_div');
     legend.classList.remove('modelmap_legend_div_hover');
     legend.classList.add('modelmap_legend_div_unhover');
-    
+
     timeout && clearTimeout(timeout);
     timeout = setTimeout(() => {
       setHovered(false);
@@ -29,27 +29,38 @@ export default function MapLegend({ icon_lookup }) {
   }
 
   return (
-    <div id='modelmap_legend_div' 
-      className='modelmap_legend_div modelmap_legend_div_unhover' 
-      onMouseOver={handleMouseEnter} 
+    <div
+      id="modelmap_legend_div"
+      className="modelmap_legend_div modelmap_legend_div_unhover"
+      onMouseOver={handleMouseEnter}
       onMouseOut={handleMouseLeave}
     >
       {!hovered && (
-        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%'}}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            width: '100%'
+          }}
+        >
           <div>Legend</div>
         </div>
       )}
       {hovered && (
-        <div style={{width: '90px'}}>
+        <div style={{ width: '90px' }}>
           {Object.entries(icon_lookup).map(([label, icon]) => {
             return (
-              <div key={label} style={{marginBottom:'10px'}}>
-                <div style={{width:'100%'}}>{icon} {label}</div>
+              <div key={label} style={{ marginBottom: '10px' }}>
+                <div style={{ width: '100%' }}>
+                  {icon} {label}
+                </div>
               </div>
             );
           })}
         </div>
       )}
     </div>
-  )
+  );
 }

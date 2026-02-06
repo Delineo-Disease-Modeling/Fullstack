@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { Map, Popup, Source, Layer } from "react-map-gl/maplibre";
+import { Map, Popup, Source, Layer } from 'react-map-gl/maplibre';
 import useSimData from '../stores/simdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -7,30 +7,31 @@ import './modelmap.css';
 import MapLegend from './maplegend';
 
 const icon_lookup = {
-  "Depository Credit Intermediation": "🏦",
-  "Restaurants and Other Eating Places": "🍽️",
-  "Offices of Physicians": "🏥",
-  "Religious Organizations": "⛪",
-  "Personal Care Services": "🏢",
-  "Child Day Care Services": "🏫",
-  "Death Care Services": "🪦",
-  "Elementary and Secondary Schools": "🏫",
-  "Florists": "💐",
-  "Museums, Historical Sites, and Similar Institutions": "🏛️",
-  "Grocery Stores": "🛒",
-  "Nursing Care Facilities (Skilled Nursing Facilities)": "🏥",
-  "Justice, Public Order, and Safety Activities": "🚔",
-  "Administration of Economic Programs": "🏛️",
-  "General Merchandise Stores, including Warehouse Clubs and Supercenters": "🏬",
-  "Gasoline Stations": "⛽",
-  "Agencies, Brokerages, and Other Insurance Related Activities": "🏢",
-  "Automotive Repair and Maintenance": "🚗",
-  "Specialty Food Stores": "🏪",
-  "Coating, Engraving, Heat Treating, and Allied Activities": "🏢",
-  "Building Material and Supplies Dealers": "🏢",
-  "Postal Service": "📬",
-  "Home": "🏠"
-}
+  'Depository Credit Intermediation': '🏦',
+  'Restaurants and Other Eating Places': '🍽️',
+  'Offices of Physicians': '🏥',
+  'Religious Organizations': '⛪',
+  'Personal Care Services': '🏢',
+  'Child Day Care Services': '🏫',
+  'Death Care Services': '🪦',
+  'Elementary and Secondary Schools': '🏫',
+  Florists: '💐',
+  'Museums, Historical Sites, and Similar Institutions': '🏛️',
+  'Grocery Stores': '🛒',
+  'Nursing Care Facilities (Skilled Nursing Facilities)': '🏥',
+  'Justice, Public Order, and Safety Activities': '🚔',
+  'Administration of Economic Programs': '🏛️',
+  'General Merchandise Stores, including Warehouse Clubs and Supercenters':
+    '🏬',
+  'Gasoline Stations': '⛽',
+  'Agencies, Brokerages, and Other Insurance Related Activities': '🏢',
+  'Automotive Repair and Maintenance': '🚗',
+  'Specialty Food Stores': '🏪',
+  'Coating, Engraving, Heat Treating, and Allied Activities': '🏢',
+  'Building Material and Supplies Dealers': '🏢',
+  'Postal Service': '📬',
+  Home: '🏠'
+};
 
 var household_locs = {};
 
@@ -59,7 +60,9 @@ function updateIcons(mapCenter, sim_data, pap_data, hotspots) {
         data['longitude'] = household_locs[index][1];
       }
 
-      const pop = (type === 'homes' ? sim_data['homes'][index] : sim_data['places'][index]) ?? { population: 0, infected: 0 };
+      const pop = (type === 'homes'
+        ? sim_data['homes'][index]
+        : sim_data['places'][index]) ?? { population: 0, infected: 0 };
 
       let description = `${pop.population} people\n${pop.infected} infected`;
       if (type === 'places' && Object.keys(hotspots).includes(data.id)) {
@@ -67,16 +70,19 @@ function updateIcons(mapCenter, sim_data, pap_data, hotspots) {
       }
 
       const marker = {
-        'type': type,
-        'id': index,
-        'latitude': data.latitude,
-        'longitude': data.longitude,
-        'label': data.label,
-        'description': description,
-        'icon': (type === 'homes' ? icon_lookup['Home'] : icon_lookup[pap_data[type][index]['top_category']]) ?? '❓',
-        'population': pop.population,
-        'infected': pop.infected
-      }
+        type: type,
+        id: index,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        label: data.label,
+        description: description,
+        icon:
+          (type === 'homes'
+            ? icon_lookup['Home']
+            : icon_lookup[pap_data[type][index]['top_category']]) ?? '❓',
+        population: pop.population,
+        infected: pop.infected
+      };
 
       icons.push(marker);
     }
@@ -91,7 +97,7 @@ function EmojiOverlay({ map, hotspots = {} }) {
   useEffect(() => {
     if (!map) return;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
 
     function drawEmojis() {
       const { width, height } = map.getContainer().getBoundingClientRect();
@@ -99,7 +105,9 @@ function EmojiOverlay({ map, hotspots = {} }) {
       canvas.height = height;
       ctx.clearRect(0, 0, width, height);
 
-      const features = map.queryRenderedFeatures(undefined, { source: "points" });
+      const features = map.queryRenderedFeatures(undefined, {
+        source: 'points'
+      });
       if (!features?.length) return;
 
       const zoom = map.getZoom();
@@ -117,10 +125,12 @@ function EmojiOverlay({ map, hotspots = {} }) {
         const adjusted = Math.sqrt(infectionRatio);
 
         // --- Color curve (same as clusters) ---
-        let baseColor = "#4CAF50"; // green
-        if (adjusted >= 0.5) baseColor = "#F44336";   // red
-        else if (adjusted >= 0.35) baseColor = "#FF9800"; // orange
-        else if (adjusted >= 0.2) baseColor = "#FFEB3B";  // yellow
+        let baseColor = '#4CAF50'; // green
+        if (adjusted >= 0.5)
+          baseColor = '#F44336'; // red
+        else if (adjusted >= 0.35)
+          baseColor = '#FF9800'; // orange
+        else if (adjusted >= 0.2) baseColor = '#FFEB3B'; // yellow
 
         // --- Zoom-scaled size ---
         const baseSize = 6;
@@ -128,11 +138,12 @@ function EmojiOverlay({ map, hotspots = {} }) {
         const size = baseSize + zoom * scaleFactor;
 
         // --- Check if this ID is in hotspots ---
-        const isHotspot = props.type === 'place' && Object.keys(hotspots).includes(props.id);
+        const isHotspot =
+          props.type === 'place' && Object.keys(hotspots).includes(props.id);
 
         // --- Pulse factor (sinusoidal between 0–1) ---
         const pulse = isHotspot
-          ? 0.5 + 0.5 * Math.sin(time * 4 + parseInt(props.id, 36) % 10) // offset by id for desync
+          ? 0.5 + 0.5 * Math.sin(time * 4 + (parseInt(props.id, 36) % 10)) // offset by id for desync
           : 0;
 
         const pulseSize = size * (1 + 0.3 * pulse); // up to 30% larger halo
@@ -145,31 +156,31 @@ function EmojiOverlay({ map, hotspots = {} }) {
         ctx.fill();
 
         // --- White outline for clarity ---
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2;
         ctx.stroke();
 
         // --- Draw emoji ---
         ctx.font = `${size}px 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText(props.icon, pixel.x, pixel.y);
       });
     }
 
     // helper to apply alpha to hex color (returns rgba())
     function applyAlpha(hex, alpha) {
-      const bigint = parseInt(hex.replace("#", ""), 16);
+      const bigint = parseInt(hex.replace('#', ''), 16);
       const r = (bigint >> 16) & 255;
       const g = (bigint >> 8) & 255;
       const b = bigint & 255;
       return `rgba(${r},${g},${b},${alpha})`;
     }
 
-    map.on("render", drawEmojis);
+    map.on('render', drawEmojis);
     drawEmojis(); // first draw immediately
 
-    return () => map.off("render", drawEmojis);
+    return () => map.off('render', drawEmojis);
   }, [map, hotspots]);
 
   return (
@@ -177,13 +188,13 @@ function EmojiOverlay({ map, hotspots = {} }) {
       ref={canvasRef}
       className="emoji-overlay-canvas"
       style={{
-        position: "absolute",
+        position: 'absolute',
         top: 0,
         left: 0,
-        width: "100%",
-        height: "100%",
+        width: '100%',
+        height: '100%',
         zIndex: 5,
-        pointerEvents: "none",
+        pointerEvents: 'none'
       }}
     />
   );
@@ -191,22 +202,28 @@ function EmojiOverlay({ map, hotspots = {} }) {
 
 function makeGeoJSON(pois) {
   return {
-    type: "FeatureCollection",
+    type: 'FeatureCollection',
     features: pois.map((poi) => ({
-      type: "Feature",
+      type: 'Feature',
       properties: {
         ...poi,
-        infection_ratio: poi.population > 0 ? poi.infected / poi.population : 0,
+        infection_ratio: poi.population > 0 ? poi.infected / poi.population : 0
       },
       geometry: {
-        type: "Point",
-        coordinates: [poi.longitude, poi.latitude],
-      },
-    })),
+        type: 'Point',
+        coordinates: [poi.longitude, poi.latitude]
+      }
+    }))
   };
 }
 
-function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick }) {
+function ClusteredMap({
+  currentTime,
+  mapCenter,
+  pois,
+  hotspots,
+  onMarkerClick
+}) {
   const mapRef = useRef();
   const [mapInstance, setMapInstance] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
@@ -218,7 +235,7 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
     setMapInstance(map);
 
     // when zoom/pan ends → fade back to 1 (no fade-out)
-    map.on("moveend", () => {
+    map.on('moveend', () => {
       const start = performance.now();
       const initialCircle = fadeCircle;
       const initialLabel = fadeLabel;
@@ -246,7 +263,7 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
   useEffect(() => {
     if (!mapInstance) return;
     const frame = requestAnimationFrame(() => {
-      const source = mapInstance.getSource("points");
+      const source = mapInstance.getSource('points');
       if (source && source.setData) source.setData(makeGeoJSON(pois));
     });
     return () => cancelAnimationFrame(frame);
@@ -259,9 +276,9 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
   // toggle label visibility when too faint
   useEffect(() => {
     if (!mapInstance) return;
-    const visibility = fadeLabel < 0.20 ? "none" : "visible";
-    if (mapInstance.getLayer("cluster-count")) {
-      mapInstance.setLayoutProperty("cluster-count", "visibility", visibility);
+    const visibility = fadeLabel < 0.2 ? 'none' : 'visible';
+    if (mapInstance.getLayer('cluster-count')) {
+      mapInstance.setLayoutProperty('cluster-count', 'visibility', visibility);
     }
   }, [fadeLabel, mapInstance]);
 
@@ -274,13 +291,13 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
 
     if (feature.properties.cluster) {
       const clusterId = feature.properties.cluster_id;
-      const source = map.getSource("points");
+      const source = map.getSource('points');
       source.getClusterExpansionZoom(clusterId, (err, zoom) => {
         if (err) return;
         map.easeTo({
           center: feature.geometry.coordinates,
           zoom: zoom + 0.5,
-          duration: 1000,
+          duration: 1000
         });
       });
       return;
@@ -304,7 +321,7 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
         label: feature.properties.label,
         description: feature.properties.description,
         icon: feature.properties.icon,
-        id: feature.properties.id,
+        id: feature.properties.id
       });
     }, 250);
   };
@@ -317,14 +334,14 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
         initialViewState={{
           latitude: mapCenter[0],
           longitude: mapCenter[1],
-          zoom: 13,
+          zoom: 13
         }}
-        style={{ width: "100%", height: "100%" }}
+        style={{ width: '100%', height: '100%' }}
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
         interactiveLayerIds={[
-          "clusters",
-          "unclustered-point-circle",
-          "unclustered-point-emoji",
+          'clusters',
+          'unclustered-point-circle',
+          'unclustered-point-emoji'
         ]}
         onClick={handleClick}
       >
@@ -337,33 +354,41 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
           clusterRadius={75}
           clusterMinPoints={3}
           clusterProperties={{
-            population: ["+", ["to-number", ["get", "population"]]],
-            infected: ["+", ["to-number", ["get", "infected"]]],
+            population: ['+', ['to-number', ['get', 'population']]],
+            infected: ['+', ['to-number', ['get', 'infected']]]
           }}
         >
           {/* 🟢 Cluster circles */}
           <Layer
             id="clusters"
             type="circle"
-            filter={["has", "point_count"]}
+            filter={['has', 'point_count']}
             paint={{
-              "circle-color": [
-                "interpolate",
-                ["linear"],
-                ["sqrt", ["/", ["get", "infected"], ["get", "population"]]],
-                0, "#4CAF50",
-                0.15, "#FFEB3B",
-                0.35, "#FF9800",
-                0.5, "#F44336",
+              'circle-color': [
+                'interpolate',
+                ['linear'],
+                ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
+                0,
+                '#4CAF50',
+                0.15,
+                '#FFEB3B',
+                0.35,
+                '#FF9800',
+                0.5,
+                '#F44336'
               ],
-              "circle-radius": [
-                "step",
-                ["get", "point_count"],
-                22, 10, 28, 25, 34,
+              'circle-radius': [
+                'step',
+                ['get', 'point_count'],
+                22,
+                10,
+                28,
+                25,
+                34
               ],
-              "circle-opacity": fadeCircle,
-              "circle-stroke-width": 1,
-              "circle-stroke-color": "#fff",
+              'circle-opacity': fadeCircle,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#fff'
             }}
           />
 
@@ -371,20 +396,22 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
           <Layer
             id="cluster-count"
             type="symbol"
-            filter={["has", "point_count"]}
+            filter={['has', 'point_count']}
             layout={{
-              "text-field": [
-                "format",
-                ["get", "population"], { "font-scale": 1.2 },
-                "\n",
-                ["concat", "Inf: ", ["get", "infected"]], { "font-scale": 0.8 },
+              'text-field': [
+                'format',
+                ['get', 'population'],
+                { 'font-scale': 1.2 },
+                '\n',
+                ['concat', 'Inf: ', ['get', 'infected']],
+                { 'font-scale': 0.8 }
               ],
-              "text-size": 12,
-              "text-allow-overlap": true,
+              'text-size': 12,
+              'text-allow-overlap': true
             }}
             paint={{
-              "text-color": "#fff",
-              "text-opacity": fadeLabel,
+              'text-color': '#fff',
+              'text-opacity': fadeLabel
             }}
           />
 
@@ -392,21 +419,25 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
           <Layer
             id="unclustered-point-circle"
             type="circle"
-            filter={["!", ["has", "point_count"]]}
+            filter={['!', ['has', 'point_count']]}
             paint={{
-              "circle-radius": 14,
-              "circle-color": [
-                "interpolate",
-                ["linear"],
-                ["sqrt", ["/", ["get", "infected"], ["get", "population"]]],
-                0, "#4CAF50",
-                0.15, "#FFEB3B",
-                0.35, "#FF9800",
-                0.5, "#F44336",
+              'circle-radius': 14,
+              'circle-color': [
+                'interpolate',
+                ['linear'],
+                ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
+                0,
+                '#4CAF50',
+                0.15,
+                '#FFEB3B',
+                0.35,
+                '#FF9800',
+                0.5,
+                '#F44336'
               ],
-              "circle-opacity": fadeCircle,
-              "circle-stroke-color": "#fff",
-              "circle-stroke-width": 1,
+              'circle-opacity': fadeCircle,
+              'circle-stroke-color': '#fff',
+              'circle-stroke-width': 1
             }}
           />
 
@@ -414,16 +445,16 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
           <Layer
             id="unclustered-point-emoji"
             type="symbol"
-            filter={["!", ["has", "point_count"]]}
+            filter={['!', ['has', 'point_count']]}
             layout={{
-              "text-field": ["get", "icon"],
-              "text-size": 18,
-              "text-allow-overlap": true,
-              "text-font": ["Open Sans Regular"],
+              'text-field': ['get', 'icon'],
+              'text-size': 18,
+              'text-allow-overlap': true,
+              'text-font': ['Open Sans Regular']
             }}
             paint={{
-              "text-color": "#000000",
-              "text-opacity": fadeCircle,
+              'text-color': '#000000',
+              'text-opacity': fadeCircle
             }}
           />
         </Source>
@@ -439,8 +470,10 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick })
             style={{ zIndex: 10 }}
           >
             <div className="max-w-36 whitespace-pre-line font-[Poppins] text-center">
-              <div className='text-2xl mb-0.5'>{popupInfo.icon}</div>
-              <header className="text-sm font-bold mb-0.5">{popupInfo.label}</header>
+              <div className="text-2xl mb-0.5">{popupInfo.icon}</div>
+              <header className="text-sm font-bold mb-0.5">
+                {popupInfo.label}
+              </header>
               <p className="text-xs">{popupInfo.description}</p>
             </div>
           </Popup>
@@ -463,9 +496,17 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
   const [currentTime, setCurrentTime] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const mapCenter = useMemo(() => [selectedZone.latitude, selectedZone.longitude], [selectedZone]);
+  const mapCenter = useMemo(
+    () => [selectedZone.latitude, selectedZone.longitude],
+    [selectedZone]
+  );
   const pois = useMemo(() => {
-    return updateIcons(mapCenter, sim_data[(currentTime * 60).toString()], pap_data, hotspots);
+    return updateIcons(
+      mapCenter,
+      sim_data[(currentTime * 60).toString()],
+      pap_data,
+      hotspots
+    );
   }, [currentTime, hotspots, mapCenter, pap_data, sim_data]);
 
   useEffect(() => {
@@ -474,7 +515,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
         return;
       }
 
-      setCurrentTime(prev => (prev < maxHours ? prev + 1 : prev));
+      setCurrentTime((prev) => (prev < maxHours ? prev + 1 : prev));
     }, 750);
 
     return () => clearInterval(interval);
@@ -498,8 +539,15 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
         let previnfected = prevpeople.infected ?? 0;
         let curinfected = curpeople.infected ?? 0;
 
-        if (curinfected > 0 && previnfected > 0 && curinfected >= previnfected * 5) {
-          new_hotspots[index] = [...(new_hotspots[index] ?? []), timestamps[i] / 60];
+        if (
+          curinfected > 0 &&
+          previnfected > 0 &&
+          curinfected >= previnfected * 5
+        ) {
+          new_hotspots[index] = [
+            ...(new_hotspots[index] ?? []),
+            timestamps[i] / 60
+          ];
         }
       }
     }
@@ -521,8 +569,11 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
         onMarkerClick={onMarkerClick}
       />
 
-      <div className='mt-3 text-center w-full'>
-        {new Date(new Date(selectedZone.start_date).getTime() + currentTime * 60 * 60 * 1000).toLocaleString('en-US', {
+      <div className="mt-3 text-center w-full">
+        {new Date(
+          new Date(selectedZone.start_date).getTime() +
+            currentTime * 60 * 60 * 1000
+        ).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',
           year: 'numeric',
@@ -538,11 +589,15 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
           className="bg-[#70B4D4] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
           onClick={() => setIsPlaying(!isPlaying)}
         >
-          {isPlaying ? <i className='bi bi-pause-fill' /> : <i className='bi bi-play-fill' />}
+          {isPlaying ? (
+            <i className="bi bi-pause-fill" />
+          ) : (
+            <i className="bi bi-play-fill" />
+          )}
         </button>
 
         <input
-          className='w-full max-w-[90vw]'
+          className="w-full max-w-[90vw]"
           type="range"
           min={1}
           max={maxHours}
@@ -552,9 +607,9 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
       </div>
 
       {/* Input Box */}
-      <div className='flex justify-center mt-3'>
+      <div className="flex justify-center mt-3">
         <input
-          className='w-[10%] px-1 bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]'
+          className="w-[10%] px-1 bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]"
           type="number"
           min={1}
           max={maxHours}

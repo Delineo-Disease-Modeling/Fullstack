@@ -1,11 +1,16 @@
-import { zValidator } from "@hono/zod-validator";
-import { PrismaClient } from "@prisma/client";
-import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
-import { hashPassword, verifyPassword } from "../lib/password.js";
-import { z } from "zod";
-import { createSession, deleteSessionTokenCookie, generateSessionToken, setSessionTokenCookie } from "../lib/session.js";
-import { authGuard } from "../middleware/auth-guard.js";
+import { zValidator } from '@hono/zod-validator';
+import { PrismaClient } from '@prisma/client';
+import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { hashPassword, verifyPassword } from '../lib/password.js';
+import { z } from 'zod';
+import {
+  createSession,
+  deleteSessionTokenCookie,
+  generateSessionToken,
+  setSessionTokenCookie
+} from '../lib/session.js';
+import { authGuard } from '../middleware/auth-guard.js';
 
 const auth_route = new Hono();
 
@@ -112,7 +117,7 @@ auth_route.post('/logout', authGuard, async (c) => {
   deleteSessionTokenCookie(c);
 
   return c.json({
-    message: 'Successfully logged out.',
+    message: 'Successfully logged out.'
   });
 });
 

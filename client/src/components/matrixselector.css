@@ -19,7 +19,7 @@ select.mselect_selectvariant {
   margin: auto;
   overflow-y: auto;
 
-  outline: 2px solid #70B4D4;
+  outline: 2px solid #70b4d4;
 }
 
 select.mselect_selectmatrix {
@@ -28,7 +28,7 @@ select.mselect_selectmatrix {
   margin: auto;
   overflow-y: auto;
 
-  outline: 2px solid #70B4D4;
+  outline: 2px solid #70b4d4;
 }
 
 div.mselect_varadder {
@@ -47,18 +47,18 @@ button.mselect_button {
   width: 10%;
   height: 20px;
   background-color: #222629;
-  color: #F0F0F0;
+  color: #f0f0f0;
   text-decoration: none;
   text-align: center;
-  line-height:2px;
+  line-height: 2px;
   font-size: 14px;
-  font-family: 'Poppins';
+  font-family: "Poppins";
   transition: 200ms ease-in-out;
 }
 
 button.mselect_button:hover {
   transform: scale(1.05);
-  background-color: #F0F0F0;
+  background-color: #f0f0f0;
   color: #222629;
   cursor: pointer;
 }
@@ -70,6 +70,6 @@ button.mselect_button:active {
 input.mselect_input {
   background-color: #fffff2;
   width: 70%;
-  outline: 2px solid #70B4D4;
+  outline: 2px solid #70b4d4;
   padding: 0px 2px;
 }

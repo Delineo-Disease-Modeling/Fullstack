@@ -28,21 +28,19 @@ div.entry {
   padding-right: 40px;
 }
 
-
 div.reverse {
   flex-wrap: wrap-reverse;
 }
 
 img.aboutimg {
-  width: 100%; 
-  height: auto; 
-  max-width: 400px; 
-  object-fit: contain; 
-  border-radius: 24px; 
-  background-color: #88D2D8; 
-  outline: 2px solid #70B4D4;
+  width: 100%;
+  height: auto;
+  max-width: 400px;
+  object-fit: contain;
+  border-radius: 24px;
+  background-color: #88d2d8;
+  outline: 2px solid #70b4d4;
 }
-
 
 div.aboutinfo {
   width: 100%;

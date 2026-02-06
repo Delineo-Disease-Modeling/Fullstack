@@ -39,7 +39,10 @@ interface SimSettingsStore {
 
   setSettings: (new_settings: Partial<SimSettings>) => void;
   addInterventions: (time: number) => void;
-  setInterventions: (time: number, new_interventions: Partial<Interventions>) => void;
+  setInterventions: (
+    time: number,
+    new_interventions: Partial<Interventions>
+  ) => void;
   deleteInterventions: (time: number) => void;
 }
 
@@ -58,47 +61,49 @@ const default_settings: SimSettings = {
   hours: 84,
   randseed: true,
   usecache: true,
-  interventions: [ { ...default_interventions } ]
+  interventions: [{ ...default_interventions }]
 };
 
-const useSimSettings = create<SimSettingsStore>(
-  (set) => ({
-    settings: structuredClone(default_settings),
+const useSimSettings = create<SimSettingsStore>((set) => ({
+  settings: structuredClone(default_settings),
 
-    setSettings: (new_settings) => {
-      set((state) => ({ settings: { ...state.settings, ...new_settings } }));
-    },
+  setSettings: (new_settings) => {
+    set((state) => ({ settings: { ...state.settings, ...new_settings } }));
+  },
 
-    addInterventions: (time) => {
-      set((state) => ({
-        settings: {
-          ...state.settings,
-          interventions: state.settings.interventions
-            .concat({ ...default_interventions, time })
-        }
-      }));
-    },
+  addInterventions: (time) => {
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        interventions: state.settings.interventions.concat({
+          ...default_interventions,
+          time
+        })
+      }
+    }));
+  },
 
-    setInterventions: (time, new_interventions) => {
-      set((state) => ({
-        settings: {
-          ...state.settings,
-          interventions: state.settings.interventions
-            .map((i) => i.time !== time ? i : { ...i, ...new_interventions })
-        }
-      }));
-    },
+  setInterventions: (time, new_interventions) => {
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        interventions: state.settings.interventions.map((i) =>
+          i.time !== time ? i : { ...i, ...new_interventions }
+        )
+      }
+    }));
+  },
 
-    deleteInterventions: (time) => {
-      set((state) => ({
-        settings: {
-          ...state.settings,
-          interventions: state.settings.interventions
-            .filter((i) => i.time !== time)
-        }
-      }))
-    }
-  }),
-);
+  deleteInterventions: (time) => {
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        interventions: state.settings.interventions.filter(
+          (i) => i.time !== time
+        )
+      }
+    }));
+  }
+}));
 
 export default useSimSettings;
