@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 import { streamText } from 'hono/streaming';
 import { createReadStream } from 'fs';
 import { DB_FOLDER } from '../env.js';
@@ -11,7 +11,6 @@ import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { saveFileStream } from '../lib/filestream.js';
 
 const patterns_route = new Hono();
-const prisma = new PrismaClient();
 
 const postPatternsSchema = z.object({
   czone_id: z.coerce.number().nonnegative(),

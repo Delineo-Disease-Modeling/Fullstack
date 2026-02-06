@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DB_URL } from '../env';
-import useAuth from '../stores/auth';
+import { useSession } from '../lib/auth-client';
 import InstructionBanner from './instruction-banner';
 import useSimSettings from '../stores/simsettings';
 
 export default function CzDict({ zone, setZone }) {
   const navigate = useNavigate();
-  const user = useAuth((state) => state.user);
+  const { data: session } = useSession();
+  const user = session?.user;
   const setSettings = useSimSettings((state) => state.setSettings);
 
   const [tab, setTab] = useState(0);
@@ -21,7 +22,8 @@ export default function CzDict({ zone, setZone }) {
         if (!zone && json['data']?.[0]) {
           setZone(json['data'][0]);
         }
-        setLocations(json['data']);
+
+        setLocations(json.data ?? []);
       })
       .catch(console.error);
   }, [zone, setZone]);
@@ -65,10 +67,10 @@ export default function CzDict({ zone, setZone }) {
                 style={
                   !loc.ready
                     ? {
-                        background: '#11111140',
-                        color: 'white',
-                        cursor: 'not-allowed'
-                      }
+                      background: '#11111140',
+                      color: 'white',
+                      cursor: 'not-allowed'
+                    }
                     : zone.id === loc.id
                       ? { background: '#70B4D4', color: 'white' }
                       : undefined

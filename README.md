@@ -19,8 +19,8 @@ VITE_API_URL=http://127.0.0.1:1880/
 # Database server IP 
 VITE_DB_URL=http://127.0.0.1:1890/
 
-# If set to true, will use data from disk
-VITE_USE_CACHED_DATA=FALSE
+# Simulator server IP 
+VITE_SIM_URL=http://127.0.0.1:1870/
 ```
 
 Then, while still in the `client` folder, run the following commands:
@@ -40,7 +40,7 @@ Delineo utilizes multiple JSON files to store and manage simulation data. These 
 This file captures the movement patterns within the simulation at specific timesteps. Each entry represents a timestep key mapped to homes and places pattern values, detailing which individuals are present at various locations. 
 
 Structure:
-```bash
+```json
 {
     "60": {             // Timestep in minutes or simulation time unit
         "homes": {      // Home patterns
@@ -66,7 +66,7 @@ Structure:
 The papdata.json file contains demographic details for individuals in the simulation, including age, sex, and home location.
 
 Structure:
-```bash
+```json
 {
     "people": {
         "0": {
@@ -90,7 +90,7 @@ Structure:
 The infectivity.json file tracks the disease spread by recording the infectivity levels at various timesteps for different virus variants.
 
 Structure:
-```bash
+```json
 {
     "60": {             // Timestep
         "delta": {      // Variant name
@@ -102,6 +102,7 @@ Structure:
     }
 }
 ```
+
 - Each timestep (e.g., 0, 60, 120, 180) is a key.
 - The keys under each timestep represent different virus variants (delta, omicron, etc.).
 - Each variant maps person IDs to infection states, 

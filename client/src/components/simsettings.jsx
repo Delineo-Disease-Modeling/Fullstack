@@ -11,7 +11,10 @@ import {
 import './simsettings.css';
 
 export default function SimSettings({ sendData }) {
-  const settings = useSimSettings((state) => state.settings);
+  const zone = useSimSettings((state) => state.zone);
+  const hours = useSimSettings((state) => state.hours);
+  const randseed = useSimSettings((state) => state.randseed);
+  const sim_id = useSimSettings((state) => state.sim_id);
   const setSettings = useSimSettings((state) => state.setSettings);
 
   return (
@@ -19,22 +22,22 @@ export default function SimSettings({ sendData }) {
       <div className="simset_params">
         {/* Pass setSelectedZone to SimLocation, so we get the full object */}
         <CzDict
-          zone={settings.zone}
+          zone={zone}
           setZone={(zone) => setSettings({ zone })}
         />
 
         <SimParameter
           label={'Length'}
-          value={settings.hours}
+          value={hours}
           callback={(hours) => setSettings({ hours })}
           min={24}
-          max={settings.zone?.length ?? 168}
+          max={zone?.length ?? 168}
           percent={false}
           units=" hours"
         />
         <SimBoolean
           label={'Random Seed'}
-          value={settings.randseed}
+          value={randseed}
           callback={(randseed) => setSettings({ randseed })}
         />
         {/* <MatrixSelector customFiles={customFiles} setMatrices={setMatrices}/> */}
@@ -54,15 +57,15 @@ export default function SimSettings({ sendData }) {
       </div>
 
       <SimRunSelector
-        czone_id={settings.zone?.id}
-        sim_id={settings.sim_id}
+        czone_id={zone?.id}
+        sim_id={sim_id}
         callback={(sim_id) => setSettings({ sim_id })}
       />
 
       <button
         className="simset_button w-32"
         onClick={() => {
-          if (!settings.zone?.ready) {
+          if (!zone?.ready) {
             alert('Please pick a valid convenience zone first!');
             return;
           }

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 import { saveFileStream } from '../lib/filestream.js';
 import { DB_FOLDER } from '../env.js';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
@@ -12,7 +12,6 @@ import chain from 'stream-chain';
 import { HTTPException } from 'hono/http-exception';
 
 const simdata_route = new Hono();
-const prisma = new PrismaClient();
 
 const postSimDataSchema = z.object({
   czone_id: z.coerce.number().nonnegative(),
@@ -30,7 +29,7 @@ const getChartParamSchema = z.object({
 
 const getChartQuerySchema = z.object({
   loc_type: z.enum(['homes', 'places']).optional(),
-  loc_id: z.string().nonempty().optional()
+  loc_id: z.string().min(1).optional()
 });
 
 const getSimDataCacheSchema = z.object({

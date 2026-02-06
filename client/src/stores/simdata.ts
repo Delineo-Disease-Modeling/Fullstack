@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type SimData = {
+export type SimData = {
   [time: number]: {
     [variant: string]: {
       [person_id: number]: number;
@@ -8,14 +8,14 @@ type SimData = {
   };
 };
 
-type MovePatterns = {
+export type MovePatterns = {
   [time: number]: {
     homes: { [id: number]: string[] };
     places: { [id: number]: string[] };
   };
 };
 
-type PapData = {
+export type PapData = {
   people: {
     [id: number]: {
       sex: number;

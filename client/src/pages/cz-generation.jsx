@@ -9,9 +9,9 @@ import {
 } from 'react-leaflet';
 import { ALG_URL, DB_URL } from '../env';
 import axios from 'axios';
-import useAuth from '../stores/auth';
+import { useSession } from '../lib/auth-client';
 
-import zip_cbg_json from '../data/zip_to_cbg.json';
+
 
 import 'leaflet/dist/leaflet.css';
 import './cz-generation.css';
@@ -107,7 +107,8 @@ function FormField({
 
 export default function CZGeneration() {
   const navigate = useNavigate();
-  const user = useAuth((state) => state.user);
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
 
   const [location, setLocation] = useState('');
   const [minPop, setMinPop] = useState(5000);
@@ -119,12 +120,19 @@ export default function CZGeneration() {
   const [iframeHTML, setIframeHTML] = useState();
   const [loading, setLoading] = useState(false);
 
-  if (!user) {
-    navigate('/simulator');
+  if (isPending) {
+    return <div className="text-white text-center mt-20">Loading...</div>;
   }
 
-  const loc_lookup = async (location) => {
-    const resp = await fetch(`${DB_URL}lookup-zip`, {
+  if (!user) {
+    navigate('/simulator');
+    return null;
+  }
+
+
+
+  const lookupLocation = async (location) => {
+    const resp = await fetch(`${DB_URL}lookup-location`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -139,31 +147,23 @@ export default function CZGeneration() {
     return await resp.json();
   };
 
-  const zip_to_cbg = (location) => {
-    return zip_cbg_json[location]?.[0];
-  };
-
   const generateCZ = (formdata) => {
     const func_body = async (formdata) => {
       console.log(formdata);
 
-      const location = await loc_lookup(formdata.get('location'));
-      const core_cbg = zip_to_cbg(
-        location?.['zip_code'] ?? formdata.get('location')
-      );
+      const locationData = await lookupLocation(formdata.get('location'));
 
-      if (!core_cbg) {
-        console.error('Could not find location');
+      if (!locationData || !locationData.cbg) {
+        console.error('Could not find location or CBG');
         return;
       }
 
-      console.log(location);
-      console.log(core_cbg);
+      console.log(locationData);
 
       const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
-        name: location?.['city'] ?? formdata.get('location'),
+        name: locationData.city || formdata.get('location'),
         description: formdata.get('description'),
-        cbg: core_cbg,
+        cbg: locationData.cbg,
         start_date: new Date(formdata.get('start_date')).toISOString(),
         length: +formdata.get('length') * 24, // Days turn to hours
         min_pop: +formdata.get('min_pop'),

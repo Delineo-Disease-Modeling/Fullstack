@@ -12,7 +12,8 @@ import InstructionBanner from '../components/instruction-banner.jsx';
 import './simulator.css';
 
 export default function Simulator() {
-  const settings = useSimSettings((state) => state.settings);
+  const sim_id = useSimSettings((state) => state.sim_id);
+  const zone = useSimSettings((state) => state.zone);
   const simdata = useSimData((state) => state.simdata);
   const papdata = useSimData((state) => state.papdata);
   const runName = useSimData((state) => state.name);
@@ -27,10 +28,10 @@ export default function Simulator() {
   const [selectedLoc, setSelectedLoc] = useState(null);
 
   const handleRename = async () => {
-    if (!settings.sim_id || !runName || runName.length < 2) return;
+    if (!sim_id || !runName || runName.length < 2) return;
 
     try {
-      const res = await fetch(`${DB_URL}simdata/${settings.sim_id}`, {
+      const res = await fetch(`${DB_URL}simdata/${sim_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -52,6 +53,7 @@ export default function Simulator() {
   };
 
   const makePostRequest = async () => {
+    const settings = useSimSettings.getState();
     const reqbody = {
       ...settings,
       czone_id: settings.zone.id,
@@ -110,9 +112,9 @@ export default function Simulator() {
 
     // Switch "pages"
     setShowSim(true);
-    setSelectedZone(settings.zone);
+    setSelectedZone(zone);
 
-    fetch(`${DB_URL}papdata/${settings.zone.id}`)
+    fetch(`${DB_URL}papdata/${zone.id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error();
@@ -124,9 +126,10 @@ export default function Simulator() {
       })
       .catch(console.error);
 
+    const settings = useSimSettings.getState();
     makePostRequest({
       ...settings,
-      czone_id: settings.zone.id,
+      czone_id: zone.id,
       length: settings.hours * 60
     });
   };
@@ -140,100 +143,98 @@ export default function Simulator() {
   };
 
   return (
-    <div>
-      <div className="sim_container">
-        {!showSim ? (
-          <div className="sim_settings px-4">
-            <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
-            <SimSettings sendData={sendSimulatorData} />
-          </div>
-        ) : !simdata || !papdata ? (
-          <div>Loading simulation data...</div>
-        ) : (
-          <div className="sim_output px-4">
-            <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-4 text-center">
-                <h2 className="text-xl font-semibold">
-                  Convenience Zone: {selectedZone.name}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  Created on:{' '}
-                  {new Date(selectedZone.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex gap-2 items-center">
-                  <label htmlFor="run-name" className="text-sm text-gray-700">
-                    Run Name:
-                  </label>
-                  <input
-                    id="run-name"
-                    type="text"
-                    value={runName || ''}
-                    onChange={(e) => setRunName(e.target.value)}
-                    onBlur={handleRename}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleRename();
-                        e.currentTarget.blur();
-                      }
-                    }}
-                    className="rounded px-2 py-1 text-sm bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]"
-                    placeholder="Untitled Run"
-                  />
-                </div>
-                <button
-                  onClick={async () => {
-                    if (
-                      window.confirm(
-                        'Are you sure you want to delete this run? This action cannot be undone.'
-                      )
-                    ) {
-                      try {
-                        const res = await fetch(
-                          `${DB_URL}simdata/${settings.sim_id}`,
-                          {
-                            method: 'DELETE'
-                          }
-                        );
-
-                        if (!res.ok) {
-                          throw new Error('Failed to delete');
-                        }
-
-                        // Reset Data
-                        setSimData(null);
-                        setPapData(null);
-                        setRunName('');
-                        setSettings({ sim_id: null });
-
-                        // Switch "pages"
-                        setShowSim(false);
-                        setSelectedZone(null);
-                      } catch (error) {
-                        console.error('Delete failed:', error);
-                        alert('Failed to delete run');
-                      }
+    <div className="sim_container">
+      {!showSim ? (
+        <div className="sim_settings px-4">
+          <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
+          <SimSettings sendData={sendSimulatorData} />
+        </div>
+      ) : !simdata || !papdata ? (
+        <div>Loading simulation data...</div>
+      ) : (
+        <div className="sim_output px-4">
+          <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4 text-center">
+              <h2 className="text-xl font-semibold">
+                Convenience Zone: {selectedZone.name}
+              </h2>
+              <p className="text-sm text-gray-600">
+                Created on:{' '}
+                {new Date(selectedZone.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-2 items-center">
+                <label htmlFor="run-name" className="text-sm text-gray-700">
+                  Run Name:
+                </label>
+                <input
+                  id="run-name"
+                  type="text"
+                  value={runName || ''}
+                  onChange={(e) => setRunName(e.target.value)}
+                  onBlur={handleRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRename();
+                      e.currentTarget.blur();
                     }
                   }}
-                  className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded"
-                >
-                  Delete Run
-                </button>
+                  className="rounded px-2 py-1 text-sm bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]"
+                  placeholder="Untitled Run"
+                />
               </div>
-              <ModelMap
-                selectedZone={selectedZone}
-                onMarkerClick={handleMarkerClick}
-              />
+              <button
+                onClick={async () => {
+                  if (
+                    window.confirm(
+                      'Are you sure you want to delete this run? This action cannot be undone.'
+                    )
+                  ) {
+                    try {
+                      const res = await fetch(
+                        `${DB_URL}simdata/${settings.sim_id}`,
+                        {
+                          method: 'DELETE'
+                        }
+                      );
+
+                      if (!res.ok) {
+                        throw new Error('Failed to delete');
+                      }
+
+                      // Reset Data
+                      setSimData(null);
+                      setPapData(null);
+                      setRunName('');
+                      setSettings({ sim_id: null });
+
+                      // Switch "pages"
+                      setShowSim(false);
+                      setSelectedZone(null);
+                    } catch (error) {
+                      console.error('Delete failed:', error);
+                      alert('Failed to delete run');
+                    }
+                  }
+                }}
+                className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded"
+              >
+                Delete Run
+              </button>
             </div>
-
-            <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
-
-            <OutputGraphs selected_loc={selectedLoc} onReset={onReset} />
+            <ModelMap
+              selectedZone={selectedZone}
+              onMarkerClick={handleMarkerClick}
+            />
           </div>
-        )}
-      </div>
+
+          <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
+
+          <OutputGraphs selected_loc={selectedLoc} onReset={onReset} />
+        </div>
+      )}
     </div>
   );
 }

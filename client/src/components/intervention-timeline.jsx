@@ -5,7 +5,10 @@ import './intervention-timeline.css';
 import Interventions from './interventions';
 
 export default function InterventionTimeline() {
-  const settings = useSimSettings((state) => state.settings);
+  const hours = useSimSettings((state) => state.hours);
+  const zone = useSimSettings((state) => state.zone);
+  const interventions = useSimSettings((state) => state.interventions);
+
   const addInterventions = useSimSettings((state) => state.addInterventions);
   const setInterventions = useSimSettings((state) => state.setInterventions);
   const deleteInterventions = useSimSettings(
@@ -17,12 +20,12 @@ export default function InterventionTimeline() {
 
   useEffect(() => {
     const unused = Array.from(
-      { length: settings.hours },
+      { length: hours },
       (_, i) => i + 1
     ).filter((v) => !values.includes(v));
 
     for (let i = 0; i < values.length; i++) {
-      if (values[i] > settings.hours) {
+      if (values[i] > hours) {
         const newtime = unused.pop();
         setInterventions(values[i], { time: newtime });
         setValues((cur) => [...cur].with(i, newtime));
@@ -31,7 +34,7 @@ export default function InterventionTimeline() {
         }
       }
     }
-  }, [curtime, setInterventions, settings.hours, values]);
+  }, [curtime, setInterventions, hours, values]);
 
   const addThumb = (e) => {
     if (values.length >= 10) {
@@ -46,7 +49,7 @@ export default function InterventionTimeline() {
 
     const rect = e.currentTarget.getBoundingClientRect();
     const clickRatio = (e.clientX - rect.left) / (rect.right - rect.left);
-    const newtime = Math.round(clickRatio * settings.hours);
+    const newtime = Math.round(clickRatio * hours);
 
     addInterventions(newtime);
     setValues((prev) => [...prev, newtime].sort((a, b) => a - b));
@@ -105,7 +108,7 @@ export default function InterventionTimeline() {
             }
             type="range"
             min={0}
-            max={settings.hours}
+            max={hours}
             value={value}
             onChange={(e) => {
               // Can't change the first timeline option
@@ -155,7 +158,7 @@ export default function InterventionTimeline() {
             className="iv_timeline bg-[#222629] disabled:bg-stone-600"
             onClick={() => {
               const newvalue = Array.from(
-                { length: settings.hours },
+                { length: hours },
                 (_, i) => i + 1
               ).filter((v) => !values.includes(v))[0];
 
@@ -183,10 +186,10 @@ export default function InterventionTimeline() {
           {curtime.toString().padStart(3, '0')}
         </h4>
         <h4 className="text-center text-lg">
-          {settings.zone &&
+          {zone &&
             new Date(
-              new Date(settings.zone.start_date).getTime() +
-                curtime * 60 * 60 * 1000
+              new Date(zone.start_date).getTime() +
+              curtime * 60 * 60 * 1000
             ).toLocaleString('en-US', {
               day: 'numeric',
               month: 'long',

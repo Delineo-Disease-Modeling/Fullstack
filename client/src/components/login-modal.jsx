@@ -1,21 +1,34 @@
 import { useState } from 'react';
 import Modal from 'react-modal';
-import useAuth from '../stores/auth';
+import { signIn, signUp } from '../lib/auth-client';
 
 Modal.setAppElement(document.getElementById('root'));
 
 function FormData({ curTab, closeModal }) {
-  const login = useAuth((state) => state.login);
-  const register = useAuth((state) => state.register);
 
-  const formSubmit = (formdata) => {
+  const formSubmit = async (formdata) => {
     const request = {};
+
     formdata.forEach((value, key) => (request[key] = value));
 
     if (curTab === 0) {
-      login(request).then(closeModal).catch(console.error);
+      await signIn.email({
+        email: request.email,
+        password: request.password
+      }, {
+        onSuccess: closeModal,
+        onError: (ctx) => alert(ctx.error.message)
+      });
     } else {
-      register(request).then(closeModal).catch(console.error);
+      await signUp.email({
+        email: request.email,
+        password: request.password,
+        name: request.name,
+        organization: request.organization
+      }, {
+        onSuccess: closeModal,
+        onError: (ctx) => alert(ctx.error.message)
+      });
     }
   };
 
@@ -115,7 +128,7 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           <button
             onClick={() => setCurTab(0)}
             data-tab={curTab}
-            className="cursor-pointer underline underline-offset-[10px] decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-[#70B4D4] hover:bg-slate-700"
+            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-[#70B4D4] hover:bg-slate-700"
             style={{ boxShadow: 'inset 0 -1px 0 0 #313131' }}
           >
             Login
@@ -123,7 +136,7 @@ export default function LoginModal({ isOpen, onRequestClose }) {
           <button
             onClick={() => setCurTab(1)}
             data-tab={curTab}
-            className="cursor-pointer underline underline-offset-[10px] decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-[#70B4D4] hover:bg-slate-700"
+            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-[#70B4D4] hover:bg-slate-700"
           >
             Register
           </button>

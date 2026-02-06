@@ -2,10 +2,10 @@ import useSimSettings from '../stores/simsettings';
 import { SimParameter } from './settings-components';
 
 export default function Interventions({ time }) {
-  const settings = useSimSettings((state) => state.settings);
+  const allInterventions = useSimSettings((state) => state.interventions);
   const setInterventions = useSimSettings((state) => state.setInterventions);
 
-  const interventions = settings.interventions.find((i) => i.time === time);
+  const interventions = allInterventions.find((i) => i.time === time);
 
   if (!interventions) {
     return null;

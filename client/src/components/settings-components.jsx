@@ -104,7 +104,7 @@ export function SimRunSelector({ czone_id, sim_id, callback }) {
     <div className="flex flex-col items-center w-full gap-4">
       <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2]">
         {/* Title */}
-        <div className="bg-[#70B4D4] text-center text-white w-full h-6 hover:cursor-pointer">
+        <div className="bg-[#70B4D4] text-center text-white w-full h-6">
           Visit a Previous Run
         </div>
 

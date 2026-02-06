@@ -25,7 +25,7 @@ const COLORS = [
 ];
 
 export default function OutputGraphs({ selected_loc, onReset }) {
-  const settings = useSimSettings((state) => state.settings);
+  const sim_id = useSimSettings((state) => state.sim_id);
 
   const [chartType, setChartType] = useState('iot');
   const [chartData, setChartData] = useState();
@@ -33,7 +33,7 @@ export default function OutputGraphs({ selected_loc, onReset }) {
   useEffect(() => {
     setChartData(null);
 
-    const url = new URL(`${DB_URL}simdata/${settings.sim_id}/chartdata`);
+    const url = new URL(`${DB_URL}simdata/${sim_id}/chartdata`);
 
     if (selected_loc) {
       url.searchParams.append('loc_type', selected_loc.type);
@@ -59,7 +59,7 @@ export default function OutputGraphs({ selected_loc, onReset }) {
     return () => {
       abortController.abort();
     };
-  }, [settings.sim_id, selected_loc]);
+  }, [sim_id, selected_loc]);
 
   return (
     <div className="outputgraphs_container">

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import useAuth from '../stores/auth';
+import { useState } from 'react';
+import { useSession, signOut } from '../lib/auth-client';
 import Modal from 'react-modal';
 import LoginModal from './login-modal';
 
@@ -11,14 +11,8 @@ Modal.setAppElement(document.getElementById('root'));
 export default function Navbar() {
   const [modalOpen, setModalOpen] = useState('');
 
-  const user = useAuth((state) => state.user);
-  const validate = useAuth((state) => state.validate);
-  const logout = useAuth((state) => state.logout);
-
-  useEffect(() => {
-    validate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { data: session } = useSession();
+  const user = session?.user;
 
   return (
     <div>
@@ -102,7 +96,7 @@ export default function Navbar() {
             <button
               className="modal bg-red-400"
               onClick={() => {
-                logout();
+                signOut();
                 setModalOpen('');
               }}
             >

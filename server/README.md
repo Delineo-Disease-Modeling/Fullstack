@@ -11,8 +11,13 @@ Then, you'll want to install [PostgreSQL](https://www.postgresql.org/) and start
 Next, clone this repository and create a `.env` file in the root directory with the following schema:
 
 ```text
-DATABASE_URL=<POSTGRES_DB_URL>
+PRISMA_DB_URL=<POSTGRES_DB_URL>
+DB_FOLDER=./db/
+BETTER_AUTH_SECRET=<GENERATE A RANDOM SECRET>
+BETTER_AUTH_URL=http://localhost:1890
 ```
+
+(Generate a random secret using `openssl rand -base64 32`)
 
 Finally, run the following commands:
 
