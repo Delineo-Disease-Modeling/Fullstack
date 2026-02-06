@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import CzDict from './czdict';
 import useSimSettings from '../stores/simsettings';
 import InterventionTimeline from './intervention-timeline';
@@ -15,10 +16,15 @@ export default function SimSettings({ sendData, error, loading }) {
   const sim_id = useSimSettings((state) => state.sim_id);
   const setSettings = useSimSettings((state) => state.setSettings);
 
+  const updateZone = useCallback(
+    (zone) => setSettings({ zone }),
+    [setSettings]
+  );
+
   return (
     <div className="flex flex-col items-center gap-16">
       {/* Pass setSelectedZone to SimLocation, so we get the full object */}
-      <CzDict zone={zone} setZone={(zone) => setSettings({ zone })} />
+      <CzDict zone={zone} setZone={updateZone} />
 
       <div className="flex flex-wrap justify-center gap-8">
         <SimParameter
@@ -57,7 +63,7 @@ export default function SimSettings({ sendData, error, loading }) {
         callback={(sim_id) => setSettings({ sim_id })}
       />
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-4">
         <button
           className="simset_button w-32 disabled:bg-gray-400! disabled:pointer-events-none"
           disabled={loading}
@@ -74,7 +80,7 @@ export default function SimSettings({ sendData, error, loading }) {
           {loading ? 'Loading...' : 'Simulate'}
         </button>
         {error && (
-          <div className="text-red-500 text-sm font-semibold max-w-md text-center">
+          <div className="text-red-500 text-sm max-w-md text-center">
             {error}
           </div>
         )}

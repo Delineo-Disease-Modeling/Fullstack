@@ -7,9 +7,14 @@ import { DB_FOLDER } from '../env.js';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
 import parser from 'stream-json';
 import { createReadStream } from 'fs';
-import { unlink } from 'fs/promises';
+import { unlink, readFile, access } from 'fs/promises';
+import { constants } from 'fs';
 import chain from 'stream-chain';
 import { HTTPException } from 'hono/http-exception';
+import { stream } from 'hono/streaming';
+import { generateGlobalStats } from '../lib/sim-stats.js';
+import { ingestSimData, SimDatabase } from '../lib/sqlite-store.js';
+import type { SimData } from '@prisma/client/index-browser';
 
 const simdata_route = new Hono();
 
@@ -45,106 +50,14 @@ const updateSimDataSchema = z.object({
   name: z.string().min(2).optional()
 });
 
-async function getSimData(id: number) {
-  const simdata = await prisma.simData.findUnique({
-    where: { id }
-  });
+type DataPoint = {
+  time: number;
+  [key: string]: number;
+};
 
-  if (!simdata) {
-    throw new HTTPException(404, {
-      message: 'Could not find associated simdata'
-    });
-  }
-
-  /**
-   * Each key is a facility ID
-   * Values look like:
-   * {
-   *    population: 0,
-   *    infected: 0
-   * }
-   */
-  type SimData = {
-    [time: string]: {
-      homes: {
-        [id: string]: {
-          population: number;
-          infected: number;
-        };
-      };
-      places: {
-        [id: string]: {
-          population: number;
-          infected: number;
-        };
-      };
-    };
-  };
-
-  const data: SimData = {};
-
-  const simdatapl = chain([
-    createReadStream(DB_FOLDER + simdata.simdata),
-    parser(),
-    StreamObject.streamObject()
-  ])[Symbol.asyncIterator]();
-
-  const patternspl = chain([
-    createReadStream(DB_FOLDER + simdata.patterns),
-    parser(),
-    StreamObject.streamObject()
-  ])[Symbol.asyncIterator]();
-
-  let spl = await simdatapl.next();
-  let ppl = await patternspl.next();
-
-  while (!spl.done && !ppl.done) {
-    const skey = spl.value.key;
-    const pkey = ppl.value.key;
-
-    if (skey !== pkey) {
-      continue;
-    }
-
-    const svalue = spl.value.value;
-    const pvalue = ppl.value.value;
-
-    data[skey] = { homes: {}, places: {} };
-
-    const curinfected = [
-      ...new Set(
-        Object.values(svalue)
-          .map((people) => Object.keys(people as any))
-          .flat()
-      )
-    ];
-
-    for (const [id, pop] of Object.entries(pvalue['homes']) as [
-      string,
-      string[]
-    ][]) {
-      data[skey]['homes'][id] = {
-        population: pop.length,
-        infected: pop.filter((v) => curinfected.includes(v)).length
-      };
-    }
-
-    for (const [id, pop] of Object.entries(pvalue['places']) as [
-      string,
-      string[]
-    ][]) {
-      data[skey]['places'][id] = {
-        population: pop.length,
-        infected: pop.filter((v) => curinfected.includes(v)).length
-      };
-    }
-
-    spl = await simdatapl.next();
-    ppl = await patternspl.next();
-  }
-
-  return data;
-}
+type ChartData = {
+  [type: string]: DataPoint[];
+};
 
 simdata_route.post(
   '/simdata',
@@ -162,6 +75,28 @@ simdata_route.post(
       saveFileStream(simdata, DB_FOLDER + simdata_obj.simdata),
       saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns)
     ]);
+
+    // Background: Get PapData Path and Trigger pre-computation
+    // We need to find the papdata associated with the czone
+    // Assuming simple relation or passing check.
+    const papdata_obj = await prisma.paPData.findUnique({
+      where: { czone_id: Number(czone_id) }
+    });
+    if (papdata_obj) {
+      generateGlobalStats(
+        DB_FOLDER + simdata_obj.simdata,
+        DB_FOLDER + simdata_obj.patterns,
+        DB_FOLDER + papdata_obj.id,
+        DB_FOLDER + simdata_obj.simdata + '.stats.json'
+      ).catch((e) => console.error('Stats generation failed:', e));
+
+      // Background: Trigger SQLite Ingestion
+      ingestSimData(
+        DB_FOLDER + simdata_obj.simdata,
+        DB_FOLDER + simdata_obj.patterns,
+        DB_FOLDER + simdata_obj.simdata + '.db'
+      ).catch((e) => console.error('SQLite ingestion failed:', e));
+    }
 
     return c.json({
       data: {
@@ -254,15 +189,114 @@ simdata_route.get(
       });
     }
 
-    const data = await getSimData(id);
+    // Check if files exist on disk
+    try {
+      await Promise.all([
+        access(DB_FOLDER + simdata.simdata, constants.F_OK),
+        access(DB_FOLDER + simdata.patterns, constants.F_OK)
+      ]);
+    } catch (e) {
+      // Integrity Error: Delete the metadata from DB to prevent ghosts
+      await prisma.simData.delete({ where: { id: simdata.id } });
+      throw new HTTPException(404, {
+        message:
+          'Simulation resource files not found on server. The run has been removed from the database.'
+      });
+    }
 
-    return c.json({
-      data: {
-        simdata: data,
-        simdata: data,
-        name: simdata.name,
-        zone: simdata.czone
+    return stream(c, async (stream) => {
+      // Stream the response to avoid memory overload
+      await stream.write(
+        `{"data":{"name":${JSON.stringify(simdata.name)},"zone":${JSON.stringify(simdata.czone)},"simdata":{`
+      );
+
+      let first = true;
+
+      const simdatapl = chain([
+        createReadStream(DB_FOLDER + simdata.simdata),
+        parser(),
+        StreamObject.streamObject()
+      ])[Symbol.asyncIterator]();
+
+      const patternspl = chain([
+        createReadStream(DB_FOLDER + simdata.patterns),
+        parser(),
+        StreamObject.streamObject()
+      ])[Symbol.asyncIterator]();
+
+      let spl = await simdatapl.next();
+      let ppl = await patternspl.next();
+
+      while (!spl.done && !ppl.done) {
+        const skey = spl.value.key;
+        const pkey = ppl.value.key;
+
+        if (skey !== pkey) {
+          if (+skey < +pkey) {
+            spl = await simdatapl.next();
+            continue;
+          } else {
+            ppl = await patternspl.next();
+            continue;
+          }
+        }
+
+        if (!first) {
+          await stream.write(',');
+        }
+        first = false;
+
+        const svalue = spl.value.value;
+        const pvalue = ppl.value.value;
+
+        // Transformation Logic (Inline to save memory)
+        // this should be a utility but fine here for streaming context
+        const frameData: any = { homes: {}, places: {} };
+
+        const curinfected = new Set(
+          Object.values(svalue)
+            .map((people) => Object.keys(people as any))
+            .flat()
+        );
+
+        // Client expects: { homes: {id: {population, infected}}, places: ... }
+
+        for (const [id, pop] of Object.entries(pvalue['homes']) as [
+          string,
+          string[]
+        ][]) {
+          const infCount = pop.filter((v) => curinfected.has(v)).length;
+          if (infCount > 0) {
+            // optimization: only send if interesting? Client might need pop always.
+            frameData['homes'][id] = {
+              population: pop.length,
+              infected: infCount
+            };
+          } else {
+            frameData['homes'][id] = {
+              population: pop.length,
+              infected: 0
+            };
+          }
+        }
+        for (const [id, pop] of Object.entries(pvalue['places']) as [
+          string,
+          string[]
+        ][]) {
+          const infCount = pop.filter((v) => curinfected.has(v)).length;
+          frameData['places'][id] = {
+            population: pop.length,
+            infected: infCount
+          };
+        }
+
+        await stream.write(`"${skey}":${JSON.stringify(frameData)}`);
+
+        spl = await simdatapl.next();
+        ppl = await patternspl.next();
       }
+
+      await stream.write('}}}');
     });
   }
 );
@@ -293,7 +327,7 @@ simdata_route.get(
     }
 
     return c.json({
-      data: czone.simdata.map((simdata) => ({
+      data: czone.simdata.map((simdata: SimData) => ({
         name: simdata.name,
         created_at: simdata.created_at,
         sim_id: simdata.id
@@ -333,13 +367,21 @@ async function getPapData(czone_id: number) {
     });
   }
 
-  let data = '';
-  const papdata = createReadStream(DB_FOLDER + papdata_obj.id);
-  for await (const chunk of papdata) {
-    data += chunk;
-  }
+  // Optimize: Use readFile instead of stream+concat
+  try {
+    const data = await readFile(DB_FOLDER + papdata_obj.id, 'utf8');
+    return JSON.parse(data);
+  } catch (e) {
+    // File missing!
+    // The user likely deleted the convenience zone files manually or storage was wiped.
+    // Remove the CZ (cascades to PaPData and SimData)
+    await prisma.convenienceZone.delete({ where: { id: czone_id } });
 
-  return JSON.parse(data);
+    throw new HTTPException(404, {
+      message:
+        'Convenience Zone data file missing. The Zone has been removed from the database.'
+    });
+  }
 }
 
 // This returns just enough data for each chart type
@@ -364,137 +406,127 @@ simdata_route.get(
       );
     }
 
-    const papdata = await getPapData(simdata.czone_id);
-
-    type DataPoint = {
-      time: number;
-      [key: string]: number;
-    };
-
-    type ChartData = {
-      [type: string]: DataPoint[];
-    };
-
-    const data: ChartData = {
-      iot: [],
-      ages: [],
-      sexes: [],
-      states: []
-    };
-
-    const simdatapl = chain([
-      createReadStream(DB_FOLDER + simdata.simdata),
-      parser(),
-      StreamObject.streamObject()
-    ])[Symbol.asyncIterator]();
-
-    const patternspl = chain([
-      createReadStream(DB_FOLDER + simdata.patterns),
-      parser(),
-      StreamObject.streamObject()
-    ])[Symbol.asyncIterator]();
-
-    let spl = await simdatapl.next();
-    let ppl = await patternspl.next();
-
-    while (!spl.done && !ppl.done) {
-      const skey = spl.value.key;
-      const pkey = ppl.value.key;
-
-      if (skey !== pkey) {
-        continue;
-      }
-
-      const svalue = spl.value.value;
-      const pvalue = ppl.value.value;
-
-      const iot_data: DataPoint = {
-        time: +skey / 60
-      };
-
-      const ages_data: DataPoint = {
-        time: +skey / 60
-      };
-
-      const sexes_data: DataPoint = {
-        time: +skey / 60
-      };
-
-      const states_data: DataPoint = {
-        time: +skey / 60
-      };
-
-      // Initialize data
-      sexes_data['Male'] = 0;
-      sexes_data['Female'] = 0;
-
-      for (const range of age_ranges) {
-        ages_data[range.join('-')] = 0;
-      }
-
-      for (const state of Object.keys(infection_states)) {
-        states_data[state] = 0;
-      }
-
-      let infected_list = svalue;
-
-      if (loc_id && loc_type) {
-        iot_data['All People'] = pvalue[loc_type][loc_id]?.length ?? 0;
-
-        for (const disease of Object.keys(svalue) as string[]) {
-          iot_data[disease] = 0;
-        }
-
-        for (const [disease, people] of Object.entries(svalue) as [
-          string,
-          object
-        ][]) {
-          infected_list[disease] = Object.fromEntries(
-            Object.entries(people).filter(([k, v]) =>
-              pvalue[loc_type][loc_id]?.includes(k)
-            )
-          );
-        }
-      }
-
-      for (const [disease, people] of Object.entries(infected_list) as [
-        string,
-        object
-      ][]) {
-        iot_data[disease] = Object.keys(people).length;
-
-        for (const [state, value] of Object.entries(infection_states)) {
-          states_data[state] += Object.values(people).filter(
-            (s) => s & value
-          ).length;
-        }
-
-        Object.keys(people).forEach((id) => {
-          const person_data = papdata['people'][id];
-
-          sexes_data[person_data['sex'] == 0 ? 'Male' : 'Female'] += 1;
-
-          for (const range of age_ranges) {
-            if (
-              person_data['age'] >= range[0] &&
-              person_data['age'] <= range[1]
-            ) {
-              ages_data[range.join('-')] += 1;
-            }
-          }
+    // Check if we have pre-computed stats for global query
+    if (!loc_id || !loc_type) {
+      try {
+        const stats = await readFile(
+          DB_FOLDER + simdata.simdata + '.stats.json',
+          'utf8'
+        );
+        return c.json({ data: JSON.parse(stats) });
+      } catch (e) {
+        // Stats file missing, generate it on the fly (and save it)
+        // This is the fallback if upload happened before this update
+        const papdata_obj = await prisma.paPData.findUnique({
+          where: { czone_id: simdata.czone_id }
         });
+
+        if (papdata_obj) {
+          // Check if source files exist before trying to generate
+          try {
+            await Promise.all([
+              access(DB_FOLDER + simdata.simdata, constants.F_OK),
+              access(DB_FOLDER + simdata.patterns, constants.F_OK)
+            ]);
+
+            const stats = await generateGlobalStats(
+              DB_FOLDER + simdata.simdata,
+              DB_FOLDER + simdata.patterns,
+              DB_FOLDER + papdata_obj.id,
+              DB_FOLDER + simdata.simdata + '.stats.json'
+            );
+            return c.json({ data: stats });
+          } catch (e) {
+            throw new HTTPException(404, {
+              message: 'Simulation source files missing, cannot generate stats'
+            });
+          }
+        }
       }
-
-      data['iot'].push(iot_data);
-      data['ages'].push(ages_data);
-      data['sexes'].push(sexes_data);
-      data['states'].push(states_data);
-
-      spl = await simdatapl.next();
-      ppl = await patternspl.next();
     }
 
-    return c.json({ data });
+    // If specific location, check for SQLite DB
+    if (loc_id) {
+      const dbPath = DB_FOLDER + simdata.simdata + '.db';
+      try {
+        await access(dbPath, constants.F_OK);
+        // DB Exists, use it!
+        const simDb = new SimDatabase(dbPath);
+        const rows = simDb.getStats(loc_id); // This returns [{time, ...}, ...]
+        simDb.close(); // Close immediately after use
+
+        // Transform rows to ChartData format
+        const chartData: ChartData = {
+          iot: [],
+          ages: [],
+          sexes: [],
+          states: []
+        };
+
+        // We need `papdata` for the demography mapping.
+        const papdata = await getPapData(simdata.czone_id);
+
+        for (const row of rows) {
+          const iot_data: DataPoint = { time: row.time };
+          const ages_data: DataPoint = { time: row.time };
+          const sexes_data: DataPoint = { time: row.time };
+          const states_data: DataPoint = { time: row.time };
+
+          // Init
+          sexes_data['Male'] = 0;
+          sexes_data['Female'] = 0;
+          for (const range of age_ranges) ages_data[range.join('-')] = 0;
+          for (const state of Object.keys(infection_states))
+            states_data[state] = 0;
+
+          // IOT Data
+          iot_data['All People'] = row.population;
+          const infectedMap = row.infected_list; // { disease: { pid: state } }
+
+          for (const [disease, people] of Object.entries(infectedMap) as [
+            string,
+            any
+          ][]) {
+            iot_data[disease] = Object.keys(people).length;
+
+            // States
+            for (const [state, value] of Object.entries(infection_states)) {
+              states_data[state] += Object.values(people).filter(
+                (s: any) => s & (value as number)
+              ).length;
+            }
+
+            // Demographics
+            Object.keys(people).forEach((pid) => {
+              const p = papdata['people'][pid];
+              if (p) {
+                sexes_data[p['sex'] == 0 ? 'Male' : 'Female'] += 1;
+                for (const range of age_ranges) {
+                  if (p['age'] >= range[0] && p['age'] <= range[1]) {
+                    ages_data[range.join('-')] += 1;
+                  }
+                }
+              }
+            });
+          }
+
+          chartData.iot.push(iot_data);
+          chartData.ages.push(ages_data);
+          chartData.sexes.push(sexes_data);
+          chartData.states.push(states_data);
+        }
+
+        return c.json({ data: chartData });
+      } catch (e) {
+        console.error('SQLite DB error:', e);
+        throw new HTTPException(404, {
+          message:
+            'Simulation database not found. Please re-run the simulation to generate the required index.'
+        });
+      }
+    }
+
+    throw new HTTPException(400, { message: 'Invalid request parameters' });
   }
 );
 

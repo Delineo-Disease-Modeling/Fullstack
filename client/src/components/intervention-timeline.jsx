@@ -89,7 +89,7 @@ export default function InterventionTimeline() {
   };
 
   return (
-    <div className="flex flex-col w-full gap-4">
+    <div className="flex flex-col w-full max-w-250 gap-4">
       {/* Timeline bar */}
       <div
         className="relative flex items-center w-full h-6 select-none"

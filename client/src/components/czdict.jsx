@@ -17,17 +17,34 @@ export default function CzDict({ zone, setZone }) {
   const hasUserZones = user && locations.some((loc) => loc.user_id === user.id);
 
   useEffect(() => {
+    let active = true;
     fetch(`${import.meta.env.VITE_DB_URL}convenience-zones`)
       .then((res) => res.json())
       .then((json) => {
-        if (!zone && json['data']?.[0]) {
-          setZone(json['data'][0]);
-        }
+        if (!active) return;
+        const locs = json.data ?? [];
+        setLocations(locs);
 
-        setLocations(json.data ?? []);
+        if (zone) {
+          // If we have a selected zone, ensure it's up to date with the fetched list
+          const freshZone = locs.find((z) => z.id === zone.id);
+          if (freshZone && JSON.stringify(freshZone) !== JSON.stringify(zone)) {
+            // Determine if we should update.
+            // Simple equality check might be enough if object order is stable
+            console.log('Syncing stale zone data', zone, freshZone);
+            setZone(freshZone);
+          }
+        } else if (locs.length > 0) {
+          // No zone selected, select the first one
+          setZone(locs[0]);
+        }
       })
       .catch(console.error);
-  }, [zone, setZone]);
+
+    return () => {
+      active = false;
+    };
+  }, [setZone, zone]);
 
   useEffect(() => {
     if (!hasUserZones) {

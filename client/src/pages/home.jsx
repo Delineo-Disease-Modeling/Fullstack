@@ -10,8 +10,8 @@ export default function Home() {
         <DiseaseGraph />
         <div className="left relative">
           <div className="bubble" />
-          <h1 className="title">Delineo Project</h1>
-          <h2 className="title">Small-town disease simulation</h2>
+          <h1 className="title">Delineo</h1>
+          <h2 className="title">Community-level disease modeling</h2>
           <NavLink to="/simulator">
             <button className="app">Start</button>
           </NavLink>

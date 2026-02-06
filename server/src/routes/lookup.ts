@@ -79,7 +79,7 @@ async function resolveLocation(
     )}&key=${GOOGLE_API_KEY}`
   );
   const loc_json = (await loc_resp.json()) as GeocodeResponse;
-  
+
   const res: { zip_code: string; city: string } = { zip_code: '', city: '' };
 
   for (const result of loc_json.results) {
@@ -116,7 +116,10 @@ lookup_route.post(
     }
 
     if (!cbg) {
-       return c.json({ error: 'CBG not found for this location', zip, city }, 404);
+      return c.json(
+        { error: 'CBG not found for this location', zip, city },
+        404
+      );
     }
 
     return c.json({ cbg, zip_code: zip, city });

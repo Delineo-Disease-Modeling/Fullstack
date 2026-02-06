@@ -119,7 +119,7 @@ export default function SimulatorRun() {
   if (loading) {
     return (
       <div className="sim_container">
-        <div>Loading simulation data...</div>
+        <div className="my-auto">Loading simulation data...</div>
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default function SimulatorRun() {
     return (
       <div className="sim_container">
         <div className="flex flex-col items-center justify-center gap-4 mt-20">
-          <div className="text-red-500 font-bold text-xl">{error}</div>
+          <div className="text-red-500 text-lg">{error}</div>
           <button
             onClick={() => navigate('/simulator')}
             className="bg-[var(--color-bg-dark)] text-[var(--color-text-light)] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
@@ -230,9 +230,9 @@ export default function SimulatorRun() {
       <div className="flex justify-center w-full">
         <button
           onClick={() => navigate('/simulator')}
-          className="bg-[var(--color-bg-dark)] text-[var(--color-text-light)] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 mb-8"
+          className="simset_button w-32"
         >
-          Return to Settings
+          Return
         </button>
       </div>
     </div>

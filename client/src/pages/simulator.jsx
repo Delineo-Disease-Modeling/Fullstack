@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useSimSettings from '../stores/simsettings';
@@ -20,6 +20,11 @@ export default function Simulator() {
 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Deselect any previous run when entering this page
+    setSettings({ sim_id: null });
+  }, [setSettings]);
 
   const makePostRequest = async () => {
     const settings = useSimSettings.getState();
@@ -65,16 +70,10 @@ export default function Simulator() {
 
       setSettings({ sim_id: data['data']['id'] });
 
-      const dbRes = await axios.get(
-        `${import.meta.env.VITE_DB_URL}simdata/${data['data']['id']}`
-      );
+      setSettings({ sim_id: data['data']['id'] });
+      console.log('Set sim_id to:', data['data']['id']);
 
-      if (dbRes.status !== 200) {
-        throw new Error('Status code mismatch');
-      }
-
-      setSimData(dbRes.data['data']['simdata']);
-      setRunName(dbRes.data['data']['name']);
+      // We rely on the navigation to /simulator/:id to fetch the data
       return true;
     } catch (e) {
       console.error(e);
@@ -99,12 +98,7 @@ export default function Simulator() {
       const papJson = await papRes.json();
       setPapData(papJson['data']);
 
-      const settings = useSimSettings.getState();
-      const simSuccess = await makePostRequest({
-        ...settings,
-        czone_id: zone.id,
-        length: settings.hours * 60
-      });
+      const simSuccess = await makePostRequest();
 
       if (simSuccess) {
         // Navigate to the run page
