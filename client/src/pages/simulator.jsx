@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DB_URL, SIM_URL } from '../env';
 import axios from 'axios';
 import useSimSettings from '../stores/simsettings';
 import useSimData from '../stores/simdata';
@@ -31,7 +30,7 @@ export default function Simulator() {
     if (!sim_id || !runName || runName.length < 2) return;
 
     try {
-      const res = await fetch(`${DB_URL}simdata/${sim_id}`, {
+      const res = await fetch(`${import.meta.env.VITE_DB_URL}simdata/${sim_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -64,7 +63,7 @@ export default function Simulator() {
 
     if (settings.sim_id !== null) {
       try {
-        const res = await fetch(`${DB_URL}simdata/${settings.sim_id}`);
+        const res = await fetch(`${import.meta.env.VITE_DB_URL}simdata/${settings.sim_id}`);
 
         if (!res.ok) {
           throw new Error(`Invalid simdata response ${res.status}`);
@@ -81,7 +80,7 @@ export default function Simulator() {
     }
 
     axios
-      .post(`${SIM_URL}simulation/`, reqbody)
+      .post(`${import.meta.env.VITE_SIM_URL}simulation/`, reqbody)
       .then(({ status, data }) => {
         if (status !== 200) {
           throw new Error('Status code mismatch');
@@ -90,7 +89,7 @@ export default function Simulator() {
         setSettings({ sim_id: data['data']['id'] });
 
         axios
-          .get(`${DB_URL}simdata/${data['data']['id']}`)
+          .get(`${import.meta.env.VITE_DB_URL}simdata/${data['data']['id']}`)
           .then(({ status, data }) => {
             if (status !== 200) {
               throw new Error('Status code mismatch');
@@ -114,7 +113,7 @@ export default function Simulator() {
     setShowSim(true);
     setSelectedZone(zone);
 
-    fetch(`${DB_URL}papdata/${zone.id}`)
+    fetch(`${import.meta.env.VITE_DB_URL}papdata/${zone.id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error();
@@ -194,7 +193,7 @@ export default function Simulator() {
                   ) {
                     try {
                       const res = await fetch(
-                        `${DB_URL}simdata/${settings.sim_id}`,
+                        `${import.meta.env.VITE_DB_URL}simdata/${settings.sim_id}`,
                         {
                           method: 'DELETE'
                         }

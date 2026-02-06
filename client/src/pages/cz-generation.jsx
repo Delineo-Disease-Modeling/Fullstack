@@ -7,7 +7,6 @@ import {
   Popup,
   useMapEvents
 } from 'react-leaflet';
-import { ALG_URL, DB_URL } from '../env';
 import axios from 'axios';
 import { useSession } from '../lib/auth-client';
 
@@ -132,7 +131,7 @@ export default function CZGeneration() {
 
 
   const lookupLocation = async (location) => {
-    const resp = await fetch(`${DB_URL}lookup-location`, {
+    const resp = await fetch(`${import.meta.env.VITE_DB_URL}lookup-location`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -160,7 +159,7 @@ export default function CZGeneration() {
 
       console.log(locationData);
 
-      const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
+      const { status, data } = await axios.post(`${import.meta.env.VITE_ALG_URL}generate-cz`, {
         name: locationData.city || formdata.get('location'),
         description: formdata.get('description'),
         cbg: locationData.cbg,

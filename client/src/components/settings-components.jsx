@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { DB_URL } from '../env';
 
 import './settings-components.css';
 
@@ -83,7 +82,7 @@ export function SimRunSelector({ czone_id, sim_id, callback }) {
       return;
     }
 
-    fetch(`${DB_URL}simdata/cache/${czone_id}`)
+    fetch(`${import.meta.env.VITE_DB_URL}simdata/cache/${czone_id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error(`Invalid cache response ${res.status}`);

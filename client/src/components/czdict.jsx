@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DB_URL } from '../env';
 import { useSession } from '../lib/auth-client';
 import InstructionBanner from './instruction-banner';
 import useSimSettings from '../stores/simsettings';
@@ -16,7 +15,7 @@ export default function CzDict({ zone, setZone }) {
   const [hoveredLocId, setHoveredLocId] = useState(null);
 
   useEffect(() => {
-    fetch(`${DB_URL}convenience-zones`)
+    fetch(`${import.meta.env.VITE_DB_URL}convenience-zones`)
       .then((res) => res.json())
       .then((json) => {
         if (!zone && json['data']?.[0]) {
