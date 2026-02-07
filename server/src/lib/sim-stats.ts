@@ -45,15 +45,15 @@ export async function generateGlobalStats(
   );
   let papdata: any;
   try {
-     if (papDataPath.endsWith('.gz')) {
-        papdata = JSON.parse(gunzipSync(papDataRaw).toString());
-     } else {
-        papdata = JSON.parse(papDataRaw.toString());
-     }
-  } catch(e) {
-      console.error("Failed to parse PapData:", e);
-      // Fallback or re-throw
-      throw e;
+    if (papDataPath.endsWith('.gz')) {
+      papdata = JSON.parse(gunzipSync(papDataRaw).toString());
+    } else {
+      papdata = JSON.parse(papDataRaw.toString());
+    }
+  } catch (e) {
+    console.error('Failed to parse PapData:', e);
+    // Fallback or re-throw
+    throw e;
   }
 
   const data: ChartData = {
@@ -72,7 +72,7 @@ export async function generateGlobalStats(
   const patChain: any[] = [createReadStream(patternsPath)];
   if (patternsPath.endsWith('.gz')) patChain.push(createGunzip());
   patChain.push(parser(), StreamObject.streamObject());
-  
+
   const patternspl = chain(patChain)[Symbol.asyncIterator]();
 
   let spl = await simdatapl.next();

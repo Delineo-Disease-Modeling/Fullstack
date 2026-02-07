@@ -14,7 +14,7 @@ import chain from 'stream-chain';
 import { HTTPException } from 'hono/http-exception';
 import { stream } from 'hono/streaming';
 import { generateGlobalStats } from '../lib/sim-stats.js';
-import { processSimData, SimDatabase } from '../lib/sqlite-store.js';
+import { processSimData, getStats } from '../lib/postgres-store.js';
 import type { SimData } from '@prisma/client/index-browser';
 
 const simdata_route = new Hono();
@@ -76,8 +76,14 @@ simdata_route.post(
     const patIsGz = patterns.name.endsWith('.gz');
 
     await Promise.all([
-      saveFileStream(simdata, DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : '')),
-      saveFileStream(patterns, DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''))
+      saveFileStream(
+        simdata,
+        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : '')
+      ),
+      saveFileStream(
+        patterns,
+        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : '')
+      )
     ]);
 
     // Background: Get PapData Path and Trigger pre-computation
@@ -103,12 +109,12 @@ simdata_route.post(
         DB_FOLDER + simdata_obj.simdata + '.stats.json'
       ).catch((e) => console.error('Stats generation failed:', e));
 
-      // Background: Trigger SQLite Ingestion
+      // Background: Trigger Postgres Ingestion
       processSimData(
+        simdata_obj.id,
         DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
-        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
-        DB_FOLDER + simdata_obj.simdata + '.db'
-      ).catch((e) => console.error('SQLite ingestion failed:', e));
+        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : '')
+      ).catch((e) => console.error('Postgres ingestion failed:', e));
     }
 
     return c.json({
@@ -487,15 +493,10 @@ simdata_route.get(
       }
     }
 
-    // If specific location, check for SQLite DB
+    // If specific location, query Postgres
     if (loc_id) {
-      const dbPath = DB_FOLDER + simdata.simdata + '.db';
       try {
-        await access(dbPath, constants.F_OK);
-        // DB Exists, use it!
-        const simDb = new SimDatabase(dbPath);
-        const rows = simDb.getStats(loc_id); // This returns [{time, ...}, ...]
-        simDb.close(); // Close immediately after use
+        const rows = await getStats(simdata.id, loc_id);
 
         // Transform rows to ChartData format
         const chartData: ChartData = {
@@ -560,10 +561,9 @@ simdata_route.get(
 
         return c.json({ data: chartData });
       } catch (e) {
-        console.error('SQLite DB error:', e);
-        throw new HTTPException(404, {
-          message:
-            'Simulation database not found. Please re-run the simulation to generate the required index.'
+        console.error('Stats retrieval error:', e);
+        throw new HTTPException(500, {
+          message: 'Failed to retrieve simulation statistics.'
         });
       }
     }

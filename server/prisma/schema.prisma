@@ -100,6 +100,22 @@ model SimData {
   simdata       String @unique @default(uuid())
   czone_id      Int
   czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
+  stats         LocationStats[]
+}
+
+model LocationStats {
+  id            String   @id @default(cuid())
+  simDataId     Int      // Foreign key to SimData
+  time          Int
+  locationId    String   @map("location_id")
+  locationType  String   @map("location_type") 
+  population    Int
+  infected      Int
+  infectedList  Bytes    @map("infected_list") // Stored as BLOB (Bytes)
+
+  simData       SimData  @relation(fields: [simDataId], references: [id], onDelete: Cascade)
+  
+  @@index([simDataId, locationId, time])
 }
 
 model POI {
