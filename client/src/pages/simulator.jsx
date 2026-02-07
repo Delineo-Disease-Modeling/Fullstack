@@ -26,6 +26,8 @@ export default function Simulator() {
     setSettings({ sim_id: null });
   }, [setSettings]);
 
+  const [progress, setProgress] = useState(0);
+
   const makePostRequest = async () => {
     const settings = useSimSettings.getState();
     const reqbody = {
@@ -36,6 +38,7 @@ export default function Simulator() {
 
     console.log(reqbody);
 
+    // If we have a selected run, load it directly
     if (settings.sim_id !== null) {
       try {
         const res = await fetch(
@@ -58,26 +61,63 @@ export default function Simulator() {
       }
     }
 
+    // Start a new simulation with SSE
+    setProgress(0);
     try {
-      const { status, data } = await axios.post(
+      const response = await fetch(
         `${import.meta.env.VITE_SIM_URL}simulation/`,
-        reqbody
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(reqbody)
+        }
       );
 
-      if (status !== 200) {
-        throw new Error('Status code mismatch');
+      if (!response.ok) {
+        throw new Error(`Simulation failed with status ${response.status}`);
       }
 
-      setSettings({ sim_id: data['data']['id'] });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      setSettings({ sim_id: data['data']['id'] });
-      console.log('Set sim_id to:', data['data']['id']);
+      while (true) {
+        const { done, value } = await reader.read();
 
-      // We rely on the navigation to /simulator/:id to fetch the data
-      return true;
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop(); // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const msg = JSON.parse(line.slice(6));
+
+              if (msg.type === 'progress') {
+                setProgress(msg.value);
+              } else if (msg.type === 'result') {
+                setSettings({ sim_id: msg.data.id });
+                console.log('Set sim_id to:', msg.data.id);
+                return true; // Success
+              } else if (msg.type === 'error') {
+                throw new Error(msg.message);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE message:', e);
+            }
+          }
+        }
+      }
+
+      // If stream ends without result, investigate (shouldn't happen with our server logic)
+      return false;
     } catch (e) {
       console.error(e);
-      setError('Failed to start simulation. Please try again.');
+      setError(`Failed to start simulation: ${e.message}`);
       return false;
     }
   };
@@ -123,6 +163,7 @@ export default function Simulator() {
           sendData={sendSimulatorData}
           error={error}
           loading={loading}
+          progress={progress}
         />
       </div>
     </div>

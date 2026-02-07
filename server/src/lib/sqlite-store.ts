@@ -48,7 +48,7 @@ export class SimDatabase {
       WHERE location_id = ?
       ORDER BY time ASC
     `);
-    
+
     return stmt.all(locationId).map((row: any) => ({
       ...row,
       infected_list: JSON.parse(row.infected_list)
@@ -66,7 +66,7 @@ export async function ingestSimData(
   dbPath: string
 ) {
   const simDb = new SimDatabase(dbPath);
-  
+
   // Streaming Logic (similar to sim-stats but inserting into DB)
   const simdatapl = chain([
     createReadStream(simdataPath),
@@ -91,8 +91,13 @@ export async function ingestSimData(
     const pkey = ppl.value.key;
 
     if (skey !== pkey) {
-        if (+skey < +pkey) { spl = await simdatapl.next(); continue; }
-        else { ppl = await patternspl.next(); continue; }
+      if (+skey < +pkey) {
+        spl = await simdatapl.next();
+        continue;
+      } else {
+        ppl = await patternspl.next();
+        continue;
+      }
     }
 
     const svalue = spl.value.value;
@@ -108,57 +113,73 @@ export async function ingestSimData(
     */
 
     // Homes
-    for (const [id, pop] of Object.entries(pvalue['homes']) as [string, string[]][]) {
-        // Find infected in this house
-        const houseInfections: Record<string, number> = {};
-        
-        let infectedCount = 0;
-        const infectionDetails: any = {};
+    for (const [id, pop] of Object.entries(pvalue['homes']) as [
+      string,
+      string[]
+    ][]) {
+      // Find infected in this house
+      const houseInfections: Record<string, number> = {};
 
-        for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
-            const diseaseInfections = Object.entries(people).filter(([pid, _]) => pop.includes(pid));
-            if (diseaseInfections.length > 0) {
-                infectionDetails[disease] = Object.fromEntries(diseaseInfections);
-                infectedCount += diseaseInfections.length; // Approximate if one person has multiple diseases? Usually acceptable.
-            }
+      let infectedCount = 0;
+      const infectionDetails: any = {};
+
+      for (const [disease, people] of Object.entries(svalue) as [
+        string,
+        object
+      ][]) {
+        const diseaseInfections = Object.entries(people).filter(([pid, _]) =>
+          pop.includes(pid)
+        );
+        if (diseaseInfections.length > 0) {
+          infectionDetails[disease] = Object.fromEntries(diseaseInfections);
+          infectedCount += diseaseInfections.length; // Approximate if one person has multiple diseases? Usually acceptable.
         }
+      }
 
-        batch.push({
-            time,
-            location_id: id,
-            location_type: 'home',
-            population: pop.length,
-            infected: infectedCount,
-            infected_list: JSON.stringify(infectionDetails)
-        });
+      batch.push({
+        time,
+        location_id: id,
+        location_type: 'home',
+        population: pop.length,
+        infected: infectedCount,
+        infected_list: JSON.stringify(infectionDetails)
+      });
     }
 
     // Places
-    for (const [id, pop] of Object.entries(pvalue['places']) as [string, string[]][]) {
-        let infectedCount = 0;
-        const infectionDetails: any = {};
+    for (const [id, pop] of Object.entries(pvalue['places']) as [
+      string,
+      string[]
+    ][]) {
+      let infectedCount = 0;
+      const infectionDetails: any = {};
 
-        for (const [disease, people] of Object.entries(svalue) as [string, object][]) {
-            const diseaseInfections = Object.entries(people).filter(([pid, _]) => pop.includes(pid));
-            if (diseaseInfections.length > 0) {
-                 infectionDetails[disease] = Object.fromEntries(diseaseInfections);
-                 infectedCount += diseaseInfections.length;
-            }
+      for (const [disease, people] of Object.entries(svalue) as [
+        string,
+        object
+      ][]) {
+        const diseaseInfections = Object.entries(people).filter(([pid, _]) =>
+          pop.includes(pid)
+        );
+        if (diseaseInfections.length > 0) {
+          infectionDetails[disease] = Object.fromEntries(diseaseInfections);
+          infectedCount += diseaseInfections.length;
         }
+      }
 
-        batch.push({
-            time,
-            location_id: id,
-            location_type: 'place',
-            population: pop.length,
-            infected: infectedCount,
-            infected_list: JSON.stringify(infectionDetails)
-        });
+      batch.push({
+        time,
+        location_id: id,
+        location_type: 'place',
+        population: pop.length,
+        infected: infectedCount,
+        infected_list: JSON.stringify(infectionDetails)
+      });
     }
-    
+
     if (batch.length >= BATCH_SIZE) {
-        simDb.insertBatch(batch);
-        batch = [];
+      simDb.insertBatch(batch);
+      batch = [];
     }
 
     spl = await simdatapl.next();
@@ -166,7 +187,7 @@ export async function ingestSimData(
   }
 
   if (batch.length > 0) {
-      simDb.insertBatch(batch);
+    simDb.insertBatch(batch);
   }
 
   simDb.close();

@@ -99,6 +99,7 @@ model SimData {
   patterns      String @unique @default(uuid())
   simdata       String @unique @default(uuid())
   czone_id      Int
+  length        Int
   czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
   stats         LocationStats[]
 }

@@ -28,8 +28,15 @@ export default function SimulatorRun() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  if (!run_id) {
+    navigate('/simulator');
+    return;
+  }
+
   const handleRename = async () => {
-    if (!sim_id || !runName || runName.length < 2) return;
+    if (!sim_id || !runName || runName.length < 2) {
+      return;
+    }
 
     try {
       const res = await fetch(
@@ -56,17 +63,80 @@ export default function SimulatorRun() {
     }
   };
 
-  const loadRunFromUrl = async (id) => {
+  const [progress, setProgress] = useState(0);
+
+  const loadRunFromUrl = async (id, signal) => {
     setLoading(true);
+    setProgress(0);
     setSimData(null);
     setPapData(null);
     setError(null);
 
     try {
-      const simRes = await fetch(`${import.meta.env.VITE_DB_URL}simdata/${id}`);
-      if (!simRes.ok) throw new Error('Run not found');
+      const response = await fetch(
+        `${import.meta.env.VITE_DB_URL}simdata/${id}`,
+        { signal }
+      );
+      if (!response.ok) throw new Error('Run not found');
 
-      const simJson = await simRes.json();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let totalSteps = 0;
+      let fullJsonString = '';
+      let maxTimestamp = 0;
+      let tail = ''; // Buffer for handling split matches across chunks
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        fullJsonString += chunk;
+
+        // Use tail + chunk for scanning to handle split boundaries
+        const textToScan = tail + chunk;
+        tail = chunk.slice(-50); // Keep last 50 chars for next iteration
+
+        // Extract Length if not found yet
+        if (totalSteps === 0) {
+          // Check for "length": 123 in the stream
+          const lengthMatch = textToScan.match(/"length":\s*(\d+)/);
+          if (lengthMatch) {
+            totalSteps = parseInt(lengthMatch[1], 10);
+          }
+        }
+
+        // Extract Progress
+        if (totalSteps > 0) {
+          // Regex to find "TIMESTAMP":{"homes" or "TIMESTAMP":{"places"
+          const matches = [
+            ...textToScan.matchAll(/"(\d+)":\{"(?:homes|places)"/g)
+          ];
+
+          for (const match of matches) {
+            const ts = parseInt(match[1], 10);
+            if (!isNaN(ts)) {
+              maxTimestamp = Math.max(maxTimestamp, ts);
+            }
+          }
+
+          if (maxTimestamp > 0) {
+            const currentProgress = Math.min(
+              100,
+              Math.round((maxTimestamp / totalSteps) * 100)
+            );
+            setProgress((old) => Math.max(old, currentProgress));
+          }
+        }
+      }
+
+      // Force 100% on completion
+      setProgress(100);
+
+      // Parse the full JSON
+      const simJson = JSON.parse(fullJsonString);
       const { simdata, name, zone: zoneData } = simJson.data;
 
       // Restore Settings
@@ -83,29 +153,33 @@ export default function SimulatorRun() {
 
       // Fetch PapData for this zone
       const papRes = await fetch(
-        `${import.meta.env.VITE_DB_URL}papdata/${zoneData.id}`
+        `${import.meta.env.VITE_DB_URL}papdata/${zoneData.id}`,
+        { signal }
       );
       if (!papRes.ok) throw new Error('Population data not found');
       const papJson = await papRes.json();
       setPapData(papJson.data);
     } catch (e) {
+      if (e.name === 'AbortError') {
+        console.log('Fetch aborted');
+        return;
+      }
       console.error(e);
       setError('Failed to load run from URL.');
-      // If run fails to load, maybe we should redirect or show a big error?
-      // For now, let's show the error state.
     } finally {
-      setLoading(false);
+      if (!signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    if (run_id) {
-      loadRunFromUrl(run_id);
-    } else {
-      // If no run_id, invalid state for this page
-      navigate('/simulator');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const controller = new AbortController();
+    loadRunFromUrl(run_id, controller.signal);
+
+    return () => {
+      controller.abort();
+    };
   }, [run_id]);
 
   const handleMarkerClick = ({ id, label, type }) => {
@@ -119,7 +193,18 @@ export default function SimulatorRun() {
   if (loading) {
     return (
       <div className="sim_container">
-        <div className="my-auto">Loading simulation data...</div>
+        <div className="flex flex-col items-center gap-4 my-auto">
+          <div className="text-lg">Loading simulation data...</div>
+          {progress > 0 && (
+            <div className="w-72 rounded-full h-2 bg-(--color-bg-dark)">
+              <div
+                className="bg-(--color-primary-blue) h-2 rounded-full transition-all duration-100"
+                style={{ width: `${progress}%` }}
+              />
+              <p className="text-sm text-center mt-2">{progress}%</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -131,7 +216,7 @@ export default function SimulatorRun() {
           <div className="text-red-500 text-lg">{error}</div>
           <button
             onClick={() => navigate('/simulator')}
-            className="bg-[var(--color-bg-dark)] text-[var(--color-text-light)] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
+            className="bg-(--color-bg-dark) text-(--color-text-light) w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
           >
             Return
           </button>
@@ -176,7 +261,7 @@ export default function SimulatorRun() {
                     e.currentTarget.blur();
                   }
                 }}
-                className="rounded px-2 py-1 text-sm bg-[var(--color-bg-ivory)] outline-solid outline-2 outline-[var(--color-primary-blue)]"
+                className="rounded px-2 py-1 text-sm bg-(--color-bg-ivory) outline-solid outline-2 outline-(--color-primary-blue)"
                 placeholder="Untitled Run"
               />
             </div>
