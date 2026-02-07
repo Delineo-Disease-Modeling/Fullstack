@@ -1,22 +1,19 @@
 div.main {
   width: 100%;
+  overflow: hidden;
   min-height: calc(100vh - 30px);
   background-color: var(--color-bg-cream);
   background-image:
-    repeating-linear-gradient(
-      45deg,
+    repeating-linear-gradient(45deg,
       rgba(120, 160, 255, 0.25) 0px,
       rgba(120, 160, 255, 0.25) 2px,
       transparent 2px,
-      transparent 80px
-    ),
-    repeating-linear-gradient(
-      -45deg,
+      transparent 80px),
+    repeating-linear-gradient(-45deg,
       rgba(120, 160, 255, 0.25) 0px,
       rgba(120, 160, 255, 0.25) 2px,
       transparent 2px,
-      transparent 60px
-    );
+      transparent 60px);
   display: flex;
   justify-content: space-evenly;
   align-items: center;
@@ -135,14 +132,13 @@ p.feature {
 }
 
 .bubble {
+  width: 200%;
+  height: 200%;
   position: absolute;
-  top: -150px;
-  left: -100px;
-  width: 550px;
-  height: 500px;
-  border-radius: 80%;
-  pointer-events: none;
+  top: -50%;
+  left: -50%;
   z-index: -1;
+  border-radius: 80%;
   background: radial-gradient(circle, #ff9bb0, #ff8593, #e07080);
   filter: blur(80px);
   opacity: 0.6;
