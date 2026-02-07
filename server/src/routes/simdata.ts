@@ -22,7 +22,8 @@ const simdata_route = new Hono();
 const postSimDataSchema = z.object({
   czone_id: z.coerce.number().nonnegative(),
   simdata: z.instanceof(File),
-  patterns: z.instanceof(File)
+  patterns: z.instanceof(File),
+  length: z.coerce.number().nonnegative()
 });
 
 const getSimDataSchema = z.object({
@@ -64,11 +65,12 @@ simdata_route.post(
   '/simdata',
   zValidator('form', postSimDataSchema),
   async (c) => {
-    const { simdata, patterns, czone_id } = c.req.valid('form');
+    const { simdata, patterns, czone_id, length } = c.req.valid('form');
 
     const simdata_obj = await prisma.simData.create({
       data: {
-        czone_id: czone_id
+        czone_id: czone_id,
+        length: length
       }
     });
 
@@ -244,7 +246,7 @@ simdata_route.get(
     return stream(c, async (stream) => {
       // Stream the response to avoid memory overload
       await stream.write(
-        `{"data":{"name":${JSON.stringify(simdata.name)},"zone":${JSON.stringify(simdata.czone)},"simdata":{`
+        `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)},"simdata":{`
       );
 
       let first = true;
@@ -420,9 +422,7 @@ async function getPapData(czone_id: number) {
     const data = await readFile(DB_FOLDER + papdata_obj.id, 'utf8');
     return JSON.parse(data);
   } catch (e) {
-    // File missing!
-    // The user likely deleted the convenience zone files manually or storage was wiped.
-    // Remove the CZ (cascades to PaPData and SimData)
+    // File missing, remove from DB
     await prisma.convenienceZone.delete({ where: { id: czone_id } });
 
     throw new HTTPException(404, {
