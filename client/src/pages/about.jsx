@@ -1,4 +1,4 @@
-import './about.css';
+import '../styles/about.css';
 
 export default function About() {
   return (
@@ -9,9 +9,9 @@ export default function About() {
         <div className="entry" data-aos="fade-up" data-aos-once="true">
           <img className="aboutimg" src="./algosAboutPagePic.png" alt="logo" />
           <div className="aboutinfo">
-            <header className="text-2xl font-medium pb-5 text-center">
+            <h1 className="text-2xl font-medium pb-5 text-center">
               Convenience Zone Generation & Pre-Computation
-            </header>
+            </h1>
             <p className="text-base">
               Our team specializes in designing innovative algorithms that lay
               the foundation for accurate and detailed simulations.

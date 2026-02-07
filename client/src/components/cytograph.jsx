@@ -1,7 +1,7 @@
 import CytoscapeComponent from 'react-cytoscapejs';
 import { useEffect, useState } from 'react';
 
-import './cytograph.css';
+import '../styles/cytograph.css';
 
 export default function CytoGraph({ move_patterns, pap_data }) {
   const [papData, setPapData] = useState(null);

@@ -1,20 +1,20 @@
 footer.site_footer {
   left: 0;
   bottom: 0;
-  background-color: #222629;
+  background-color: var(--color-bg-dark);
   width: 100%;
   padding: 40px;
   text-align: center;
 }
 
 button.site_footer {
-  border: 2px solid #f0f0f0;
+  border: 2px solid var(--color-border-light);
   border-radius: 25px;
-  background-color: #222629;
+  background-color: var(--color-bg-dark);
   width: 120px;
   height: 50px;
   padding: 12px;
-  color: #f0f0f0;
+  color: var(--color-text-light);
   text-decoration: none;
   font-size: 16px;
   font-family: "Poppins";
@@ -23,8 +23,8 @@ button.site_footer {
 
 button.site_footer:hover {
   transform: scale(1.05);
-  background-color: #f0f0f0;
-  color: #222629;
+  background-color: var(--color-text-light);
+  color: var(--color-bg-dark);
   cursor: pointer;
 }
 

@@ -1,10 +1,10 @@
 div.modelmap_legend_div {
   position: absolute;
   z-index: 1;
-  background-color: #fffff2;
+  background-color: var(--color-bg-ivory);
   margin: 10px;
   padding: 5px;
-  outline: 2px solid #70b4d4;
+  outline: 2px solid var(--color-primary-blue);
 
   overflow-y: scroll;
   overflow-x: hidden;

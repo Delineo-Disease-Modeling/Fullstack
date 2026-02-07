@@ -3,7 +3,7 @@ import { Map, Popup, Source, Layer } from 'react-map-gl/maplibre';
 import useSimData from '../stores/simdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import './modelmap.css';
+import '../styles/modelmap.css';
 import MapLegend from './maplegend';
 
 const icon_lookup = {
@@ -327,7 +327,7 @@ function ClusteredMap({
   };
 
   return (
-    <div className="mapcontainer outline-solid outline-2 outline-[#70B4D4] relative">
+    <div className="mapcontainer outline-solid outline-2 outline-[var(--color-primary-blue)] relative">
       <Map
         ref={mapRef}
         onLoad={handleMapLoad}
@@ -586,7 +586,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
       {/* Slider Component */}
       <div className="flex items-center justify-center gap-3 mt-3">
         <button
-          className="bg-[#70B4D4] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
+          className="bg-[var(--color-primary-blue)] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
           onClick={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
@@ -609,7 +609,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
       {/* Input Box */}
       <div className="flex justify-center mt-3">
         <input
-          className="w-[10%] px-1 bg-[#fffff2] outline-solid outline-2 outline-[#70B4D4]"
+          className="w-[10%] px-1 bg-[var(--color-bg-ivory)] outline-solid outline-2 outline-[var(--color-primary-blue)]"
           type="number"
           min={1}
           max={maxHours}

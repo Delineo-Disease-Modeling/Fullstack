@@ -14,21 +14,21 @@ div.mselect_label {
 }
 
 select.mselect_selectvariant {
-  background-color: #fffff2;
+  background-color: var(--color-bg-ivory);
   width: 100px;
   margin: auto;
   overflow-y: auto;
 
-  outline: 2px solid #70b4d4;
+  outline: 2px solid var(--color-primary-blue);
 }
 
 select.mselect_selectmatrix {
-  background-color: #fffff2;
+  background-color: var(--color-bg-ivory);
   width: 300px;
   margin: auto;
   overflow-y: auto;
 
-  outline: 2px solid #70b4d4;
+  outline: 2px solid var(--color-primary-blue);
 }
 
 div.mselect_varadder {
@@ -46,8 +46,8 @@ button.mselect_button {
   border-radius: 10px;
   width: 10%;
   height: 20px;
-  background-color: #222629;
-  color: #f0f0f0;
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-light);
   text-decoration: none;
   text-align: center;
   line-height: 2px;
@@ -58,8 +58,8 @@ button.mselect_button {
 
 button.mselect_button:hover {
   transform: scale(1.05);
-  background-color: #f0f0f0;
-  color: #222629;
+  background-color: var(--color-text-light);
+  color: var(--color-bg-dark);
   cursor: pointer;
 }
 
@@ -68,8 +68,8 @@ button.mselect_button:active {
 }
 
 input.mselect_input {
-  background-color: #fffff2;
+  background-color: var(--color-bg-ivory);
   width: 70%;
-  outline: 2px solid #70b4d4;
+  outline: 2px solid var(--color-primary-blue);
   padding: 0px 2px;
 }

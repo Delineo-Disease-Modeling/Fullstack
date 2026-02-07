@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { DB_URL } from '../env';
 import {
   LineChart,
   Line,
@@ -13,7 +12,7 @@ import {
 import { CustomTooltip } from './customtooltip';
 import useSimSettings from '../stores/simsettings';
 
-import './outputgraphs.css';
+import '../styles/outputgraphs.css';
 
 const COLORS = [
   '#8884d8',
@@ -25,7 +24,7 @@ const COLORS = [
 ];
 
 export default function OutputGraphs({ selected_loc, onReset }) {
-  const settings = useSimSettings((state) => state.settings);
+  const sim_id = useSimSettings((state) => state.sim_id);
 
   const [chartType, setChartType] = useState('iot');
   const [chartData, setChartData] = useState();
@@ -33,7 +32,9 @@ export default function OutputGraphs({ selected_loc, onReset }) {
   useEffect(() => {
     setChartData(null);
 
-    const url = new URL(`${DB_URL}simdata/${settings.sim_id}/chartdata`);
+    const url = new URL(
+      `${import.meta.env.VITE_DB_URL}simdata/${sim_id}/chartdata`
+    );
 
     if (selected_loc) {
       url.searchParams.append('loc_type', selected_loc.type);
@@ -59,14 +60,14 @@ export default function OutputGraphs({ selected_loc, onReset }) {
     return () => {
       abortController.abort();
     };
-  }, [settings.sim_id, selected_loc]);
+  }, [sim_id, selected_loc]);
 
   return (
     <div className="outputgraphs_container">
       <div className="p-2.5">
         <label>Select Chart Type: </label>
         <select
-          className="px-1 outline-2 outline-solid bg-[#fffff2] outline-[#70B4D4]"
+          className="px-1 outline-2 outline-solid bg-[var(--color-bg-ivory)] outline-[var(--color-primary-blue)]"
           value={chartType}
           onChange={(e) => setChartType(e.target.value)}
         >

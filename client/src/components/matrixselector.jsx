@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import './matrixselector.css';
+import '../styles/matrixselector.css';
 
 // UPDATE THIS ANYTIME YOU ADD A NEW DEFAULT FILE
 const matrix_files = ['default1.csv', 'default2.csv'];

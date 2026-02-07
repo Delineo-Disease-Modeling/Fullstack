@@ -1,24 +1,18 @@
 import { NavLink } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import useAuth from '../stores/auth';
+import { useState } from 'react';
+import { useSession, signOut } from '../lib/auth-client';
 import Modal from 'react-modal';
 import LoginModal from './login-modal';
 
-import './navbar.css';
+import '../styles/navbar.css';
 
 Modal.setAppElement(document.getElementById('root'));
 
 export default function Navbar() {
   const [modalOpen, setModalOpen] = useState('');
 
-  const user = useAuth((state) => state.user);
-  const validate = useAuth((state) => state.validate);
-  const logout = useAuth((state) => state.logout);
-
-  useEffect(() => {
-    validate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { data: session } = useSession();
+  const user = session?.user;
 
   return (
     <div>
@@ -82,9 +76,9 @@ export default function Navbar() {
             transform: 'translate(-50%, -50%)',
             maxWidth: '80vw',
             borderRadius: '0.5rem',
-            background: '#222629',
-            border: '1px solid #F0F0F0',
-            color: '#F0F0F0',
+            background: 'var(--color-bg-dark)',
+            border: '1px solid var(--color-border-light)',
+            color: 'var(--color-text-light)',
             maxHeight: '90vh',
             overflowY: 'scroll'
           }
@@ -102,7 +96,7 @@ export default function Navbar() {
             <button
               className="modal bg-red-400"
               onClick={() => {
-                logout();
+                signOut();
                 setModalOpen('');
               }}
             >

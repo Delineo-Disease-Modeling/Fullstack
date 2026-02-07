@@ -1,5 +1,5 @@
 import 'animate.css';
-import './team.css';
+import '../styles/team.css';
 
 const teamData = {
   professors: [
@@ -74,11 +74,11 @@ const teamData = {
 export default function Team() {
   const renderTeamSection = (team, teamName) => (
     <div className="team" data-aos="fade-up" data-aos-once="true">
-      <header className="teamheader">{teamName}</header>
+      <h1 className="teamheader">{teamName}</h1>
       {team.map((member) => (
         <div className="member" key={member.name}>
           <img
-            className="member bg-[#88D2D8]"
+            className="member bg-[var(--color-accent-teal)]"
             onError={(e) => (e.target.src = './delineo.svg')}
             src={`images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`}
             alt={member.name}

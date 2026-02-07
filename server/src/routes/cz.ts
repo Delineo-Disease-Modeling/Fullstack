@@ -1,26 +1,24 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 
 const cz_route = new Hono();
-
-const prisma = new PrismaClient();
 
 const getConvZonesSchema = z.object({
   user_id: z.string().optional()
 });
 
 const postConvZonesSchema = z.object({
-  name: z.string().nonempty(),
-  description: z.string().nonempty(),
+  name: z.string().min(1),
+  description: z.string().min(1),
   latitude: z.number(),
   longitude: z.number(),
   cbg_list: z.array(z.string()),
   start_date: z.string().datetime(),
   length: z.number().nonnegative(),
   size: z.number().nonnegative(),
-  user_id: z.string().nonempty()
+  user_id: z.string().min(1)
 });
 
 const deleteConvZonesSchema = z.object({

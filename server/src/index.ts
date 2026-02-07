@@ -4,7 +4,7 @@ import { serve } from '@hono/node-server';
 import { trimTrailingSlash } from 'hono/trailing-slash';
 import { DB_FOLDER, PORT } from './env.js';
 import { HTTPException } from 'hono/http-exception';
-import { auth } from './middleware/auth.js';
+import { auth } from './lib/auth.js';
 import { bodyLimit } from 'hono/body-limit';
 import { mkdir } from 'fs/promises';
 
@@ -14,16 +14,14 @@ import cz_route from './routes/cz.js';
 import patterns_route from './routes/patterns.js';
 import simdata_route from './routes/simdata.js';
 
-const app = new Hono();
+const app = new Hono<{
+  Variables: {
+    user: typeof auth.$Infer.Session.user | null;
+    session: typeof auth.$Infer.Session.session | null;
+  };
+}>();
 
 app.use('*', trimTrailingSlash());
-app.use('*', auth);
-app.use(
-  '*',
-  bodyLimit({
-    maxSize: 20 * 1024 * 1024 * 1024
-  })
-);
 
 app.use(
   '*',
@@ -47,6 +45,27 @@ app.use(
   })
 );
 
+app.use(
+  '*',
+  bodyLimit({
+    maxSize: 20 * 1024 * 1024 * 1024
+  })
+);
+
+app.use('*', async (c, next) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+  if (!session) {
+    c.set('user', null);
+    c.set('session', null);
+    return next();
+  }
+
+  c.set('user', session.user);
+  c.set('session', session.session);
+  return next();
+});
+
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
     return c.json({ message: error.message }, error.status);
@@ -55,7 +74,7 @@ app.onError((error, c) => {
   return c.json({ message: 'An unknown error has occurred' }, 500);
 });
 
-app.route('/auth', auth_route);
+app.route('/', auth_route);
 app.route('/', lookup_route);
 app.route('/', cz_route);
 app.route('/', patterns_route);

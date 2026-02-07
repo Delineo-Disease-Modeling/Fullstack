@@ -1,60 +1,44 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMapEvents
-} from 'react-leaflet';
-import { ALG_URL, DB_URL } from '../env';
+import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/maplibre';
+import maplibregl from 'maplibre-gl';
 import axios from 'axios';
-import useAuth from '../stores/auth';
+import { useSession } from '../lib/auth-client';
 
-import zip_cbg_json from '../data/zip_to_cbg.json';
-
-import 'leaflet/dist/leaflet.css';
-import './cz-generation.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import '../styles/cz-generation.css';
 
 function InteractiveMap({ onLocationSelect, disabled }) {
   const [markerPosition, setMarkerPosition] = useState(null);
 
-  function LocationMarker() {
-    useMapEvents({
-      click(e) {
-        if (disabled) {
-          return;
-        }
-
-        setMarkerPosition(e.latlng);
-        const coords = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-        onLocationSelect(coords);
-      }
-    });
-
-    return markerPosition === null ? null : (
-      <Marker position={markerPosition}>
-        <Popup>
-          Selected Location: {markerPosition.lat.toFixed(4)},{' '}
-          {markerPosition.lng.toFixed(4)}
-        </Popup>
-      </Marker>
-    );
-  }
-
   return (
-    <MapContainer
-      center={[39.3290708, -76.6219753]}
-      zoom={10}
-      style={{ height: '100%', width: '100%' }}
+    <Map
+      mapLib={maplibregl}
+      initialViewState={{
+        longitude: -76.6219753,
+        latitude: 39.3290708,
+        zoom: 10
+      }}
+      style={{ width: '100%', height: '100%' }}
+      mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+      onClick={(e) => {
+        if (disabled) return;
+        const { lng, lat } = e.lngLat;
+        setMarkerPosition({ lat, lng });
+        const coords = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        onLocationSelect(coords);
+      }}
     >
-      <TileLayer
-        attribution="&copy; OpenStreetMap contributors"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <NavigationControl position="top-left" />
 
-      <LocationMarker />
-    </MapContainer>
+      {markerPosition && (
+        <Marker
+          longitude={markerPosition.lng}
+          latitude={markerPosition.lat}
+          color="red"
+        />
+      )}
+    </Map>
   );
 }
 
@@ -107,7 +91,8 @@ function FormField({
 
 export default function CZGeneration() {
   const navigate = useNavigate();
-  const user = useAuth((state) => state.user);
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
 
   const [location, setLocation] = useState('');
   const [minPop, setMinPop] = useState(5000);
@@ -118,13 +103,19 @@ export default function CZGeneration() {
   const [description, setDescription] = useState('');
   const [iframeHTML, setIframeHTML] = useState();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (isPending) {
+    return <div className="text-white text-center mt-20">Loading...</div>;
+  }
 
   if (!user) {
     navigate('/simulator');
+    return null;
   }
 
-  const loc_lookup = async (location) => {
-    const resp = await fetch(`${DB_URL}lookup-zip`, {
+  const lookupLocation = async (location) => {
+    const resp = await fetch(`${import.meta.env.VITE_DB_URL}lookup-location`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -139,36 +130,34 @@ export default function CZGeneration() {
     return await resp.json();
   };
 
-  const zip_to_cbg = (location) => {
-    return zip_cbg_json[location]?.[0];
-  };
-
   const generateCZ = (formdata) => {
     const func_body = async (formdata) => {
       console.log(formdata);
 
-      const location = await loc_lookup(formdata.get('location'));
-      const core_cbg = zip_to_cbg(
-        location?.['zip_code'] ?? formdata.get('location')
-      );
+      const locationData = await lookupLocation(formdata.get('location'));
 
-      if (!core_cbg) {
-        console.error('Could not find location');
+      if (!locationData || !locationData.cbg) {
+        console.error('Could not find location or CBG');
+        setError(
+          'Could not find location or CBG. Please try a different location.'
+        );
         return;
       }
 
-      console.log(location);
-      console.log(core_cbg);
+      console.log(locationData);
 
-      const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
-        name: location?.['city'] ?? formdata.get('location'),
-        description: formdata.get('description'),
-        cbg: core_cbg,
-        start_date: new Date(formdata.get('start_date')).toISOString(),
-        length: +formdata.get('length') * 24, // Days turn to hours
-        min_pop: +formdata.get('min_pop'),
-        user_id: user.id
-      });
+      const { status, data } = await axios.post(
+        `${import.meta.env.VITE_ALG_URL}generate-cz`,
+        {
+          name: locationData.city || formdata.get('location'),
+          description: formdata.get('description'),
+          cbg: locationData.cbg,
+          start_date: new Date(formdata.get('start_date')).toISOString(),
+          length: +formdata.get('length') * 24, // Days turn to hours
+          min_pop: +formdata.get('min_pop'),
+          user_id: user.id
+        }
+      );
 
       if (status !== 200) {
         throw new Error('Status code mismatch');
@@ -185,23 +174,27 @@ export default function CZGeneration() {
       return;
     }
 
+    setError('');
     setLoading(true);
     func_body(formdata)
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e);
+        setError('Failed to generate Convenience Zone. Please try again.');
+      })
       .finally(() => setLoading(false));
   };
 
   return (
     <div className="flex flex-col items-center justify-start gap-20 min-h-[calc(100vh-160px)]">
-      <header className="mt-28 text-3xl mx-8 text-wrap text-center">
+      <h1 className="mt-28 text-3xl mx-8 text-wrap text-center">
         Convenience Zone Creation
-      </header>
+      </h1>
 
       <form
         action={generateCZ}
         className="flex flex-col gap-8 mb-28 items-center"
       >
-        <div className="flex justify-center items-start gap-10 flex-wrap mx-4">
+        <div className="flex justify-center items-center gap-10 flex-wrap-reverse mx-4">
           <div className="flex flex-col gap-4 items-stretch">
             <FormField
               label="City, Address, or Location"
@@ -270,12 +263,17 @@ export default function CZGeneration() {
             </div>
           )}
         </div>
+        {error && (
+          <div className="text-red-500 font-bold mb-4 text-center mx-4">
+            {error}
+          </div>
+        )}
         <input
           type={!iframeHTML ? 'submit' : 'button'}
           value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
           onClick={() => iframeHTML && navigate('/simulator')}
           disabled={loading}
-          className="bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
+          className="bg-[var(--color-bg-dark)] text-[var(--color-text-light)] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
         />
       </form>
     </div>

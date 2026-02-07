@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type ConvenienceZone = {
+export type ConvenienceZone = {
   id: number;
   name: string;
   description: string;
@@ -15,7 +15,7 @@ type ConvenienceZone = {
   ready?: boolean;
 };
 
-type Interventions = {
+export type Interventions = {
   time: number;
   mask: number;
   vaccine: number;
@@ -24,7 +24,7 @@ type Interventions = {
   selfiso: number;
 };
 
-type SimSettings = {
+export type SimSettings = {
   sim_id: number | null;
   zone: ConvenienceZone | null;
   hours: number;
@@ -34,9 +34,7 @@ type SimSettings = {
   interventions: Interventions[];
 };
 
-interface SimSettingsStore {
-  settings: SimSettings;
-
+interface SimSettingsActions {
   setSettings: (new_settings: Partial<SimSettings>) => void;
   addInterventions: (time: number) => void;
   setInterventions: (
@@ -45,6 +43,8 @@ interface SimSettingsStore {
   ) => void;
   deleteInterventions: (time: number) => void;
 }
+
+type SimSettingsStore = SimSettings & SimSettingsActions;
 
 const default_interventions: Interventions = {
   time: 0,
@@ -65,43 +65,32 @@ const default_settings: SimSettings = {
 };
 
 const useSimSettings = create<SimSettingsStore>((set) => ({
-  settings: structuredClone(default_settings),
+  ...default_settings,
 
   setSettings: (new_settings) => {
-    set((state) => ({ settings: { ...state.settings, ...new_settings } }));
+    set((state) => ({ ...state, ...new_settings }));
   },
 
   addInterventions: (time) => {
     set((state) => ({
-      settings: {
-        ...state.settings,
-        interventions: state.settings.interventions.concat({
-          ...default_interventions,
-          time
-        })
-      }
+      interventions: state.interventions.concat({
+        ...default_interventions,
+        time
+      })
     }));
   },
 
   setInterventions: (time, new_interventions) => {
     set((state) => ({
-      settings: {
-        ...state.settings,
-        interventions: state.settings.interventions.map((i) =>
-          i.time !== time ? i : { ...i, ...new_interventions }
-        )
-      }
+      interventions: state.interventions.map((i) =>
+        i.time !== time ? i : { ...i, ...new_interventions }
+      )
     }));
   },
 
   deleteInterventions: (time) => {
     set((state) => ({
-      settings: {
-        ...state.settings,
-        interventions: state.settings.interventions.filter(
-          (i) => i.time !== time
-        )
-      }
+      interventions: state.interventions.filter((i) => i.time !== time)
     }));
   }
 }));
