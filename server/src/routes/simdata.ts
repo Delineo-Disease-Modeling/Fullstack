@@ -158,7 +158,7 @@ simdata_route.get(
 
       // Optimization: Fetch and filter PapData
       const papdata_obj = await prisma.paPData.findUnique({
-         where: { czone_id: simdata.czone_id }
+        where: { czone_id: simdata.czone_id }
       });
 
       if (papdata_obj) {
@@ -166,25 +166,25 @@ simdata_route.get(
         try {
           // Verify papdata exists
           await access(papPath, constants.F_OK);
-          
+
           // Read and Parse
           const raw = await readFile(papPath);
           // Handle GZIP
           const buffer = await new Promise<Buffer>((resolve, reject) => {
-             const unzip = createGunzip();
-             const chunks: any[] = [];
-             unzip.on('data', (c) => chunks.push(c));
-             unzip.on('end', () => resolve(Buffer.concat(chunks)));
-             unzip.on('error', reject);
-             unzip.end(raw);
+            const unzip = createGunzip();
+            const chunks: any[] = [];
+            unzip.on('data', (c) => chunks.push(c));
+            unzip.on('end', () => resolve(Buffer.concat(chunks)));
+            unzip.on('error', reject);
+            unzip.end(raw);
           });
-          
+
           const json = JSON.parse(buffer.toString());
-          
+
           // Filter logic
           optimizedPapData = {
-              homes: {},
-              places: {}
+            homes: {},
+            places: {}
           };
 
           for (const [id, _] of Object.entries(json['homes'])) {
@@ -200,33 +200,34 @@ simdata_route.get(
               top_category: val['top_category']
             };
           }
-
         } catch (e) {
-          console.error("Failed to load/optimize papdata for embedding", e);
+          console.error('Failed to load/optimize papdata for embedding', e);
         }
       }
-
     } catch (e) {
       // Integrity Error: Delete the metadata from DB to prevent ghosts
       // await prisma.simData.delete({ where: { id: simdata.id } });
       throw new HTTPException(404, {
-        message:
-          'Simulation resource files not found on server.'
+        message: 'Simulation resource files not found on server.'
       });
     }
 
     return stream(c, async (stream) => {
       // Stream the response
       const safePap = optimizedPapData || { homes: {}, places: {} };
-      
+
       // We need to send the canonical order of IDs for PapData first
-      const homeIds = Object.keys(safePap.homes).sort((a, b) => Number(a) - Number(b));
-      const placeIds = Object.keys(safePap.places).sort((a, b) => Number(a) - Number(b));
+      const homeIds = Object.keys(safePap.homes).sort(
+        (a, b) => Number(a) - Number(b)
+      );
+      const placeIds = Object.keys(safePap.places).sort(
+        (a, b) => Number(a) - Number(b)
+      );
 
       // Remap PapData to Arrays
       const papDataArrays = {
-          homes: homeIds.map(id => ({ id, ...safePap.homes[id] })),
-          places: placeIds.map(id => safePap.places[id])
+        homes: homeIds.map((id) => ({ id, ...safePap.homes[id] })),
+        places: placeIds.map((id) => safePap.places[id])
       };
 
       await stream.write(
@@ -285,7 +286,7 @@ simdata_route.get(
 
         const svalue = spl.value.value;
         const pvalue = ppl.value.value;
-        
+
         // Condensed Arrays
         const homesArray: number[] = [];
         const placesArray: number[] = [];
@@ -298,39 +299,40 @@ simdata_route.get(
 
         // Process Homes (Ordered)
         for (const id of homeIds) {
-           const pop = pvalue['homes'][id];
-           if (pop) {
-             const len = pop.length;
-             const infCount = pop.filter((v: any) => curinfected.has(v)).length;
-             homesArray.push(len, infCount);
-           } else {
-             homesArray.push(0, 0);
-           }
+          const pop = pvalue['homes'][id];
+          if (pop) {
+            const len = pop.length;
+            const infCount = pop.filter((v: any) => curinfected.has(v)).length;
+            homesArray.push(len, infCount);
+          } else {
+            homesArray.push(0, 0);
+          }
         }
 
         // Process Places (Ordered)
         for (const id of placeIds) {
-           const pop = pvalue['places'][id];
-           if (pop) {
-             const len = pop.length;
-             const infCount = pop.filter((v: any) => curinfected.has(v)).length;
-             placesArray.push(len, infCount);
-             
-              // Hotspot Detection
-              const prevInf = prevInfected[id] || 0;
-              if (infCount > 0 && prevInf > 0 && infCount >= prevInf * 5) {
-                if (!hotspots[id]) hotspots[id] = [];
-                hotspots[id].push(Number(skey));
-              }
-              prevInfected[id] = infCount;
+          const pop = pvalue['places'][id];
+          if (pop) {
+            const len = pop.length;
+            const infCount = pop.filter((v: any) => curinfected.has(v)).length;
+            placesArray.push(len, infCount);
 
-           } else {
-             placesArray.push(0, 0);
-             prevInfected[id] = 0;
-           }
+            // Hotspot Detection
+            const prevInf = prevInfected[id] || 0;
+            if (infCount > 0 && prevInf > 0 && infCount >= prevInf * 5) {
+              if (!hotspots[id]) hotspots[id] = [];
+              hotspots[id].push(Number(skey));
+            }
+            prevInfected[id] = infCount;
+          } else {
+            placesArray.push(0, 0);
+            prevInfected[id] = 0;
+          }
         }
 
-        await stream.write(`"${skey}":${JSON.stringify({ h: homesArray, p: placesArray })}`);
+        await stream.write(
+          `"${skey}":${JSON.stringify({ h: homesArray, p: placesArray })}`
+        );
 
         spl = await simIter.next();
         ppl = await patIter.next();
@@ -378,15 +380,15 @@ async function getPapData(czone_id: number) {
   try {
     await access(papPath, constants.F_OK);
     const raw = await readFile(papPath);
-    
+
     // Handle GZIP
     const buffer = await new Promise<Buffer>((resolve, reject) => {
-       const unzip = createGunzip();
-       const chunks: any[] = [];
-       unzip.on('data', (c) => chunks.push(c));
-       unzip.on('end', () => resolve(Buffer.concat(chunks)));
-       unzip.on('error', reject);
-       unzip.end(raw);
+      const unzip = createGunzip();
+      const chunks: any[] = [];
+      unzip.on('data', (c) => chunks.push(c));
+      unzip.on('end', () => resolve(Buffer.concat(chunks)));
+      unzip.on('error', reject);
+      unzip.end(raw);
     });
 
     return JSON.parse(buffer.toString());

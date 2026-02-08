@@ -144,9 +144,7 @@ export default function Simulator() {
   return (
     <div className="sim_container">
       <div className="sim_settings px-4">
-        <InstructionBanner
-          text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin."
-        />
+        <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
         <SimSettings
           sendData={sendSimulatorData}
           error={error}

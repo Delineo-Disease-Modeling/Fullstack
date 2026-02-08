@@ -112,9 +112,7 @@ export default function SimulatorRun() {
         // Extract Progress
         if (totalSteps > 0) {
           // Regex to find "TIMESTAMP":{"h" or "TIMESTAMP":{"p"
-          const matches = [
-            ...textToScan.matchAll(/"(\d+)":\{"(?:h|p)"/g)
-          ];
+          const matches = [...textToScan.matchAll(/"(\d+)":\{"(?:h|p)"/g)];
 
           for (const match of matches) {
             const ts = parseInt(match[1], 10);
@@ -138,13 +136,7 @@ export default function SimulatorRun() {
 
       // Parse the full JSON
       const simJson = JSON.parse(fullJsonString);
-      const {
-        simdata,
-        name,
-        zone: zoneData,
-        hotspots,
-        papdata
-      } = simJson.data;
+      const { simdata, name, zone: zoneData, hotspots, papdata } = simJson.data;
 
       // Restore Settings
       setSettings({

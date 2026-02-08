@@ -146,7 +146,9 @@ function EmojiOverlay({ map, hotspots = {} }) {
 
         // --- Check if this ID is in hotspots ---
         const isHotspot =
-          props.type === 'places' && hotspots && Object.keys(hotspots).includes(props.id);
+          props.type === 'places' &&
+          hotspots &&
+          Object.keys(hotspots).includes(props.id);
 
         // --- Pulse factor (sinusoidal between 0–1) ---
         const pulse = isHotspot
@@ -546,7 +548,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
       <div className="mt-3 text-center w-full">
         {new Date(
           new Date(selectedZone.start_date).getTime() +
-          currentTime * 60 * 60 * 1000
+            currentTime * 60 * 60 * 1000
         ).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',
