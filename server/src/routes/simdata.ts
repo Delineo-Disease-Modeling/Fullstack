@@ -15,6 +15,7 @@ import { HTTPException } from 'hono/http-exception';
 import { stream } from 'hono/streaming';
 import { generateGlobalStats } from '../lib/sim-stats.js';
 import { processSimData, getStats } from '../lib/postgres-store.js';
+import type { SimData } from '@prisma/client';
 
 const simdata_route = new Hono();
 
@@ -121,6 +122,29 @@ simdata_route.post(
         id: simdata_obj.id
       }
     });
+  }
+);
+
+simdata_route.patch(
+  '/simdata/:id',
+  zValidator('param', getSimDataSchema),
+  zValidator('json', updateSimDataSchema),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const { name } = c.req.valid('json');
+
+    try {
+      const simdata = await prisma.simData.update({
+        where: { id },
+        data: { name }
+      });
+
+      return c.json({ data: simdata });
+    } catch (e) {
+      throw new HTTPException(404, {
+        message: `Could not find simdata #${id}`
+      });
+    }
   }
 );
 
@@ -540,6 +564,41 @@ simdata_route.get(
     }
 
     throw new HTTPException(400, { message: 'Invalid request parameters' });
+  }
+);
+
+simdata_route.get(
+  '/simdata/cache/:czone_id',
+  zValidator('param', getSimDataCacheSchema),
+  async (c) => {
+    const { czone_id } = c.req.valid('param');
+
+    const czone = await prisma.convenienceZone.findUnique({
+      where: {
+        id: czone_id
+      },
+      include: {
+        simdata: {
+          orderBy: {
+            id: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!czone) {
+      throw new HTTPException(404, {
+        message: `Could not find convenience zone #${czone_id}`
+      });
+    }
+
+    return c.json({
+      data: czone.simdata.map((simdata: SimData) => ({
+        name: simdata.name,
+        created_at: simdata.created_at,
+        sim_id: simdata.id
+      }))
+    });
   }
 );
 
