@@ -97,18 +97,15 @@ patterns_route.get(
 
     return streamText(c, async (stream) => {
       // READ PAPDATA
-      let papPath = DB_FOLDER + papdata_obj.id;
-      let papIsGz = false;
+      let papPath = DB_FOLDER + papdata_obj.id + '.gz';
       try {
-        await access(papPath + '.gz', constants.F_OK);
-        papPath += '.gz';
-        papIsGz = true;
+        await access(papPath, constants.F_OK);
       } catch {
-        // assume plain
+        stream.close();
+        return;
       }
 
-      const papChain: any[] = [createReadStream(papPath)];
-      if (papIsGz) papChain.push(createGunzip());
+      const papChain: any[] = [createReadStream(papPath), createGunzip()];
 
       const papdataStream = chain(papChain);
 
@@ -119,18 +116,15 @@ patterns_route.get(
       await stream.write('\n');
 
       // READ PATTERNS
-      let patPath = DB_FOLDER + patterns_obj.id;
-      let patIsGz = false;
+      let patPath = DB_FOLDER + patterns_obj.id + '.gz';
       try {
-        await access(patPath + '.gz', constants.F_OK);
-        patPath += '.gz';
-        patIsGz = true;
+        await access(patPath, constants.F_OK);
       } catch {
-        // assume plain
+        stream.close();
+        return;
       }
 
-      const patChain: any[] = [createReadStream(patPath)];
-      if (patIsGz) patChain.push(createGunzip());
+      const patChain: any[] = [createReadStream(patPath), createGunzip()];
       patChain.push(parser(), StreamObject.streamObject());
 
       const pipeline = chain(patChain);
@@ -171,30 +165,44 @@ patterns_route.get(
       );
     }
 
-    let data = '';
-
-    let papPath = DB_FOLDER + papdata_obj.id;
-    let papIsGz = false;
+    let papPath = DB_FOLDER + papdata_obj.id + '.gz';
     try {
-      await access(papPath + '.gz', constants.F_OK);
-      papPath += '.gz';
-      papIsGz = true;
+      await access(papPath, constants.F_OK);
     } catch {
-      // assume plain
+      return c.json({ message: 'Papdata file not found' }, 404);
     }
 
-    const papChain: any[] = [createReadStream(papPath)];
-    if (papIsGz) papChain.push(createGunzip());
+    const papChain: any[] = [createReadStream(papPath), createGunzip()];
 
     const papdata = chain(papChain);
 
+    let data = '';
     for await (const chunk of papdata) {
       data += chunk;
     }
 
-    return c.json({
-      data: JSON.parse(data)
-    });
+    const json = JSON.parse(data);
+
+    const filtered: any = {
+      homes: {},
+      places: {}
+    };
+
+    for (const [id, _] of Object.entries(json['homes'])) {
+      filtered['homes'][id] = {};
+    }
+
+    for (const [id, val] of Object.entries(json['places']) as any) {
+      filtered['places'][id] = {
+        id: id,
+        latitude: val['latitude'],
+        longitude: val['longitude'],
+        label: val['label'],
+        top_category: val['top_category']
+      };
+    }
+
+    return c.json({ data: filtered });
   }
 );
 

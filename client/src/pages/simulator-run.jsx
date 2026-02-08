@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useSimSettings from '../stores/simsettings';
-import useSimData from '../stores/simdata';
+import useMapData from '../stores/mapdata';
 
 import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
@@ -14,14 +14,15 @@ export default function SimulatorRun() {
   const navigate = useNavigate();
   const sim_id = useSimSettings((state) => state.sim_id);
   const zone = useSimSettings((state) => state.zone);
-  const simdata = useSimData((state) => state.simdata);
-  const papdata = useSimData((state) => state.papdata);
-  const runName = useSimData((state) => state.name);
+  const simdata = useMapData((state) => state.simdata);
+  const papdata = useMapData((state) => state.papdata);
+  const runName = useMapData((state) => state.name);
 
   const setSettings = useSimSettings((state) => state.setSettings);
-  const setSimData = useSimData((state) => state.setSimData);
-  const setPapData = useSimData((state) => state.setPapData);
-  const setRunName = useSimData((state) => state.setName);
+  const setSimData = useMapData((state) => state.setSimData);
+  const setPapData = useMapData((state) => state.setPapData);
+  const setHotspots = useMapData((state) => state.setHotspots);
+  const setRunName = useMapData((state) => state.setName);
 
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedLoc, setSelectedLoc] = useState(null);
@@ -110,9 +111,9 @@ export default function SimulatorRun() {
 
         // Extract Progress
         if (totalSteps > 0) {
-          // Regex to find "TIMESTAMP":{"homes" or "TIMESTAMP":{"places"
+          // Regex to find "TIMESTAMP":{"h" or "TIMESTAMP":{"p"
           const matches = [
-            ...textToScan.matchAll(/"(\d+)":\{"(?:homes|places)"/g)
+            ...textToScan.matchAll(/"(\d+)":\{"(?:h|p)"/g)
           ];
 
           for (const match of matches) {
@@ -137,7 +138,13 @@ export default function SimulatorRun() {
 
       // Parse the full JSON
       const simJson = JSON.parse(fullJsonString);
-      const { simdata, name, zone: zoneData } = simJson.data;
+      const {
+        simdata,
+        name,
+        zone: zoneData,
+        hotspots,
+        papdata
+      } = simJson.data;
 
       // Restore Settings
       setSettings({
@@ -145,20 +152,14 @@ export default function SimulatorRun() {
         zone: zoneData,
         hours: zoneData.length
       });
+
       setSelectedZone(zoneData);
 
       // Restore Data
       setSimData(simdata);
       setRunName(name);
-
-      // Fetch PapData for this zone
-      const papRes = await fetch(
-        `${import.meta.env.VITE_DB_URL}papdata/${zoneData.id}`,
-        { signal }
-      );
-      if (!papRes.ok) throw new Error('Population data not found');
-      const papJson = await papRes.json();
-      setPapData(papJson.data);
+      setHotspots(hotspots);
+      setPapData(papdata);
     } catch (e) {
       if (e.name === 'AbortError') {
         console.log('Fetch aborted');

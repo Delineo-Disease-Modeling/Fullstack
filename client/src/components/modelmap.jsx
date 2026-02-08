@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { Map, Popup, Source, Layer } from 'react-map-gl/maplibre';
-import useSimData from '../stores/simdata';
+import useMapData from '../stores/mapdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../styles/modelmap.css';
@@ -38,55 +38,62 @@ var household_locs = {};
 function updateIcons(mapCenter, sim_data, pap_data, hotspots) {
   const icons = [];
 
-  if (!sim_data) {
+  if (!sim_data || !pap_data) {
     return icons;
   }
 
-  const types = ['homes', 'places'];
+  // Helper to process location types
+  const processLocs = (type, dataArray, statArray) => {
+    if (!dataArray || !statArray) return;
 
-  for (const type of types) {
-    for (const [index, data] of Object.entries(pap_data[type])) {
+    dataArray.forEach((data, index) => {
+      let lat = data.latitude;
+      let lng = data.longitude;
+
       if (type === 'homes') {
-        data.label = `Home #${index}`;
+        data.label = `Home #${data.id}`;
 
-        if (!(index in household_locs)) {
-          household_locs[index] = [
+        // Assign random location if needed (persistent by ID)
+        if (!(data.id in household_locs)) {
+          household_locs[data.id] = [
             mapCenter[0] + (Math.random() * 0.06 - 0.03),
             mapCenter[1] + (Math.random() * 0.06 - 0.03)
           ];
         }
 
-        data['latitude'] = household_locs[index][0];
-        data['longitude'] = household_locs[index][1];
+        lat = household_locs[data.id][0];
+        lng = household_locs[data.id][1];
       }
 
-      const pop = (type === 'homes'
-        ? sim_data['homes'][index]
-        : sim_data['places'][index]) ?? { population: 0, infected: 0 };
+      const pop = statArray[index * 2] ?? 0;
+      const inf = statArray[index * 2 + 1] ?? 0;
 
-      let description = `${pop.population} people\n${pop.infected} infected`;
-      if (type === 'places' && Object.keys(hotspots).includes(data.id)) {
-        description += `\n\nHotspot at hour${hotspots[data.id].length === 1 ? '' : 's'}: ${hotspots[data.id].join(', ')}`;
+      let description = `${pop} people\n${inf} infected`;
+      if (type === 'places' && hotspots && hotspots[data.id]) {
+        description += `\n\nHotspot at hour${hotspots[data.id].length === 1 ? '' : 's'}: ${hotspots[data.id].map((t) => Math.floor(t / 60)).join(', ')}`;
       }
 
       const marker = {
         type: type,
-        id: index,
-        latitude: data.latitude,
-        longitude: data.longitude,
+        id: data.id,
+        latitude: lat,
+        longitude: lng,
         label: data.label,
         description: description,
         icon:
           (type === 'homes'
             ? icon_lookup['Home']
-            : icon_lookup[pap_data[type][index]['top_category']]) ?? '❓',
-        population: pop.population,
-        infected: pop.infected
+            : icon_lookup[data['top_category']]) ?? '❓',
+        population: pop,
+        infected: inf
       };
 
       icons.push(marker);
-    }
-  }
+    });
+  };
+
+  processLocs('homes', pap_data.homes, sim_data.h);
+  processLocs('places', pap_data.places, sim_data.p);
 
   return icons;
 }
@@ -139,7 +146,7 @@ function EmojiOverlay({ map, hotspots = {} }) {
 
         // --- Check if this ID is in hotspots ---
         const isHotspot =
-          props.type === 'place' && Object.keys(hotspots).includes(props.id);
+          props.type === 'places' && hotspots && Object.keys(hotspots).includes(props.id);
 
         // --- Pulse factor (sinusoidal between 0–1) ---
         const pulse = isHotspot
@@ -459,7 +466,7 @@ function ClusteredMap({
           />
         </Source>
 
-        {/* 💬 Popup */}
+        {/* Popup */}
         {popupInfo && (
           <Popup
             longitude={popupInfo.coordinates[0]}
@@ -486,13 +493,11 @@ function ClusteredMap({
 }
 
 export default function ModelMap({ onMarkerClick, selectedZone }) {
-  const sim_data = useSimData((state) => state.simdata);
-  const pap_data = useSimData((state) => state.papdata);
+  const sim_data = useMapData((state) => state.simdata);
+  const pap_data = useMapData((state) => state.papdata);
+  const hotspots = useMapData((state) => state.hotspots) || {};
 
-  // const [pois, setPois] = useState([]);
   const [maxHours, setMaxHours] = useState(1);
-  const [hotspots, setHotspots] = useState({});
-
   const [currentTime, setCurrentTime] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -522,39 +527,8 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
   }, [isPlaying, maxHours]);
 
   useEffect(() => {
-    const new_hotspots = {};
-
-    // Calculate "hotspot" locations (facilities only)
-    for (const index of Object.keys(pap_data['places'])) {
-      const timestamps = Object.keys(sim_data).sort();
-
-      for (let i = 1; i < timestamps.length; i++) {
-        const prevpeople = sim_data[timestamps[i - 1]]?.['places']?.[index];
-        const curpeople = sim_data[timestamps[i]]?.['places']?.[index];
-
-        if (!prevpeople || !curpeople) {
-          continue;
-        }
-
-        let previnfected = prevpeople.infected ?? 0;
-        let curinfected = curpeople.infected ?? 0;
-
-        if (
-          curinfected > 0 &&
-          previnfected > 0 &&
-          curinfected >= previnfected * 5
-        ) {
-          new_hotspots[index] = [
-            ...(new_hotspots[index] ?? []),
-            timestamps[i] / 60
-          ];
-        }
-      }
-    }
-
-    setMaxHours(Math.max(...Object.keys(sim_data)) / 60);
-    setHotspots(new_hotspots);
-  }, [sim_data, pap_data, mapCenter]);
+    if (sim_data) setMaxHours(Math.max(...Object.keys(sim_data)) / 60);
+  }, [sim_data]);
 
   return (
     <div>
@@ -572,7 +546,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
       <div className="mt-3 text-center w-full">
         {new Date(
           new Date(selectedZone.start_date).getTime() +
-            currentTime * 60 * 60 * 1000
+          currentTime * 60 * 60 * 1000
         ).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',

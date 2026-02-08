@@ -7,7 +7,7 @@ import { DB_FOLDER } from '../env.js';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
 import parser from 'stream-json';
 import { createReadStream } from 'fs';
-import { unlink, readFile, access } from 'fs/promises';
+import { readFile, access } from 'fs/promises';
 import { constants } from 'fs';
 import { createGunzip } from 'zlib';
 import chain from 'stream-chain';
@@ -15,7 +15,6 @@ import { HTTPException } from 'hono/http-exception';
 import { stream } from 'hono/streaming';
 import { generateGlobalStats } from '../lib/sim-stats.js';
 import { processSimData, getStats } from '../lib/postgres-store.js';
-import type { SimData } from '@prisma/client/index-browser';
 
 const simdata_route = new Hono();
 
@@ -88,9 +87,7 @@ simdata_route.post(
       )
     ]);
 
-    // Background: Get PapData Path and Trigger pre-computation
-    // We need to find the papdata associated with the czone
-    // Assuming simple relation or passing check.
+    // Get PapData Path and Trigger pre-computation
     const papdata_obj = await prisma.paPData.findUnique({
       where: { czone_id: Number(czone_id) }
     });
@@ -127,69 +124,6 @@ simdata_route.post(
   }
 );
 
-simdata_route.patch(
-  '/simdata/:id',
-  zValidator('param', getSimDataSchema),
-  zValidator('json', updateSimDataSchema),
-  async (c) => {
-    const { id } = c.req.valid('param');
-    const { name } = c.req.valid('json');
-
-    if (!name) {
-      return c.json({ message: 'Nothing to update' }, 400);
-    }
-
-    try {
-      const simdata = await prisma.simData.update({
-        where: { id },
-        data: { name }
-      });
-
-      return c.json({ data: simdata });
-    } catch (e) {
-      throw new HTTPException(404, {
-        message: `Could not find simdata #${id}`
-      });
-    }
-  }
-);
-
-simdata_route.delete(
-  '/simdata/:id',
-  zValidator('param', getSimDataSchema),
-  async (c) => {
-    const { id } = c.req.valid('param');
-
-    const simdata = await prisma.simData.findUnique({
-      where: { id }
-    });
-
-    if (!simdata) {
-      throw new HTTPException(404, {
-        message: `Could not find simdata #${id}`
-      });
-    }
-
-    try {
-      await Promise.all([
-        unlink(DB_FOLDER + simdata.simdata).catch(console.error),
-        unlink(DB_FOLDER + simdata.patterns).catch(console.error)
-      ]);
-
-      await prisma.simData.delete({
-        where: { id }
-      });
-
-      return c.json({ message: 'Deleted successfully' });
-    } catch (e) {
-      console.error(e);
-      throw new HTTPException(500, {
-        message: 'Failed to delete simdata'
-      });
-    }
-  }
-);
-
 // This returns just enough data for the model map to work
 simdata_route.get(
   '/simdata/:id',
@@ -211,52 +145,100 @@ simdata_route.get(
     }
 
     // Check if files exist on disk
-    let simPath = DB_FOLDER + simdata.simdata;
-    let patPath = DB_FOLDER + simdata.patterns;
-    let simIsGz = false;
-    let patIsGz = false;
+    let simPath = DB_FOLDER + simdata.simdata + '.gz';
+    let patPath = DB_FOLDER + simdata.patterns + '.gz';
+
+    let optimizedPapData: any = null;
 
     try {
-      // Check simdata
-      try {
-        await access(simPath + '.gz', constants.F_OK);
-        simPath += '.gz';
-        simIsGz = true;
-      } catch {
-        await access(simPath, constants.F_OK);
+      await Promise.all([
+        access(simPath, constants.F_OK),
+        access(patPath, constants.F_OK)
+      ]);
+
+      // Optimization: Fetch and filter PapData
+      const papdata_obj = await prisma.paPData.findUnique({
+         where: { czone_id: simdata.czone_id }
+      });
+
+      if (papdata_obj) {
+        let papPath = DB_FOLDER + papdata_obj.id + '.gz';
+        try {
+          // Verify papdata exists
+          await access(papPath, constants.F_OK);
+          
+          // Read and Parse
+          const raw = await readFile(papPath);
+          // Handle GZIP
+          const buffer = await new Promise<Buffer>((resolve, reject) => {
+             const unzip = createGunzip();
+             const chunks: any[] = [];
+             unzip.on('data', (c) => chunks.push(c));
+             unzip.on('end', () => resolve(Buffer.concat(chunks)));
+             unzip.on('error', reject);
+             unzip.end(raw);
+          });
+          
+          const json = JSON.parse(buffer.toString());
+          
+          // Filter logic
+          optimizedPapData = {
+              homes: {},
+              places: {}
+          };
+
+          for (const [id, _] of Object.entries(json['homes'])) {
+            optimizedPapData['homes'][id] = {};
+          }
+
+          for (const [id, val] of Object.entries(json['places']) as any) {
+            optimizedPapData['places'][id] = {
+              id: id,
+              latitude: val['latitude'],
+              longitude: val['longitude'],
+              label: val['label'],
+              top_category: val['top_category']
+            };
+          }
+
+        } catch (e) {
+          console.error("Failed to load/optimize papdata for embedding", e);
+        }
       }
 
-      // Check patterns
-      try {
-        await access(patPath + '.gz', constants.F_OK);
-        patPath += '.gz';
-        patIsGz = true;
-      } catch {
-        await access(patPath, constants.F_OK);
-      }
     } catch (e) {
       // Integrity Error: Delete the metadata from DB to prevent ghosts
-      await prisma.simData.delete({ where: { id: simdata.id } });
+      // await prisma.simData.delete({ where: { id: simdata.id } });
       throw new HTTPException(404, {
         message:
-          'Simulation resource files not found on server. The run has been removed from the database.'
+          'Simulation resource files not found on server.'
       });
     }
 
     return stream(c, async (stream) => {
-      // Stream the response to avoid memory overload
+      // Stream the response
+      const safePap = optimizedPapData || { homes: {}, places: {} };
+      
+      // We need to send the canonical order of IDs for PapData first
+      const homeIds = Object.keys(safePap.homes).sort((a, b) => Number(a) - Number(b));
+      const placeIds = Object.keys(safePap.places).sort((a, b) => Number(a) - Number(b));
+
+      // Remap PapData to Arrays
+      const papDataArrays = {
+          homes: homeIds.map(id => ({ id, ...safePap.homes[id] })),
+          places: placeIds.map(id => safePap.places[id])
+      };
+
       await stream.write(
-        `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)},"simdata":{`
+        `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)},"papdata":${JSON.stringify(papDataArrays)},"simdata":{`
       );
 
       let first = true;
 
-      const simChain: any[] = [createReadStream(simPath)];
-      if (simIsGz) simChain.push(createGunzip());
+      const simChain: any[] = [createReadStream(simPath), createGunzip()];
       simChain.push(parser(), StreamObject.streamObject());
 
-      const patChain: any[] = [createReadStream(patPath)];
-      if (patIsGz) patChain.push(createGunzip());
+      const patChain: any[] = [createReadStream(patPath), createGunzip()];
       patChain.push(parser(), StreamObject.streamObject());
 
       const simdatapl = chain(simChain);
@@ -277,6 +259,11 @@ simdata_route.get(
       let spl = await simIter.next();
       let ppl = await patIter.next();
 
+      // Hotspot Logic
+      const hotspots: { [key: string]: number[] } = {};
+      const prevInfected: { [key: string]: number } = {};
+
+      // Lookup maps for fast index access
       while (!spl.done && !ppl.done) {
         const skey = spl.value.key;
         const pkey = ppl.value.key;
@@ -298,10 +285,10 @@ simdata_route.get(
 
         const svalue = spl.value.value;
         const pvalue = ppl.value.value;
-
-        // Transformation Logic (Inline to save memory)
-        // this should be a utility but fine here for streaming context
-        const frameData: any = { homes: {}, places: {} };
+        
+        // Condensed Arrays
+        const homesArray: number[] = [];
+        const placesArray: number[] = [];
 
         const curinfected = new Set(
           Object.values(svalue)
@@ -309,79 +296,47 @@ simdata_route.get(
             .flat()
         );
 
-        // Client expects: { homes: {id: {population, infected}}, places: ... }
-
-        for (const [id, pop] of Object.entries(pvalue['homes']) as [
-          string,
-          string[]
-        ][]) {
-          const infCount = pop.filter((v) => curinfected.has(v)).length;
-          if (infCount > 0) {
-            // optimization: only send if interesting? Client might need pop always.
-            frameData['homes'][id] = {
-              population: pop.length,
-              infected: infCount
-            };
-          } else {
-            frameData['homes'][id] = {
-              population: pop.length,
-              infected: 0
-            };
-          }
-        }
-        for (const [id, pop] of Object.entries(pvalue['places']) as [
-          string,
-          string[]
-        ][]) {
-          const infCount = pop.filter((v) => curinfected.has(v)).length;
-          frameData['places'][id] = {
-            population: pop.length,
-            infected: infCount
-          };
+        // Process Homes (Ordered)
+        for (const id of homeIds) {
+           const pop = pvalue['homes'][id];
+           if (pop) {
+             const len = pop.length;
+             const infCount = pop.filter((v: any) => curinfected.has(v)).length;
+             homesArray.push(len, infCount);
+           } else {
+             homesArray.push(0, 0);
+           }
         }
 
-        await stream.write(`"${skey}":${JSON.stringify(frameData)}`);
+        // Process Places (Ordered)
+        for (const id of placeIds) {
+           const pop = pvalue['places'][id];
+           if (pop) {
+             const len = pop.length;
+             const infCount = pop.filter((v: any) => curinfected.has(v)).length;
+             placesArray.push(len, infCount);
+             
+              // Hotspot Detection
+              const prevInf = prevInfected[id] || 0;
+              if (infCount > 0 && prevInf > 0 && infCount >= prevInf * 5) {
+                if (!hotspots[id]) hotspots[id] = [];
+                hotspots[id].push(Number(skey));
+              }
+              prevInfected[id] = infCount;
+
+           } else {
+             placesArray.push(0, 0);
+             prevInfected[id] = 0;
+           }
+        }
+
+        await stream.write(`"${skey}":${JSON.stringify({ h: homesArray, p: placesArray })}`);
 
         spl = await simIter.next();
         ppl = await patIter.next();
       }
 
-      await stream.write('}}}');
-    });
-  }
-);
-
-simdata_route.get(
-  '/simdata/cache/:czone_id',
-  zValidator('param', getSimDataCacheSchema),
-  async (c) => {
-    const { czone_id } = c.req.valid('param');
-
-    const czone = await prisma.convenienceZone.findUnique({
-      where: {
-        id: czone_id
-      },
-      include: {
-        simdata: {
-          orderBy: {
-            id: 'desc'
-          }
-        }
-      }
-    });
-
-    if (!czone) {
-      throw new HTTPException(404, {
-        message: `Could not find convenience zone #${czone_id}`
-      });
-    }
-
-    return c.json({
-      data: czone.simdata.map((simdata: SimData) => ({
-        name: simdata.name,
-        created_at: simdata.created_at,
-        sim_id: simdata.id
-      }))
+      await stream.write(`},"hotspots":${JSON.stringify(hotspots)}}}`);
     });
   }
 );
@@ -418,9 +373,23 @@ async function getPapData(czone_id: number) {
   }
 
   // Optimize: Use readFile instead of stream+concat
+  const papPath = DB_FOLDER + papdata_obj.id + '.gz';
+
   try {
-    const data = await readFile(DB_FOLDER + papdata_obj.id, 'utf8');
-    return JSON.parse(data);
+    await access(papPath, constants.F_OK);
+    const raw = await readFile(papPath);
+    
+    // Handle GZIP
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+       const unzip = createGunzip();
+       const chunks: any[] = [];
+       unzip.on('data', (c) => chunks.push(c));
+       unzip.on('end', () => resolve(Buffer.concat(chunks)));
+       unzip.on('error', reject);
+       unzip.end(raw);
+    });
+
+    return JSON.parse(buffer.toString());
   } catch (e) {
     // File missing, remove from DB
     await prisma.convenienceZone.delete({ where: { id: czone_id } });
