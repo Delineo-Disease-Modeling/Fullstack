@@ -26,6 +26,36 @@ export default function CzDict({ zone, setZone }) {
       .catch(console.error);
   }, [zone, setZone]);
 
+  const deleteZone = async (loc, e) => {
+    e?.stopPropagation?.();
+    if (!user || loc.user_id !== user.id) {
+      return;
+    }
+
+    const ok = window.confirm(`Delete zone "${loc.name}"? This also deletes its saved runs.`);
+    if (!ok) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${DB_URL}convenience-zones/${loc.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw new Error(`Delete failed (${res.status})`);
+      }
+
+      const remaining = (locations || []).filter((z) => z.id !== loc.id);
+      setLocations(remaining);
+
+      if (zone?.id === loc.id) {
+        setSettings({ sim_id: null });
+        setZone(remaining[0] ?? null);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete zone');
+    }
+  };
+
   return (
     <div className='flex flex-col items-center w-full gap-4'>
       <div className='flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[#70B4D4] bg-[#fffff2]'>
@@ -63,7 +93,7 @@ export default function CzDict({ zone, setZone }) {
               style={
                 !loc.ready
                   ? { background: '#11111140', color: 'white', cursor: 'not-allowed' }
-                  : zone.id === loc.id
+                  : zone?.id === loc.id
                     ? { background: '#70B4D4', color: 'white' }
                     : undefined
               }
@@ -79,7 +109,18 @@ export default function CzDict({ zone, setZone }) {
             >
               <p className="flex-1">{loc.name}</p>
               <p className="flex-1 text-center">{loc.size}</p>
-              <p className="flex-1 text-right">{new Date(loc.created_at).toLocaleDateString()}</p>
+              <div className="flex-1 flex items-center justify-end gap-2">
+                <p className="text-right">{new Date(loc.created_at).toLocaleDateString()}</p>
+                {tab === 1 && user && loc.user_id === user.id && (
+                  <button
+                    className='text-xs px-2 py-0.5 rounded-sm bg-[#222629] text-white hover:brightness-110'
+                    onClick={(e) => deleteZone(loc, e)}
+                    title='Delete zone'
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
 
               {!loc.ready && hoveredLocId === loc.id && (
                 <div className="absolute z-10 px-2 py-1 text-xs text-white -translate-x-1/2 -translate-y-1/2 bg-black rounded-sm shadow-lg top-1/2 left-1/2">

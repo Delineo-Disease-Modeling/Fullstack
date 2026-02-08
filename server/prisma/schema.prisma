@@ -63,6 +63,12 @@ model SimData {
   simdata       String @unique @default(uuid())
   czone_id      Int
   czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
+  // Simulation parameters
+  hours         Int?
+  mask_rate     Float?
+  vaccine_rate  Float?
+  capacity      Float?
+  lockdown      Float?
 }
 
 model POI {
@@ -72,4 +78,34 @@ model POI {
   address     String
   cbg         String
   categories  String[]
+}
+
+model RunReport {
+  id            Int      @id @default(autoincrement())
+  created_at    DateTime @default(now())
+  run_type      String   // "cz_generation" or "simulation"
+  status        String   // "running", "completed", "failed"
+  name          String   // e.g., "CZ Generation: Hagerstown" or "Simulation Run #5"
+  
+  // Timing
+  started_at    DateTime
+  completed_at  DateTime?
+  duration_ms   Int?
+  
+  // Links to related records
+  czone_id      Int?
+  sim_id        Int?
+  user_id       String?
+  
+  // Parameters (JSON string)
+  parameters    String?  // JSON: {location, length, interventions, etc.}
+  
+  // Results summary (JSON string)  
+  summary       String?  // JSON: {people_count, infection_rate, etc.}
+  
+  // Log entries (JSON array string)
+  logs          String?  // JSON array: [{timestamp, level, message}, ...]
+  
+  // Error info if failed
+  error         String?
 }

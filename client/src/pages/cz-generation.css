@@ -9,3 +9,9 @@
   cursor: not-allowed;
   filter: brightness(0.75);
 }
+
+/* Remove focus outlines from map container and its children */
+.leaflet-container:focus,
+.leaflet-container *:focus {
+  outline: none !important;
+}

@@ -62,3 +62,34 @@ div.mapcontainer {
     box-shadow: 0 0 15px 6px rgba(255, 0, 0, 0.6), 0 0 0 0 rgba(255, 0, 0, 0.4);
   }
 }
+
+/* Heatmap toggle controls */
+.heatmap-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.heatmap-toggle-btn {
+  padding: 0.375rem 0.75rem;
+  border: 2px solid #70B4D4;
+  border-radius: 9999px;
+  background: #fffff2;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.heatmap-toggle-btn:hover {
+  background: #e8f4fa;
+}
+
+.heatmap-toggle-btn.active {
+  background: #70B4D4;
+  color: #fff;
+  border-color: #70B4D4;
+}

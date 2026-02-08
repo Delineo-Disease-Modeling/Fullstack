@@ -20,6 +20,21 @@ const postSimDataSchema = z.object({
   patterns: z.instanceof(File)
 });
 
+// New schema for JSON-based simulation data storage
+const postSimDataJsonSchema = z.object({
+  czone_id: z.coerce.number().nonnegative(),
+  name: z.string().optional(),
+  simdata: z.any(), // The simulation result data
+  movement: z.any(), // Movement patterns
+  papdata: z.any().optional(), // People, homes, places metadata
+  // Simulation parameters
+  hours: z.coerce.number().optional(),
+  mask_rate: z.coerce.number().optional(),
+  vaccine_rate: z.coerce.number().optional(),
+  capacity: z.coerce.number().optional(),
+  lockdown: z.coerce.number().optional()
+});
+
 const getSimDataSchema = z.object({
   id: z.coerce.number().nonnegative()
 });
@@ -160,6 +175,80 @@ simdata_route.post(
   }
 );
 
+// New endpoint for saving simulation data as JSON
+simdata_route.post(
+  '/simdata-json',
+  zValidator('json', postSimDataJsonSchema),
+  async (c) => {
+    const { czone_id, name, simdata, movement, papdata, hours, mask_rate, vaccine_rate, capacity, lockdown } = c.req.valid('json');
+    const { writeFile } = await import('fs/promises');
+
+    // Check if papdata exists for this czone, if not create it
+    let papdata_obj = await prisma.paPData.findUnique({
+      where: { czone_id }
+    });
+    
+    if (!papdata_obj && papdata) {
+      papdata_obj = await prisma.paPData.create({
+        data: { czone_id }
+      });
+      await writeFile(DB_FOLDER + papdata_obj.id, JSON.stringify(papdata));
+    }
+
+    const simdata_obj = await prisma.simData.create({
+      data: {
+        czone_id: czone_id,
+        name: name || `Simulation ${new Date().toLocaleString()}`,
+        hours: hours,
+        mask_rate: mask_rate,
+        vaccine_rate: vaccine_rate,
+        capacity: capacity,
+        lockdown: lockdown
+      }
+    });
+
+    // Save simdata and patterns as JSON files
+    await Promise.all([
+      writeFile(DB_FOLDER + simdata_obj.simdata, JSON.stringify(simdata)),
+      writeFile(DB_FOLDER + simdata_obj.patterns, JSON.stringify(movement))
+    ]);
+
+    return c.json({
+      data: {
+        id: simdata_obj.id
+      }
+    });
+  }
+);
+
+// Get list of simulation runs for a convenience zone
+simdata_route.get(
+  '/simdata-list/:czone_id',
+  zValidator('param', getSimDataCacheSchema),
+  async (c) => {
+    const { czone_id } = c.req.valid('param');
+
+    const runs = await prisma.simData.findMany({
+      where: { czone_id },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        created_at: true,
+        hours: true,
+        mask_rate: true,
+        vaccine_rate: true,
+        capacity: true,
+        lockdown: true
+      }
+    });
+
+    return c.json({
+      data: runs
+    });
+  }
+);
+
 simdata_route.patch(
   '/simdata/:id',
   zValidator('param', getSimDataSchema),
@@ -245,7 +334,13 @@ simdata_route.get(
     return c.json({
       'data': {
         'simdata': data,
-        name: simdata.name
+        name: simdata.name,
+        hours: simdata.hours,
+        mask_rate: simdata.mask_rate,
+        vaccine_rate: simdata.vaccine_rate,
+        capacity: simdata.capacity,
+        lockdown: simdata.lockdown,
+        created_at: simdata.created_at
       }
     });
   }
@@ -443,6 +538,9 @@ simdata_route.get(
 
         Object.keys(people).forEach((id) => {
           const person_data = papdata['people'][id];
+
+          // Skip if person not found in papdata (ID mismatch between simulation and papdata)
+          if (!person_data) return;
 
           sexes_data[person_data['sex'] == 0 ? 'Male' : 'Female'] += 1;
 

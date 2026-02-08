@@ -71,21 +71,24 @@ export function setSessionTokenCookie(
   context: Context,
   token: string,
 ): void {
+  // Use 'lax' + secure:false for local HTTP dev; switch to 'none' + secure:true in production
+  const isProduction = process.env.NODE_ENV === 'production';
   setCookie(context, 'session', token, {
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: 60 * 60 * 24 * 14,
     path: '/',
-    secure: true
+    secure: isProduction
   });
 }
 
 export function deleteSessionTokenCookie(context: Context): void {
+  const isProduction = process.env.NODE_ENV === 'production';
   setCookie(context, 'session', '', {
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: 0,
     path: '/',
-    secure: true
+    secure: isProduction
   });
 }

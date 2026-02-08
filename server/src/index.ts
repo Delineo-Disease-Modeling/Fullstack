@@ -13,6 +13,7 @@ import lookup_route from './routes/lookup.js';
 import cz_route from './routes/cz.js';
 import patterns_route from './routes/patterns.js';
 import simdata_route from './routes/simdata.js';
+import reports_route from './routes/reports.js';
 
 const app = new Hono();
 
@@ -27,6 +28,7 @@ app.use(
   cors({
     origin: [
       'http://localhost:5173',
+      'http://127.0.0.1:5173',
       'https://coviddev.isi.jhu.edu',
       'http://coviddev.isi.jhu.edu',
       'https://covidweb.isi.jhu.edu',
@@ -44,6 +46,7 @@ app.onError((error, c) => {
     return c.json({ message: error.message }, error.status);
   }
 
+  console.error('Unhandled error:', error);
   return c.json({ message: 'An unknown error has occurred' }, 500);
 });
 
@@ -52,6 +55,7 @@ app.route('/', lookup_route);
 app.route('/', cz_route);
 app.route('/', patterns_route);
 app.route('/', simdata_route);
+app.route('/', reports_route);
 
 app.get('/', async (c) => {
   return c.json({

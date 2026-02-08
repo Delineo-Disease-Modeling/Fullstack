@@ -8,7 +8,7 @@ type ConvenienceZone = {
   longitude: number;
   cbg_list: string[];
   size: number;
-  length: number;
+  length: number;  // Length in hours - end_date is computed from start_date + length
   start_date: string;
   created_at: string;
   user_id: string;
@@ -30,6 +30,7 @@ type SimSettings = {
   hours: number;
   randseed: boolean;
   usecache: boolean;
+  initial_infected_count: number;
   // matrices: string[];
   interventions: Interventions[];
 };
@@ -58,6 +59,7 @@ const default_settings: SimSettings = {
   hours: 84,
   randseed: true,
   usecache: true,
+  initial_infected_count: 1,
   interventions: [ { ...default_interventions } ]
 };
 

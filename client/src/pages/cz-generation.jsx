@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { ALG_URL, DB_URL } from "../env";
 import axios from 'axios';
 import useAuth from "../stores/auth";
@@ -51,6 +52,131 @@ function InteractiveMap({ onLocationSelect, disabled }) {
   );
 }
 
+// Static CBG Map component for viewing and editing CBGs after generation
+function CBGMap({ cbgData, center, onCBGClick, selectedCBGs }) {
+  const geoJsonLayerRef = useRef(null);
+  const layersRef = useRef(new Map()); // Map of cbgId -> layer
+  const selectedRef = useRef(selectedCBGs); // Keep ref to avoid stale closures
+  const hasFittedRef = useRef(false);
+  
+  // Update ref when selection changes
+  useEffect(() => {
+    selectedRef.current = selectedCBGs;
+  }, [selectedCBGs]);
+
+  const getStyleForCbg = (cbgId) => {
+    const isSelected = selectedRef.current?.includes(cbgId);
+    return {
+      fillColor: isSelected ? '#70B4D4' : '#BDBDBD',
+      weight: isSelected ? 2 : 1.25,
+      opacity: 1,
+      color: isSelected ? '#1f2937' : '#6b7280',
+      fillOpacity: isSelected ? 0.6 : 0.2,
+    };
+  };
+
+  // Update layer styles when selection changes (without remounting)
+  useEffect(() => {
+    layersRef.current.forEach((layer, cbgId) => {
+      layer.setStyle(getStyleForCbg(cbgId));
+      // Update tooltip
+      const pop = layer.feature?.properties?.population ?? 'N/A';
+      const isSelected = selectedCBGs?.includes(cbgId);
+      layer.setTooltipContent(
+        `<strong>CBG:</strong> ${cbgId}<br/><strong>Population:</strong> ${pop}<br/><strong>Status:</strong> ${isSelected ? 'In Zone' : 'Click to Add'}`
+      );
+    });
+  }, [selectedCBGs]);
+
+  // Component that adds GeoJSON to map
+  function GeoJSONLayer() {
+    const map = useMap();
+    
+    useEffect(() => {
+      if (!cbgData) return;
+
+      // Clear previous layer
+      if (geoJsonLayerRef.current) {
+        map.removeLayer(geoJsonLayerRef.current);
+        layersRef.current.clear();
+      }
+
+      // Create new GeoJSON layer
+      const geoJsonLayer = L.geoJSON(cbgData, {
+        style: (feature) => {
+          const cbgId = feature.properties.GEOID || feature.properties.CensusBlockGroup;
+          return getStyleForCbg(cbgId);
+        },
+        onEachFeature: (feature, layer) => {
+          const cbgId = feature.properties.GEOID || feature.properties.CensusBlockGroup;
+          const pop = feature.properties.population ?? 'N/A';
+          const isSelected = selectedRef.current?.includes(cbgId);
+          
+          // Store layer reference
+          layersRef.current.set(cbgId, layer);
+          
+          layer.bindTooltip(
+            `<strong>CBG:</strong> ${cbgId}<br/><strong>Population:</strong> ${pop}<br/><strong>Status:</strong> ${isSelected ? 'In Zone' : 'Click to Add'}`,
+            { sticky: true }
+          );
+          
+          layer.on({
+            click: () => {
+              if (onCBGClick) {
+                onCBGClick(cbgId, feature.properties);
+              }
+            },
+            mouseover: (e) => {
+              e.target.setStyle({
+                weight: 3,
+                fillOpacity: 0.9,
+              });
+            },
+            mouseout: (e) => {
+              e.target.setStyle(getStyleForCbg(cbgId));
+            }
+          });
+        }
+      });
+
+      geoJsonLayer.addTo(map);
+      geoJsonLayerRef.current = geoJsonLayer;
+
+      // Fit bounds only once
+      if (!hasFittedRef.current) {
+        const bounds = geoJsonLayer.getBounds();
+        if (bounds.isValid()) {
+          map.invalidateSize();
+          map.fitBounds(bounds, { padding: [20, 20], maxZoom: 12 });
+          hasFittedRef.current = true;
+        }
+      }
+
+      return () => {
+        if (geoJsonLayerRef.current) {
+          map.removeLayer(geoJsonLayerRef.current);
+        }
+      };
+    }, [map, cbgData]);
+    
+    return null;
+  }
+
+  return (
+    <MapContainer
+      center={center || [39.3290708, -76.6219753]}
+      zoom={12}
+      style={{ height: '100%', width: '100%' }}
+    >
+      <TileLayer
+        attribution='&copy; OpenStreetMap contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <GeoJSONLayer />
+    </MapContainer>
+  );
+}
+
 function FormField({ label, name, type, placeholder, defaultValue, disabled, value, onChange, min, max }) {
   return (
     <div className='flex flex-col gap-0.5'>
@@ -93,15 +219,81 @@ export default function CZGeneration() {
 
   const [ location, setLocation ] = useState('');
   const [ minPop, setMinPop ] = useState(5000);
-  const [ startDate, setStartDate ] = useState(new Date().toISOString().slice(0, 10));
-  const [ length, setLength ] = useState(15);
+  const [ startDate, setStartDate ] = useState('2019-01-01');  // Default to 2019 (pattern files are from 2019)
+  const [ endDate, setEndDate ] = useState('2019-01-15');      // Default 2 weeks
   const [ description, setDescription ] = useState('');
-  const [ iframeHTML, setIframeHTML ] = useState();
   const [ loading, setLoading ] = useState(false);
+  
+  // Two-phase state
+  const [ phase, setPhase ] = useState('input'); // 'input' | 'edit' | 'finalizing'
+  const [ cbgGeoJSON, setCbgGeoJSON ] = useState(null);
+  const [ selectedCBGs, setSelectedCBGs ] = useState([]);
+  const [ totalPopulation, setTotalPopulation ] = useState(0);
+  const [ mapCenter, setMapCenter ] = useState(null);
+  const [ cityName, setCityName ] = useState('');
+
+  // Derived state
+  const hasGenerated = phase === 'edit';
+  const isFinalizing = phase === 'finalizing';
 
   if (!user) {
     navigate('/simulator');
   }
+
+  // Finalize CZ - create DB record and generate patterns with the final CBG list
+  const finalizeCZ = async () => {
+    if (selectedCBGs.length === 0) {
+      alert('Please select at least one CBG');
+      return;
+    }
+    
+    setPhase('finalizing');
+    try {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const lengthHours = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      
+      console.log('Finalizing CZ with CBGs:', selectedCBGs);
+      const resp = await axios.post(`${ALG_URL}finalize-cz`, {
+        name: cityName,
+        description: description,
+        cbg_list: selectedCBGs,
+        start_date: start.toISOString(),
+        length: lengthHours,
+        latitude: mapCenter?.[0] || 0,
+        longitude: mapCenter?.[1] || 0,
+        user_id: user.id
+      });
+      
+      if (resp.status === 200 && resp.data?.id) {
+        console.log('CZ finalized with ID:', resp.data.id);
+        navigate('/simulator');
+      } else {
+        throw new Error('Failed to finalize CZ');
+      }
+    } catch (err) {
+      console.error('Error finalizing CZ:', err);
+      alert('Failed to create convenience zone. Please try again.');
+      setPhase('edit'); // Go back to edit phase
+    }
+  };
+
+  // Handle CBG click to toggle selection
+  const handleCBGClick = (cbgId, properties) => {
+    setSelectedCBGs(prev => {
+      if (prev.includes(cbgId)) {
+        // Remove CBG
+        const newSelection = prev.filter(id => id !== cbgId);
+        // Update population
+        setTotalPopulation(p => p - (properties.population || 0));
+        return newSelection;
+      } else {
+        // Add CBG
+        setTotalPopulation(p => p + (properties.population || 0));
+        return [...prev, cbgId];
+      }
+    });
+  };
 
   const loc_lookup = async (location) => {
     const resp = await fetch(`${DB_URL}lookup-zip`, {
@@ -120,43 +312,104 @@ export default function CZGeneration() {
   };
 
   const zip_to_cbg = (location) => {
-    return zip_cbg_json[location]?.[0];
+    const cbgs = zip_cbg_json[location];
+    if (!Array.isArray(cbgs) || cbgs.length === 0) {
+      return undefined;
+    }
+
+    // ZIPs can overlap multiple CBGs (and occasionally multiple counties).
+    // Choose a stable "core" CBG by taking the most common county (state+county FIPS).
+    const countyCounts = new Map();
+    for (const cbg of cbgs) {
+      if (typeof cbg !== 'string' || cbg.length < 5) continue;
+      const county = cbg.slice(0, 5);
+      countyCounts.set(county, (countyCounts.get(county) ?? 0) + 1);
+    }
+
+    let bestCounty = cbgs[0]?.slice(0, 5);
+    let bestCount = -1;
+    for (const [county, count] of countyCounts.entries()) {
+      if (count > bestCount) {
+        bestCounty = county;
+        bestCount = count;
+      }
+    }
+
+    return cbgs.find((cbg) => typeof cbg === 'string' && cbg.startsWith(bestCounty)) ?? cbgs[0];
   };
 
   const generateCZ = (formdata) => {
     const func_body = async (formdata) => {
       console.log(formdata);
-  
-      const location = await loc_lookup(formdata.get('location'));
-      const core_cbg = zip_to_cbg(location?.['zip_code'] ?? formdata.get('location'));
+
+      const rawLocationInput = String(formdata.get('location') ?? '').trim();
+      const zipMatch = rawLocationInput.match(/^\d{5}(?:-\d{4})?$/);
+      const userZip = zipMatch ? rawLocationInput.slice(0, 5) : null;
+
+      // If user entered a valid ZIP, try to use it directly first
+      let core_cbg = null;
+      let location = null;
+      let cityName = rawLocationInput;
+
+      if (userZip) {
+        // User entered a ZIP code - try local lookup first (no Google API needed)
+        core_cbg = zip_to_cbg(userZip);
+        if (core_cbg) {
+          // Try to get city name from Google API, but don't fail if unavailable
+          try {
+            location = await loc_lookup(rawLocationInput);
+            if (location?.['city']) {
+              cityName = location['city'];
+            }
+          } catch (e) {
+            console.log('Google API unavailable, using ZIP as location name');
+          }
+        }
+      } else {
+        // User entered a city/address - need Google API to resolve ZIP
+        location = await loc_lookup(rawLocationInput);
+        if (location?.['zip_code']) {
+          core_cbg = zip_to_cbg(location['zip_code']);
+          cityName = location['city'] ?? rawLocationInput;
+        }
+      }
   
       if (!core_cbg) {
-        console.error('Could not find location');
+        console.error('Could not find location. Try entering a 5-digit ZIP code.');
+        alert('Could not find location. Please try entering a 5-digit ZIP code (e.g., 21201 for Baltimore).');
         return;
       }
   
       console.log(location);
       console.log(core_cbg);
 
-      const { status, data } = await axios.post(`${ALG_URL}generate-cz`, {
-        name: location['city'],
-        description: formdata.get('description'),
+      // Phase 1: Just cluster CBGs (fast) - don't create DB record yet
+      const { status, data } = await axios.post(`${ALG_URL}cluster-cbgs`, {
         cbg: core_cbg,
-        start_date: new Date(formdata.get('start_date')).toISOString(),
-        length: +formdata.get('length') * 24,     // Days turn to hours
-        min_pop: +formdata.get('min_pop'),
-        user_id: user.id
+        min_pop: +formdata.get('min_pop')
       });
 
       if (status !== 200) {
         throw new Error('Status code mismatch');
       }
 
-      if (!data?.['id']) {
-        throw new Error('Invalid JSON (missing id)');
+      if (!data?.cluster) {
+        throw new Error('Invalid response (missing cluster)');
       }
 
-      setIframeHTML(data['map']);
+      // Store cluster data for editing
+      const cluster = data.cluster || [];
+      setSelectedCBGs(cluster);
+      setTotalPopulation(data.size || 0);
+      setMapCenter(data.center || null);
+      setCityName(cityName);
+      
+      // GeoJSON is returned directly from cluster-cbgs
+      if (data.geojson) {
+        setCbgGeoJSON(data.geojson);
+      }
+      
+      setPhase('edit');
     };
 
     if (loading) {
@@ -165,7 +418,10 @@ export default function CZGeneration() {
 
     setLoading(true);
     func_body(formdata)
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        alert('Failed to cluster CBGs. Please try again.');
+      })
       .finally(() => setLoading(false));
   }
 
@@ -185,7 +441,7 @@ export default function CZGeneration() {
                 placeholder='e.g. 55902'
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                disabled={loading || !!iframeHTML}
+                disabled={loading || hasGenerated}
               />
 
               <FormField 
@@ -196,7 +452,7 @@ export default function CZGeneration() {
                 min={100}
                 max={100_000}
                 onChange={(e) => setMinPop(e.target.value)}
-                disabled={loading || !!iframeHTML}
+                disabled={loading || hasGenerated}
               />
 
               <FormField 
@@ -205,18 +461,17 @@ export default function CZGeneration() {
                 type='date'
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                disabled={loading || !!iframeHTML}
+                disabled={loading || hasGenerated}
               />
 
               <FormField 
-                label='Length (days)'
-                name='length'
-                type='number'
-                value={length}
-                min={7}
-                max={365}
-                onChange={(e) => setLength(e.target.value)}
-                disabled={loading || !!iframeHTML}
+                label='End Date'
+                name='end_date'
+                type='date'
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                disabled={loading || hasGenerated}
               />
 
               <FormField
@@ -226,16 +481,42 @@ export default function CZGeneration() {
                 placeholder='a short description for this convenience zone...'
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                disabled={loading || !!iframeHTML}
+                disabled={loading || hasGenerated}
               />
+              
+              {/* Show stats after generation */}
+              {hasGenerated && (
+                <div className='mt-4 p-3 bg-[#fffff2] outline outline-2 outline-[#70B4D4] rounded-lg'>
+                  <div className='text-sm font-semibold mb-2'>Zone Statistics</div>
+                  <div className='text-sm'>CBGs: {selectedCBGs.length}</div>
+                  <div className='text-sm'>Population: {totalPopulation.toLocaleString()}</div>
+                </div>
+              )}
             </div>
 
-          {iframeHTML ? (
-            <iframe
-              srcDoc={iframeHTML}
-              title='Generated Convenience Zone'
-              className='h-72 w-140 max-w-[85vw]'
-            />
+          {hasGenerated ? (
+            <div className='flex flex-col gap-2'>
+              <div className='h-80 w-140 max-w-[85vw] relative'>
+                {cbgGeoJSON ? (
+                  <CBGMap
+                    cbgData={cbgGeoJSON}
+                    center={null}
+                    onCBGClick={handleCBGClick}
+                    selectedCBGs={selectedCBGs}
+                  />
+                ) : (
+                  <div className='h-full w-full flex items-center justify-center bg-gray-100 text-gray-500'>
+                    <div className='text-center'>
+                      <p>CBG map not available</p>
+                      <p className='text-sm'>GeoJSON endpoint needed on Algorithms server</p>
+                    </div>
+                  </div>
+                )}
+                <div className='absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs'>
+                  Click CBGs to add/remove from zone
+                </div>
+              </div>
+            </div>
           ) : (
             <div className='h-72 w-140 max-w-[85vw]'>
               <InteractiveMap
@@ -246,11 +527,16 @@ export default function CZGeneration() {
           )}
         </div>
         <input
-          type={!iframeHTML ? 'submit' : 'button'}
-          value={loading ? 'Loading...' : !iframeHTML ? 'Generate!' : 'Return'}
-          onClick={() => iframeHTML && navigate('/simulator')}
-          disabled={loading}
-          className='bg-[#222629] text-[#F0F0F0] w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500'
+          type={phase === 'input' ? 'submit' : 'button'}
+          value={
+            loading ? 'Clustering...' : 
+            isFinalizing ? 'Generating Patterns...' : 
+            phase === 'input' ? 'Preview CBGs' : 
+            'Finalize & Generate'
+          }
+          onClick={() => phase === 'edit' && finalizeCZ()}
+          disabled={loading || isFinalizing}
+          className='bg-[#222629] text-[#F0F0F0] w-48 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500 outline-none focus:outline-none'
         />
       </form>
     </div>

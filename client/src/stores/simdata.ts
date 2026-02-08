@@ -69,6 +69,19 @@ const useSimData = create<SimDataStore>(
         set({ simdata: null });
         return;
       }
+      console.log('[STORE] setSimData called with keys:', Object.keys(newSimData || {}).slice(0, 5));
+      // Check structure
+      const firstKey = Object.keys(newSimData || {})[0];
+      if (firstKey) {
+        console.log('[STORE] First timestamp data structure:', Object.keys(newSimData[firstKey]));
+        if (newSimData[firstKey].homes) {
+          const homeKeys = Object.keys(newSimData[firstKey].homes);
+          const firstHome = homeKeys[0];
+          if (firstHome) {
+            console.log('[STORE] Sample home data:', newSimData[firstKey].homes[firstHome]);
+          }
+        }
+      }
       set((state) => ({
         simdata: state.simdata ? { ...state.simdata, ...newSimData } : (newSimData as SimData)
       }));

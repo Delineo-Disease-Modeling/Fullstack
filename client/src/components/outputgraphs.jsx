@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { CustomTooltip } from './customtooltip';
 import useSimSettings from '../stores/simsettings';
+import useSimData from '../stores/simdata';
 
 import './outputgraphs.css';
 
@@ -14,12 +15,57 @@ const COLORS = ["#8884d8", "#82ca9d", "#d54df7", "#ffdc4f", "#ff954f", "#4fd0ff"
 
 export default function OutputGraphs({ selected_loc, onReset }) {
   const settings = useSimSettings((state) => state.settings);
+  const simdata = useSimData((state) => state.simdata);
+  const papdata = useSimData((state) => state.papdata);
 
   const [chartType, setChartType] = useState('iot');
   const [chartData, setChartData] = useState();
 
   useEffect(() => {
     setChartData(null);
+
+    // If we have local simdata but no sim_id, compute chart data locally
+    if (!settings.sim_id && simdata) {
+      // Compute infection over time (iot) from local simdata
+      const timestamps = Object.keys(simdata).map(Number).sort((a, b) => a - b);
+      
+      const iotData = timestamps.map(t => {
+        const timeData = simdata[String(t)] || simdata[t] || {};
+        let totalPop = 0;
+        let totalInfected = 0;
+        
+        // Sum homes
+        for (const loc of Object.values(timeData.homes || {})) {
+          totalPop += loc.population || 0;
+          totalInfected += loc.infected || 0;
+        }
+        // Sum places
+        for (const loc of Object.values(timeData.places || {})) {
+          totalPop += loc.population || 0;
+          totalInfected += loc.infected || 0;
+        }
+        
+        return {
+          time: t / 60, // Convert to hours
+          Infected: totalInfected,
+          Susceptible: Math.max(0, totalPop - totalInfected)
+        };
+      });
+      
+      // Generate placeholder data for other chart types
+      setChartData({
+        iot: iotData,
+        ages: iotData.map(d => ({ time: d.time, '0-18': 0, '19-40': 0, '41-65': 0, '65+': 0 })),
+        sexes: iotData.map(d => ({ time: d.time, Male: 0, Female: 0 })),
+        states: iotData.map(d => ({ time: d.time, Infected: d.Infected, Recovered: 0 }))
+      });
+      return;
+    }
+
+    // Skip if no sim_id (direct simulation without DB storage)
+    if (!settings.sim_id) {
+      return;
+    }
 
     const url = new URL(`${DB_URL}simdata/${settings.sim_id}/chartdata`);
 
@@ -47,7 +93,7 @@ export default function OutputGraphs({ selected_loc, onReset }) {
     return () => {
       abortController.abort();
     };
-  }, [settings.sim_id, selected_loc]);
+  }, [settings.sim_id, selected_loc, simdata]);
 
   return (
     <div className='outputgraphs_container'>
