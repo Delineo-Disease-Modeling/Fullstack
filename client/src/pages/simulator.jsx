@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useSimSettings from '../stores/simsettings';
-import useSimData from '../stores/simdata';
-
+import useMapData from '../stores/mapdata';
 import SimSettings from '../components/simsettings.jsx';
 import InstructionBanner from '../components/instruction-banner.jsx';
 
@@ -11,12 +9,10 @@ import '../styles/simulator.css';
 
 export default function Simulator() {
   const navigate = useNavigate();
-  const zone = useSimSettings((state) => state.zone);
 
   const setSettings = useSimSettings((state) => state.setSettings);
-  const setSimData = useSimData((state) => state.setSimData);
-  const setPapData = useSimData((state) => state.setPapData);
-  const setRunName = useSimData((state) => state.setName);
+  const setSimData = useMapData((state) => state.setSimData);
+  const setRunName = useMapData((state) => state.setName);
 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -124,20 +120,10 @@ export default function Simulator() {
 
   const sendSimulatorData = async () => {
     // Reset Data
-    setSimData(null);
-    setPapData(null);
-    setRunName('');
     setError(null);
     setLoading(true);
 
     try {
-      const papRes = await fetch(
-        `${import.meta.env.VITE_DB_URL}papdata/${zone.id}`
-      );
-      if (!papRes.ok) throw new Error('Failed to fetch population data');
-      const papJson = await papRes.json();
-      setPapData(papJson['data']);
-
       const simSuccess = await makePostRequest();
 
       if (simSuccess) {
