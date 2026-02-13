@@ -18,11 +18,6 @@ import reports_route from './routes/reports.js';
 const app = new Hono();
 
 app.use('*', trimTrailingSlash());
-app.use('*', auth);
-app.use('*', bodyLimit({
-  maxSize: 20 * 1024 * 1024 * 1024
-}));
-
 app.use(
   '*',
   cors({
@@ -34,12 +29,16 @@ app.use(
       'https://covidweb.isi.jhu.edu',
       'http://covidweb.isi.jhu.edu'
     ],
-    allowMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+    allowMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'Upgrade-Insecure-Requests', 'Content-Length'],
     exposeHeaders: ['Set-Cookie', 'Content-Length'],
     credentials: true
   })
 );
+app.use('*', auth);
+app.use('*', bodyLimit({
+  maxSize: 20 * 1024 * 1024 * 1024
+}));
 
 app.onError((error, c) => {
   if (error instanceof HTTPException) {

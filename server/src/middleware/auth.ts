@@ -4,7 +4,16 @@ import { deleteSessionTokenCookie, setSessionTokenCookie, validateSessionToken }
 
 export const auth = async (c: Context, next: Next) => {
   const cookie = getCookie(c);
-  const session = await validateSessionToken(cookie['session']);
+  let session = null;
+  try {
+    session = await validateSessionToken(cookie['session']);
+  } catch (_error) {
+    // If session lookup fails (e.g., DB temporarily unavailable), keep request unauthenticated
+    // instead of failing all routes such as lookup endpoints.
+    c.set('user', undefined);
+    deleteSessionTokenCookie(c);
+    return next();
+  }
 
   if (!session) {
     c.set('user', undefined);

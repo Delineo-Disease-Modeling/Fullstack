@@ -53,7 +53,7 @@ function InteractiveMap({ onLocationSelect, disabled }) {
 }
 
 // Static CBG Map component for viewing and editing CBGs after generation
-function CBGMap({ cbgData, center, onCBGClick, selectedCBGs }) {
+function CBGMap({ cbgData, center, onCBGClick, onMapBackgroundClick, selectedCBGs }) {
   const geoJsonLayerRef = useRef(null);
   const layersRef = useRef(new Map()); // Map of cbgId -> layer
   const selectedRef = useRef(selectedCBGs); // Keep ref to avoid stale closures
@@ -121,7 +121,8 @@ function CBGMap({ cbgData, center, onCBGClick, selectedCBGs }) {
           );
           
           layer.on({
-            click: () => {
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
               if (onCBGClick) {
                 onCBGClick(cbgId, feature.properties);
               }
@@ -162,6 +163,18 @@ function CBGMap({ cbgData, center, onCBGClick, selectedCBGs }) {
     return null;
   }
 
+  function BackgroundClickLayer() {
+    useMapEvents({
+      click(e) {
+        if (onMapBackgroundClick) {
+          onMapBackgroundClick(e.latlng);
+        }
+      }
+    });
+
+    return null;
+  }
+
   return (
     <MapContainer
       center={center || [39.3290708, -76.6219753]}
@@ -172,6 +185,7 @@ function CBGMap({ cbgData, center, onCBGClick, selectedCBGs }) {
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <BackgroundClickLayer />
       <GeoJSONLayer />
     </MapContainer>
   );
@@ -216,6 +230,7 @@ function FormField({ label, name, type, placeholder, defaultValue, disabled, val
 export default function CZGeneration() {
   const navigate = useNavigate();
   const user = useAuth((state) => state.user);
+  const isResolvingMapClickRef = useRef(false);
 
   const [ location, setLocation ] = useState('');
   const [ minPop, setMinPop ] = useState(5000);
@@ -228,9 +243,13 @@ export default function CZGeneration() {
   const [ phase, setPhase ] = useState('input'); // 'input' | 'edit' | 'finalizing'
   const [ cbgGeoJSON, setCbgGeoJSON ] = useState(null);
   const [ selectedCBGs, setSelectedCBGs ] = useState([]);
+  const [ seedCBG, setSeedCBG ] = useState('');
+  const [ useTestData, setUseTestData ] = useState(false);
   const [ totalPopulation, setTotalPopulation ] = useState(0);
   const [ mapCenter, setMapCenter ] = useState(null);
   const [ cityName, setCityName ] = useState('');
+  const [ cziMetrics, setCziMetrics ] = useState(null);
+  const [ cziLoading, setCziLoading ] = useState(false);
 
   // Derived state
   const hasGenerated = phase === 'edit';
@@ -239,6 +258,63 @@ export default function CZGeneration() {
   if (!user) {
     navigate('/simulator');
   }
+
+  useEffect(() => {
+    if (!hasGenerated || !seedCBG || selectedCBGs.length === 0) {
+      setCziMetrics(null);
+      setCziLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setCziLoading(true);
+      try {
+        const resp = await axios.post(`${ALG_URL}cz-metrics`, {
+          seed_cbg: seedCBG,
+          cbg_list: selectedCBGs,
+          use_test_data: useTestData
+        });
+        if (!cancelled) {
+          setCziMetrics(resp.data || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCziMetrics({
+            movement_inside: 0,
+            movement_boundary: 0,
+            czi: 0,
+          });
+        }
+        console.warn('Failed to compute CZI metrics:', err);
+      } finally {
+        if (!cancelled) {
+          setCziLoading(false);
+        }
+      }
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [hasGenerated, seedCBG, selectedCBGs, useTestData]);
+
+  const movementInside = Number(cziMetrics?.movement_inside ?? 0);
+  const movementBoundary = Number(cziMetrics?.movement_boundary ?? 0);
+  const cziDisplay = (() => {
+    if (cziLoading) {
+      return 'Calculating...';
+    }
+    if (movementBoundary === 0) {
+      return movementInside > 0 ? 'Infinity' : '0';
+    }
+    const cziValue = Number(cziMetrics?.czi);
+    if (Number.isFinite(cziValue)) {
+      return cziValue.toFixed(4);
+    }
+    return (movementInside / movementBoundary).toFixed(4);
+  })();
 
   // Finalize CZ - create DB record and generate patterns with the final CBG list
   const finalizeCZ = async () => {
@@ -262,7 +338,8 @@ export default function CZGeneration() {
         length: lengthHours,
         latitude: mapCenter?.[0] || 0,
         longitude: mapCenter?.[1] || 0,
-        user_id: user.id
+        user_id: user.id,
+        use_test_data: useTestData
       });
       
       if (resp.status === 200 && resp.data?.id) {
@@ -273,26 +350,103 @@ export default function CZGeneration() {
       }
     } catch (err) {
       console.error('Error finalizing CZ:', err);
-      alert('Failed to create convenience zone. Please try again.');
+      alert(err?.response?.data?.message || 'Failed to create convenience zone. Please try again.');
       setPhase('edit'); // Go back to edit phase
     }
   };
 
   // Handle CBG click to toggle selection
-  const handleCBGClick = (cbgId, properties) => {
-    setSelectedCBGs(prev => {
-      if (prev.includes(cbgId)) {
-        // Remove CBG
-        const newSelection = prev.filter(id => id !== cbgId);
-        // Update population
-        setTotalPopulation(p => p - (properties.population || 0));
-        return newSelection;
-      } else {
-        // Add CBG
-        setTotalPopulation(p => p + (properties.population || 0));
-        return [...prev, cbgId];
+  const handleCBGClick = async (cbgId, properties) => {
+    const wasInCluster = selectedCBGs.includes(cbgId);
+    
+    if (wasInCluster) {
+      // Remove CBG from selection
+      setSelectedCBGs(prev => prev.filter(id => id !== cbgId));
+      setTotalPopulation(p => p - (properties.population || 0));
+    } else {
+      // Add CBG to selection
+      setSelectedCBGs(prev => [...prev, cbgId]);
+      setTotalPopulation(p => p + (properties.population || 0));
+      
+      // If this was a border CBG (not originally in cluster), fetch its neighbors
+      if (!properties.in_cluster) {
+        try {
+          // Fetch neighbors for the newly added CBG
+          const resp = await axios.get(`${ALG_URL}cbg-geojson`, {
+            params: {
+              cbgs: cbgId,
+              include_neighbors: 'true'
+            }
+          });
+          
+          if (resp.data?.features) {
+            // Merge new features into existing GeoJSON
+            setCbgGeoJSON(prev => {
+              if (!prev) return resp.data;
+              
+              // Get existing CBG IDs
+              const existingIds = new Set(
+                prev.features.map(f => f.properties?.GEOID || f.properties?.CensusBlockGroup)
+              );
+              
+              // Only add features that don't already exist
+              const newFeatures = resp.data.features.filter(f => {
+                const id = f.properties?.GEOID || f.properties?.CensusBlockGroup;
+                return !existingIds.has(id);
+              });
+              
+              if (newFeatures.length === 0) return prev;
+              
+              return {
+                ...prev,
+                features: [...prev.features, ...newFeatures]
+              };
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to fetch neighbors for newly added CBG:', err);
+          // Non-critical - the CBG is still added, just no new neighbors shown
+        }
       }
-    });
+    }
+  };
+
+  const handleMapBackgroundClick = async (latlng) => {
+    if (!latlng || isResolvingMapClickRef.current) {
+      return;
+    }
+
+    const stateHint = String(selectedCBGs?.[0] ?? '').slice(0, 2);
+    if (!stateHint) {
+      return;
+    }
+
+    isResolvingMapClickRef.current = true;
+    try {
+      const resp = await axios.get(`${ALG_URL}cbg-at-point`, {
+        params: {
+          latitude: latlng.lat,
+          longitude: latlng.lng,
+          state_fips: stateHint
+        }
+      });
+
+      const clickedCbg = resp.data?.cbg;
+      if (!clickedCbg || selectedCBGs.includes(clickedCbg)) {
+        return;
+      }
+
+      await handleCBGClick(clickedCbg, {
+        population: resp.data?.population || 0,
+        in_cluster: false
+      });
+    } catch (err) {
+      if (err?.response?.status !== 404) {
+        console.warn('Failed to resolve clicked map location to CBG:', err);
+      }
+    } finally {
+      isResolvingMapClickRef.current = false;
+    }
   };
 
   const loc_lookup = async (location) => {
@@ -343,15 +497,19 @@ export default function CZGeneration() {
       console.log(formdata);
 
       const rawLocationInput = String(formdata.get('location') ?? '').trim();
+      const isTestMode = rawLocationInput.toUpperCase() === 'TEST';
+      setUseTestData(isTestMode);
       const zipMatch = rawLocationInput.match(/^\d{5}(?:-\d{4})?$/);
       const userZip = zipMatch ? rawLocationInput.slice(0, 5) : null;
 
       // If user entered a valid ZIP, try to use it directly first
       let core_cbg = null;
       let location = null;
-      let cityName = rawLocationInput;
+      let cityName = isTestMode ? 'TEST' : rawLocationInput;
 
-      if (userZip) {
+      if (isTestMode) {
+        // Backend will pick a seed CBG from data/TEST/test.csv if cbg is not supplied.
+      } else if (userZip) {
         // User entered a ZIP code - try local lookup first (no Google API needed)
         core_cbg = zip_to_cbg(userZip);
         if (core_cbg) {
@@ -374,7 +532,7 @@ export default function CZGeneration() {
         }
       }
   
-      if (!core_cbg) {
+      if (!isTestMode && !core_cbg) {
         console.error('Could not find location. Try entering a 5-digit ZIP code.');
         alert('Could not find location. Please try entering a 5-digit ZIP code (e.g., 21201 for Baltimore).');
         return;
@@ -384,10 +542,14 @@ export default function CZGeneration() {
       console.log(core_cbg);
 
       // Phase 1: Just cluster CBGs (fast) - don't create DB record yet
-      const { status, data } = await axios.post(`${ALG_URL}cluster-cbgs`, {
-        cbg: core_cbg,
-        min_pop: +formdata.get('min_pop')
-      });
+      const clusterReq = {
+        min_pop: +formdata.get('min_pop'),
+        use_test_data: isTestMode
+      };
+      if (core_cbg) {
+        clusterReq.cbg = core_cbg;
+      }
+      const { status, data } = await axios.post(`${ALG_URL}cluster-cbgs`, clusterReq);
 
       if (status !== 200) {
         throw new Error('Status code mismatch');
@@ -400,6 +562,7 @@ export default function CZGeneration() {
       // Store cluster data for editing
       const cluster = data.cluster || [];
       setSelectedCBGs(cluster);
+      setSeedCBG(data.seed_cbg || core_cbg || '');
       setTotalPopulation(data.size || 0);
       setMapCenter(data.center || null);
       setCityName(cityName);
@@ -420,7 +583,7 @@ export default function CZGeneration() {
     func_body(formdata)
       .catch((err) => {
         console.error(err);
-        alert('Failed to cluster CBGs. Please try again.');
+        alert(err?.response?.data?.message || 'Failed to cluster CBGs. Please try again.');
       })
       .finally(() => setLoading(false));
   }
@@ -490,6 +653,12 @@ export default function CZGeneration() {
                   <div className='text-sm font-semibold mb-2'>Zone Statistics</div>
                   <div className='text-sm'>CBGs: {selectedCBGs.length}</div>
                   <div className='text-sm'>Population: {totalPopulation.toLocaleString()}</div>
+                  <div className='text-sm'>
+                    CZI (inside / boundary): {cziDisplay}
+                  </div>
+                  <div className='text-xs text-gray-600 mt-1'>
+                    Movement inside: {Math.round(movementInside).toLocaleString()} | Boundary movement: {Math.round(movementBoundary).toLocaleString()}
+                  </div>
                 </div>
               )}
             </div>
@@ -502,6 +671,7 @@ export default function CZGeneration() {
                     cbgData={cbgGeoJSON}
                     center={null}
                     onCBGClick={handleCBGClick}
+                    onMapBackgroundClick={handleMapBackgroundClick}
                     selectedCBGs={selectedCBGs}
                   />
                 ) : (
@@ -513,7 +683,7 @@ export default function CZGeneration() {
                   </div>
                 )}
                 <div className='absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs'>
-                  Click CBGs to add/remove from zone
+                  Click CBGs (or empty map area) to add/remove from zone
                 </div>
               </div>
             </div>

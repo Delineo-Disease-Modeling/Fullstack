@@ -145,6 +145,7 @@ function EmojiOverlay({ map, hotspots = {} }) {
       if (!features?.length) return;
 
       const zoom = map.getZoom();
+
       const time = Date.now() / 1000; // seconds for smooth pulse
 
       features.forEach((f) => {
@@ -302,6 +303,11 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
     if (mapInstance.getLayer('heatmap-infection')) {
       mapInstance.setLayoutProperty('heatmap-infection', 'visibility', heatmapMode === 'infection' ? 'visible' : 'none');
     }
+    // Show location dots on heatmap modes
+    const isHeatmap = heatmapMode === 'population' || heatmapMode === 'infection';
+    if (mapInstance.getLayer('heatmap-location-dots')) {
+      mapInstance.setLayoutProperty('heatmap-location-dots', 'visibility', isHeatmap ? 'visible' : 'none');
+    }
   }, [heatmapMode, mapInstance]);
 
   const handleMapLoad = (event) => {
@@ -419,6 +425,7 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
           "clusters",
           "unclustered-point-circle",
           "unclustered-point-emoji",
+          "heatmap-location-dots",
         ]}
         onClick={handleClick}
       >
@@ -606,6 +613,27 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
               "heatmap-opacity": 0.85
             }}
           />
+
+          {/* 📍 Location dots overlay for heatmap modes */}
+          <Layer
+            id="heatmap-location-dots"
+            type="circle"
+            minzoom={14}
+            layout={{ "visibility": (heatmapMode === 'population' || heatmapMode === 'infection') ? 'visible' : 'none' }}
+            paint={{
+              "circle-radius": [
+                "interpolate", ["linear"], ["zoom"],
+                10, 4,
+                14, 8,
+                18, 12
+              ],
+              "circle-color": "#ffffff",
+              "circle-opacity": 0.9,
+              "circle-stroke-color": "#333333",
+              "circle-stroke-width": 1.5,
+              "circle-stroke-opacity": 0.8
+            }}
+          />
         </Source>
 
         {/* 💬 Popup */}
@@ -777,7 +805,8 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
           year: 'numeric',
           weekday: 'short',
           hour: 'numeric',
-          minute: '2-digit'
+          minute: '2-digit',
+          timeZone: 'UTC'
         })}
       </div>
 
