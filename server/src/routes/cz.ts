@@ -3,7 +3,7 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { PrismaClient } from "@prisma/client";
 import { DB_FOLDER } from "../env.js";
-import { unlink } from "fs/promises";
+import { access, unlink } from "fs/promises";
 
 const cz_route = new Hono();
 
@@ -43,6 +43,11 @@ cz_route.get('/convenience-zones', zValidator('query', getConvZonesSchema), asyn
         select: {
           id: true
         }
+      },
+      patterns: {
+        select: {
+          id: true
+        }
       }
     },
     where: {
@@ -50,12 +55,33 @@ cz_route.get('/convenience-zones', zValidator('query', getConvZonesSchema), asyn
     }
   });
 
-  return c.json({
-    data: zones.map((zone: any) => ({
+  const data = await Promise.all(zones.map(async (zone: any) => {
+    const papdataId = zone.papdata?.id;
+    const patternsId = zone.patterns?.id;
+    let ready = false;
+
+    if (papdataId && patternsId) {
+      try {
+        await Promise.all([
+          access(DB_FOLDER + papdataId),
+          access(DB_FOLDER + patternsId)
+        ]);
+        ready = true;
+      } catch {
+        ready = false;
+      }
+    }
+
+    return {
       ...zone,
       papdata: undefined,
-      ready: !!zone.papdata
-    }))
+      patterns: undefined,
+      ready
+    };
+  }));
+
+  return c.json({
+    data
   });
 });
 

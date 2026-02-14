@@ -44,7 +44,12 @@ auth_route.post('/login', zValidator('json', loginSchema), async (c) => {
     });
   }
 
-  const verified = await verifyPassword(password, user.password_hash);
+  let verified = false;
+  try {
+    verified = await verifyPassword(password, user.password_hash);
+  } catch {
+    verified = false;
+  }
 
   if (!verified) {
     throw new HTTPException(401, {

@@ -97,6 +97,7 @@ export default function Simulator() {
   const [isSaving, setIsSaving] = useState(false);
   const [runParams, setRunParams] = useState(null);
   const [showRunParams, setShowRunParams] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   const saveSimulation = async () => {
     if (!rawSimData || !settings.zone?.id) {
@@ -167,6 +168,8 @@ export default function Simulator() {
   };
 
   const makePostRequest = async () => {
+    setLoadError(null);
+
     // Use zone description (e.g., "hagerstown") as location, falling back to name
     const locationName = (settings.zone?.description || settings.zone?.name || 'barnsdall')
       .toLowerCase()
@@ -221,6 +224,7 @@ export default function Simulator() {
           lockdown: json?.data?.lockdown
         });
         setShowRunParams(false);
+        setLoadError(null);
         return;
       } catch (error) {
         console.error(error);
@@ -403,8 +407,12 @@ export default function Simulator() {
                 lockdown: data?.data?.lockdown
               });
               setShowRunParams(false);
+              setLoadError(null);
             })
-            .catch(console.error);
+            .catch((error) => {
+              console.error(error);
+              setLoadError('Failed to load saved simulation data.');
+            });
         } else if (data?.['simdata']) {
           // Direct simdata returned from simulation (legacy format)
           const simOutput = data['simdata'];
@@ -424,6 +432,7 @@ export default function Simulator() {
           console.log(`[PERF] Transformation complete: ${Object.keys(transformed).length} timesteps`);
           
           setSimData(transformed);
+          setLoadError(null);
           
           // Set papdata if available
           if (simOutput?.['papdata']) {
@@ -452,9 +461,13 @@ export default function Simulator() {
           setRunName('Simulation Result');
         } else {
           console.error('No simulation data received');
+          setLoadError('No simulation data received.');
         }
       })
-      .catch(console.error);
+      .catch((error) => {
+        console.error(error);
+        setLoadError(error?.response?.data?.message || error?.message || 'Failed to run simulation.');
+      });
   };
 
   const sendSimulatorData = () => {
@@ -462,6 +475,7 @@ export default function Simulator() {
     setSimData(null);
     setPapData(null);
     setRunName('');
+    setLoadError(null);
 
     // Switch "pages"
     setShowSim(true);
@@ -470,14 +484,18 @@ export default function Simulator() {
     fetch(`${DB_URL}papdata/${settings.zone.id}`)
       .then((res) => {
         if (!res.ok) {
-          throw new Error();
+          throw new Error('This convenience zone is missing simulation input files. Please regenerate it.');
         }
         return res.json();
       })
       .then((json) => {
         setPapData(json['data']);
+        setLoadError(null);
       })
-      .catch(console.error);
+      .catch((error) => {
+        console.error(error);
+        setLoadError(error?.message || 'Failed to load papdata.');
+      });
 
     makePostRequest({
       ...settings,
@@ -502,6 +520,8 @@ export default function Simulator() {
             <InstructionBanner text="Welcome! Generate a Convenience Zone or pick one that's already generated, then click 'Simulate' to begin." />
             <SimSettings sendData={sendSimulatorData} />
           </div>
+        ) : loadError ? (
+          <div className='text-red-600'>{loadError}</div>
         ) : !simdata || !papdata ? (
           <div>Loading simulation data...</div>
         ) : (
