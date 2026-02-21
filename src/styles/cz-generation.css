@@ -1,0 +1,17 @@
+.formfield {
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-ivory);
+  outline: 2px solid var(--color-primary-blue);
+}
+
+.formfield:disabled {
+  cursor: not-allowed;
+  filter: brightness(0.75);
+}
+
+/* Remove focus outlines from map container and its children */
+.leaflet-container:focus,
+.leaflet-container *:focus {
+  outline: none;
+}
