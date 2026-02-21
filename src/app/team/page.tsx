@@ -20,12 +20,12 @@ const teamData: {
   pastAlumn: TeamMember[];
 } = {
   professors: [
-    { name: 'Professor Anton Dahbura', department: 'Computer Science' },
+    { name: 'Dr. Anton Dahbura', department: 'Computer Science' },
     {
-      name: 'Professor Kimia Ghobadi',
+      name: 'Dr. Kimia Ghobadi',
       department: 'Civil and Systems Engineering'
     },
-    { name: 'Professor Eili Klein', department: 'Emergency Medicine' }
+    { name: 'Dr. Eili Klein', department: 'Emergency Medicine' }
   ],
 
   fullstackTeam: [
