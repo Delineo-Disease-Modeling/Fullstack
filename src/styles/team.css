@@ -35,6 +35,17 @@ header.PIheader {
   margin-bottom: 20px;
 }
 
+div.team-section {
+  width: 100%;
+}
+
+h1.teamheader {
+  font-weight: 500;
+  font-size: 32px;
+  text-align: center;
+  padding: 20px 0 16px;
+}
+
 div.team {
   padding-left: 15%;
   padding-right: 15%;
@@ -43,7 +54,7 @@ div.team {
   row-gap: 60px;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 

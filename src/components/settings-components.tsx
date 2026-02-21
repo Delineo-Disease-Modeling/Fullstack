@@ -109,21 +109,24 @@ export function SimRunSelector({
   callback
 }: SimRunSelectorProps) {
   const [data, setData] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!czone_id) {
       setData(null);
       return;
     }
+    setLoading(true);
     fetch(`/api/simdata/cache/${czone_id}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Invalid cache response ${res.status}`);
         return res.json();
       })
-      .then((json) => setData(json.data))
+      .then((json) => { setData(json.data); setLoading(false); })
       .catch((e) => {
         console.error(e);
         setData(null);
+        setLoading(false);
       });
   }, [czone_id]);
 
@@ -137,7 +140,9 @@ export function SimRunSelector({
         <p className="flex-1 text-right">Created Date</p>
       </div>
       <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1">
-        {!data?.length && (
+        {loading ? (
+          <p className="text-center text-wrap my-auto">Loading...</p>
+        ) : !data?.length && (
           <p className="text-center text-wrap my-auto">
             No previous runs found, run a simulation to get started!
           </p>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import 'animate.css';
 import '@/styles/team.css';
 
@@ -87,6 +88,22 @@ const teamData: {
   ]
 };
 
+function MemberImage({ name }: { name: string }) {
+  const [src, setSrc] = useState(
+    `/images/team/${name.toLowerCase().replace(/\s/g, '')}.jpg`
+  );
+
+  return (
+    <img
+      key={src}
+      className="member bg-(--color-accent-teal)"
+      onError={() => setSrc('/images/delineo.svg')}
+      src={src}
+      alt={name}
+    />
+  );
+}
+
 function TeamSection({
   team,
   teamName
@@ -95,41 +112,34 @@ function TeamSection({
   teamName: string;
 }) {
   return (
-    <div className="team" data-aos="fade-up" data-aos-once="true">
+    <div className="team-section" data-aos="fade-up" data-aos-once="true">
       <h1 className="teamheader">{teamName}</h1>
-      {team.map((member) => (
-        <div className="member" key={member.name}>
-          <img
-            className="member bg-(--color-accent-teal)"
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              img.onerror = null;
-              img.src = '/images/delineo.svg';
-            }}
-            src={`/images/team/${member.name.toLowerCase().replace(/\s/g, '')}.jpg`}
-            alt={member.name}
-          />
-          <h1 className="name">{member.name}</h1>
+      <div className="team">
+        {team.map((member) => (
+          <div className="member" key={member.name}>
+            <MemberImage name={member.name} />
+            <h1 className="name">{member.name}</h1>
 
-          {member.department && <h2 className="role">{member.department}</h2>}
-          {member.gradYear && (
-            <h2 className="gradYear">Class of {member.gradYear}</h2>
-          )}
+            {member.department && <h2 className="role">{member.department}</h2>}
+            {member.gradYear && (
+              <h2 className="gradYear">Class of {member.gradYear}</h2>
+            )}
 
-          <div className="w-full flex items-center justify-center min-h-6">
-            {member.github && (
-              <a href={member.github}>
-                <i className="px-2 bi-github"></i>
-              </a>
-            )}
-            {member.linkedin && (
-              <a href={member.linkedin}>
-                <i className="px-2 bi-linkedin"></i>
-              </a>
-            )}
+            <div className="w-full flex items-center justify-center min-h-6">
+              {member.github && (
+                <a href={member.github}>
+                  <i className="px-2 bi-github"></i>
+                </a>
+              )}
+              {member.linkedin && (
+                <a href={member.linkedin}>
+                  <i className="px-2 bi-linkedin"></i>
+                </a>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

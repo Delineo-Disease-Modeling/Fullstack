@@ -21,17 +21,20 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
   const [hoveredLocId, setHoveredLocId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const hasUserZones = user && locations.some((loc) => loc.user_id === user.id);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     fetch('/api/convenience-zones')
       .then((res) => res.json())
       .then((json) => {
         if (!active) return;
         const locs = json.data ?? [];
         setLocations(locs);
+        setLoading(false);
 
         if (zone) {
           const freshZone = locs.find((z: ConvenienceZone) => z.id === zone.id);
@@ -42,7 +45,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
           setZone(locs[0]);
         }
       })
-      .catch(console.error);
+      .catch((e) => { console.error(e); if (active) setLoading(false); });
 
     return () => {
       active = false;
@@ -90,7 +93,9 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
         </div>
 
         <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1">
-          {locations.length === 0 && (
+          {loading ? (
+            <p className="text-center my-auto">Loading...</p>
+          ) : locations.length === 0 && (
             <p className="text-center my-auto">
               No zones found, create one to get started!
             </p>
