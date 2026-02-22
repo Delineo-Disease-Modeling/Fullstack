@@ -8,6 +8,10 @@ import { auth } from '@/lib/auth';
 import type { CachedUser } from '@/stores/useAuthStore';
 import './globals.css';
 
+export const viewport = {
+  viewportFit: 'cover'
+};
+
 export const metadata: Metadata = {
   title: 'Delineo',
   description: 'Community-level disease modeling'

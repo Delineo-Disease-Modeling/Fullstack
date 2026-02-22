@@ -4,6 +4,7 @@ footer.site_footer {
   background-color: var(--color-bg-dark);
   width: 100%;
   padding: 40px;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
   text-align: center;
 }
 

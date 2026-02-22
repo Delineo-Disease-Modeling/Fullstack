@@ -30,7 +30,7 @@ export function SimParameter({
       </div>
       <input
         type="range"
-        className="simset_slider_input w-[300px]"
+        className="simset_slider_input w-75"
         min={min}
         max={max}
         value={percent ? value * 100.0 : value}
@@ -131,11 +131,11 @@ export function SimRunSelector({
   }, [czone_id]);
 
   return (
-    <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-[var(--color-primary-blue)] bg-[var(--color-bg-ivory)]">
-      <div className="bg-[var(--color-primary-blue)] text-center text-white w-full h-6">
+    <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory)">
+      <div className="bg-(--color-primary-blue) text-center text-white w-full h-6">
         Visit a Previous Run
       </div>
-      <div className="flex px-1 justify-between text-xs font-semibold bg-[var(--color-primary-blue)] text-white py-1">
+      <div className="flex px-1 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
         <p className="flex-1">Name</p>
         <p className="flex-1 text-right">Created Date</p>
       </div>

@@ -48,7 +48,7 @@ export default function SimSettings({
 
       <div className="flex flex-wrap justify-center gap-8">
         <SimParameter
-          label={'Length'}
+          label={'Simulation Length'}
           value={hours}
           callback={(hours) => setSettings({ hours })}
           min={24}
