@@ -103,12 +103,18 @@ interface SimRunSelectorProps {
   callback: (sim_id: number | null) => void;
 }
 
+type SimRunType = {
+  name: string;
+  created_at: string;
+  sim_id: number;
+};
+
 export function SimRunSelector({
   czone_id,
   sim_id,
   callback
 }: SimRunSelectorProps) {
-  const [data, setData] = useState<any[] | null>(null);
+  const [data, setData] = useState<SimRunType[] | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -148,9 +154,10 @@ export function SimRunSelector({
           </p>
         )}
         {data?.map((run) => (
-          <div
+          <button
+            type="button"
             key={run.sim_id}
-            className="flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none"
+            className="flex w-full text-left px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none bg-transparent border-none p-0 font-[inherit] text-inherit"
             style={
               run.sim_id === sim_id
                 ? { background: 'var(--color-primary-blue)', color: 'white' }
@@ -162,7 +169,7 @@ export function SimRunSelector({
             <p className="flex-1 text-right">
               {new Date(run.created_at).toLocaleDateString()}
             </p>
-          </div>
+          </button>
         ))}
       </div>
     </div>

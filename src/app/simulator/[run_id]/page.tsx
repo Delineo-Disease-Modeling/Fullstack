@@ -8,6 +8,7 @@ import OutputGraphs from '@/components/outputgraphs';
 import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
+import '@/styles/settings-components.css';
 
 const ModelMap = dynamic(() => import('@/components/modelmap'), { ssr: false });
 

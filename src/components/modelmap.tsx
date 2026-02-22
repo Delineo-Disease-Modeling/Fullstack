@@ -246,8 +246,6 @@ function ClusteredMap({
   const mapRef = useRef<any>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [popupInfo, setPopupInfo] = useState<any>(null);
-  const [fadeCircle, setFadeCircle] = useState(1);
-  const [fadeLabel, setFadeLabel] = useState(1);
   const hasFitBounds = useRef(false);
 
   useEffect(() => {
@@ -319,17 +317,6 @@ function ClusteredMap({
   const handleMapLoad = (event: any) => {
     const map = event.target;
     setMapInstance(map);
-    map.on('moveend', () => {
-      const start = performance.now();
-      const animate = (now: number) => {
-        const t = Math.min((now - start) / 350, 1);
-        const eased = 1 - (1 - t) ** 3;
-        setFadeLabel(Math.min(eased * 1.1, 1));
-        setFadeCircle(Math.min(eased * 0.85 + 0.15, 1));
-        if (t < 1) requestAnimationFrame(animate);
-      };
-      requestAnimationFrame(animate);
-    });
   };
 
   useEffect(() => {
@@ -348,16 +335,6 @@ function ClusteredMap({
     setPopupInfo(null);
   }, []);
 
-  useEffect(() => {
-    if (!mapInstance) return;
-    if (mapInstance.getLayer('cluster-count'))
-      mapInstance.setLayoutProperty(
-        'cluster-count',
-        'visibility',
-        fadeLabel < 0.2 ? 'none' : 'visible'
-      );
-  }, [fadeLabel, mapInstance]);
-
   const geojson = makeGeoJSON(pois);
 
   const handleClick = (event: any) => {
@@ -368,12 +345,12 @@ function ClusteredMap({
       const clusterId = feature.properties.cluster_id;
       map
         .getSource('points')
-        .getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
-          if (err) return;
+        .getClusterExpansionZoom(clusterId)
+        .then((zoom: number) => {
           map.easeTo({
             center: feature.geometry.coordinates,
             zoom: zoom + 0.5,
-            duration: 1000
+            duration: 600
           });
         });
       return;
@@ -465,7 +442,7 @@ function ClusteredMap({
                 25,
                 34
               ],
-              'circle-opacity': fadeCircle,
+              'circle-opacity': 1,
               'circle-stroke-width': 1,
               'circle-stroke-color': '#fff'
             }}
@@ -486,7 +463,7 @@ function ClusteredMap({
               'text-size': 12,
               'text-allow-overlap': true
             }}
-            paint={{ 'text-color': '#fff', 'text-opacity': fadeLabel }}
+            paint={{ 'text-color': '#fff', 'text-opacity': 1 }}
           />
           <Layer
             id="unclustered-point-circle"
@@ -495,7 +472,7 @@ function ClusteredMap({
             paint={{
               'circle-radius': 14,
               'circle-color': clusterColor as any,
-              'circle-opacity': fadeCircle,
+              'circle-opacity': 1,
               'circle-stroke-color': '#fff',
               'circle-stroke-width': 1
             }}
@@ -510,7 +487,7 @@ function ClusteredMap({
               'text-allow-overlap': true,
               'text-font': ['Open Sans Regular']
             }}
-            paint={{ 'text-color': '#000000', 'text-opacity': fadeCircle }}
+            paint={{ 'text-color': '#000000', 'text-opacity': 1 }}
           />
         </Source>
         <Source id="heatmap-points" type="geojson" data={geojson as any}>

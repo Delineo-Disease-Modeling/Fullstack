@@ -6,8 +6,17 @@ export default function DiseaseGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
+    if (!canvasRef.current) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      return;
+    }
+
     let animationFrameId: number;
 
     const NODE_COUNT = 60;
@@ -142,7 +151,7 @@ export default function DiseaseGraph() {
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      nodes.forEach((node) => node.update(canvas.width, canvas.height));
+      nodes.forEach((node) => { node.update(canvas.width, canvas.height); });
       ctx.lineWidth = 1;
       for (let i = 0; i < nodes.length; i++) {
         const nodeA = nodes[i];

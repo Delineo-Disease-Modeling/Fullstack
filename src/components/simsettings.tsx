@@ -80,6 +80,7 @@ export default function SimSettings({
 
       <div className="flex flex-col items-center gap-8 w-full">
         <button
+          type="button"
           className="simset_button w-32 disabled:bg-gray-400! disabled:pointer-events-none"
           disabled={loading}
           onClick={() => {

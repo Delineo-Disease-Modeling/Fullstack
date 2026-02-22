@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import '@/styles/about.css';
 
 export default function About() {
@@ -7,10 +8,12 @@ export default function About() {
 
       <div className="timeline">
         <div className="entry" data-aos="fade-up" data-aos-once="true">
-          <img
+          <Image
             className="aboutimg"
             src="/images/about/algosAboutPagePic.png"
             alt="logo"
+            width={800}
+            height={600}
           />
           <div className="aboutinfo">
             <h1 className="text-2xl font-medium pb-5 text-center">
@@ -40,10 +43,12 @@ export default function About() {
         </div>
 
         <div className="entry" data-aos="fade-up" data-aos-once="true">
-          <img
+          <Image
             className="aboutimg"
             src="/images/about/simulatorAboutPagePic.png"
             alt="logo"
+            width={800}
+            height={600}
           />
           <div className="aboutinfo">
             <header className="text-2xl font-medium pb-5 text-center">
@@ -69,10 +74,12 @@ export default function About() {
         </div>
 
         <div className="entry" data-aos="fade-up" data-aos-once="true">
-          <img
+          <Image
             className="aboutimg"
             src="/images/about/fullstackAboutPagePic.png"
             alt="logo"
+            width={800}
+            height={600}
           />
           <div className="aboutinfo">
             <header className="text-2xl font-medium pb-5 text-center">

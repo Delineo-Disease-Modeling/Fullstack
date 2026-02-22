@@ -18,7 +18,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
     const request: Record<string, string> = {};
     setError(null);
 
-    formdata.forEach((value, key) => (request[key] = value as string));
+    formdata.forEach((value, key) => { request[key] = value as string; });
 
     if (!request.email || !request.password) {
       setError('Please fill in all fields');
@@ -42,7 +42,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
           { email: request.email, password: request.password },
           {
             onSuccess: closeModal,
-            onError: (ctx: any) => setError(ctx.error.message)
+            onError: (ctx) => setError(ctx.error.message)
           }
         );
       } else {
@@ -52,10 +52,10 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
             password: request.password,
             name: request.name,
             organization: request.organization
-          } as any,
+          },
           {
             onSuccess: closeModal,
-            onError: (ctx: any) => setError(ctx.error.message)
+            onError: (ctx) => setError(ctx.error.message)
           }
         );
       }
@@ -88,7 +88,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
           id="email"
           name="email"
           type="email"
-          className={`rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)] ${error ? 'border-red-500' : ''}`}
+          className={`rounded-md px-2 py-0.5 text-(--color-bg-dark) bg-(--color-text-light) ${error ? 'border-red-500' : ''}`}
           required
         />
       </div>
@@ -99,7 +99,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
             id="name"
             name="name"
             type="text"
-            className="rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)]"
+            className="rounded-md px-2 py-0.5 text-(--color-bg-dark) bg-(--color-text-light)"
             required
           />
         </div>
@@ -110,7 +110,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
           id="password"
           name="password"
           type="password"
-          className={`rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)] ${error ? 'border-red-500' : ''}`}
+          className={`rounded-md px-2 py-0.5 text-(--color-bg-dark) bg-(--color-text-light) ${error ? 'border-red-500' : ''}`}
           required
         />
       </div>
@@ -121,7 +121,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
             id="organization"
             name="organization"
             type="text"
-            className="rounded-md px-2 py-0.5 text-[var(--color-bg-dark)] bg-[var(--color-text-light)]"
+            className="rounded-md px-2 py-0.5 text-(--color-bg-dark) bg-(--color-text-light)"
             required
           />
         </div>
@@ -129,7 +129,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="modal outline-solid outline-1 px-8 py-1 rounded-lg mt-2 w-full hover:bg-[var(--color-primary-blue)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="modal outline-solid outline-1 px-8 py-1 rounded-lg mt-2 w-full hover:bg-(--color-primary-blue) transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {loading ? (curTab === 0 ? 'Logging in…' : 'Registering…') : (curTab === 0 ? 'Login' : 'Register')}
       </button>
@@ -182,23 +182,25 @@ export default function LoginModal({
         <header>Login or Register</header>
         <div className="flex gap-4 w-full">
           <button
+            type="button"
             onClick={() => {
               setCurTab(0);
               setError(null);
             }}
             data-tab={curTab}
-            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-[var(--color-primary-blue)] hover:bg-slate-700 w-1/2"
+            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=0]:decoration-(--color-primary-blue) hover:bg-slate-700 w-1/2"
             style={{ boxShadow: 'inset 0 -1px 0 0 #313131' }}
           >
             Login
           </button>
           <button
+            type="button"
             onClick={() => {
               setCurTab(1);
               setError(null);
             }}
             data-tab={curTab}
-            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-[var(--color-primary-blue)] hover:bg-slate-700 w-1/2"
+            className="cursor-pointer underline underline-offset-10 decoration-2 rounded-md px-1 py-0.5 data-[tab=1]:decoration-(--color-primary-blue) hover:bg-slate-700 w-1/2"
           >
             Register
           </button>

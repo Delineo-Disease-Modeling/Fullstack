@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -33,7 +34,7 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
       <div className="navbuffer"></div>
       <nav>
         <Link href="/" className="link">
-          <img src="/images/logo.png" alt="logo" />
+          <Image src="/images/logo.png" alt="logo" width={25} height={25} />
         </Link>
         <ul>
           <li>{navLink('/simulator', 'Simulator')}</li>

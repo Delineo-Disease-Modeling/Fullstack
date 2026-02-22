@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
 import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
@@ -22,6 +22,8 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
   const [hoveredLocId, setHoveredLocId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const zoneRef = useRef(zone);
+  zoneRef.current = zone;
 
   const hasUserZones = user && locations.some((loc) => loc.user_id === user.id);
 
@@ -36,9 +38,10 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
         setLocations(locs);
         setLoading(false);
 
-        if (zone) {
-          const freshZone = locs.find((z: ConvenienceZone) => z.id === zone.id);
-          if (freshZone && JSON.stringify(freshZone) !== JSON.stringify(zone)) {
+        const currentZone = zoneRef.current;
+        if (currentZone) {
+          const freshZone = locs.find((z: ConvenienceZone) => z.id === currentZone.id);
+          if (freshZone && JSON.stringify(freshZone) !== JSON.stringify(currentZone)) {
             setZone(freshZone);
           }
         } else if (locs.length > 0) {
@@ -50,13 +53,14 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
     return () => {
       active = false;
     };
-  }, [setZone, zone]);
+  }, [setZone]);
 
   useEffect(() => {
     if (!hasUserZones) {
       setTab(0);
     }
   }, [hasUserZones]);
+
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -65,7 +69,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
           <div className="flex h-6">
             <button
               type="button"
-              className="bg-[var(--color-primary-blue)] text-center text-white flex-1 h-full cursor-pointer"
+              className="bg-(--color-primary-blue) text-center text-white flex-1 h-full cursor-pointer"
               style={tab === 0 ? { filter: 'brightness(0.8)' } : undefined}
               onClick={() => setTab(0)}
             >
@@ -73,7 +77,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
             </button>
             <button
               type="button"
-              className="bg-[var(--color-primary-blue)] text-center text-white flex-1 h-full cursor-pointer"
+              className="bg-(--color-primary-blue) text-center text-white flex-1 h-full cursor-pointer"
               style={tab === 1 ? { filter: 'brightness(0.8)' } : undefined}
               onClick={() => setTab(1)}
             >
@@ -81,18 +85,18 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-6 text-white bg-[var(--color-primary-blue)]">
+          <div className="flex items-center justify-center h-6 text-white bg-(--color-primary-blue)">
             Convenience Zones
           </div>
         )}
 
-        <div className="flex px-1 justify-between text-xs font-semibold bg-[var(--color-primary-blue)] text-white py-1">
+        <div className="flex px-1 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
           <p className="flex-1">Name</p>
           <p className="flex-1 text-center">Population Size</p>
           <p className="flex-1 text-right">Created Date</p>
         </div>
 
-        <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1">
+        <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1" style={{ overflowAnchor: 'none' }}>
           {loading ? (
             <p className="text-center my-auto">Loading...</p>
           ) : locations.length === 0 && (
@@ -144,7 +148,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       </div>
 
       {zone && (
-        <div className="w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-[var(--color-primary-blue)] bg-[var(--color-bg-ivory)] italic whitespace-pre-line">
+        <div className="w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory) italic whitespace-pre-line">
           {zone.description}
         </div>
       )}

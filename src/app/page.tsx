@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import DiseaseGraph from '@/components/disease-graph';
 import '@/styles/home.css';
@@ -17,7 +18,7 @@ export default function Home() {
             <button className="app">Start</button>
           </Link>
         </div>
-        <img className="logo" src="/images/logo.png" alt="logo" />
+        <Image className="logo" src="/images/logo.png" alt="logo" width={400} height={400} />
       </div>
       <div className="featurelist">
         <div className="feature" data-aos="fade-left">

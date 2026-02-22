@@ -2,30 +2,48 @@ div.modelmap_legend_div {
   position: absolute;
   z-index: 1;
   background-color: var(--color-bg-ivory);
-  margin: 10px;
   padding: 5px;
   outline: 2px solid var(--color-primary-blue);
 
+  height: 32px;
+  width: 64px;
   overflow-y: scroll;
   overflow-x: hidden;
-  font-size: 10px;
+  font-size: 12px;
 
   transition: all 0.25s ease-in-out;
 
   -ms-overflow-style: none;
   scrollbar-width: none;
+  cursor: default;
 }
 
 div.modelmap_legend_div::-webkit-scrollbar {
   display: none;
 }
 
-div.modelmap_legend_div_unhover {
-  height: 20px;
-  width: 50px;
-}
-
-div.modelmap_legend_div_hover {
+div.modelmap_legend_div:hover {
   height: calc(60vh - 20px);
   width: 100px;
+}
+
+.modelmap_legend_collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+div.modelmap_legend_div:hover .modelmap_legend_collapsed {
+  display: none;
+}
+
+.modelmap_legend_expanded {
+  display: none;
+  width: 90px;
+}
+
+div.modelmap_legend_div:hover .modelmap_legend_expanded {
+  display: block;
 }

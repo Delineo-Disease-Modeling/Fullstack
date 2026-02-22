@@ -1,7 +1,7 @@
 'use client';
 
 import L from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -46,7 +46,10 @@ function GeoJSONLayer({
 }) {
   const map = useMap();
 
-  const getStyleForCbg = (cbgId: string) => {
+  const onCBGClickRef = useRef(onCBGClick);
+  useEffect(() => { onCBGClickRef.current = onCBGClick; }, [onCBGClick]);
+
+  const getStyleForCbg = useCallback((cbgId: string) => {
     const isSelected = selectedRef.current?.includes(cbgId);
     return {
       fillColor: isSelected ? '#70B4D4' : '#BDBDBD',
@@ -55,7 +58,7 @@ function GeoJSONLayer({
       color: isSelected ? '#1f2937' : '#6b7280',
       fillOpacity: isSelected ? 0.6 : 0.2
     };
-  };
+  }, [selectedRef]);
 
   useEffect(() => {
     if (geoJsonLayerRef.current) {
@@ -97,8 +100,8 @@ function GeoJSONLayer({
         typedLayer.on({
           click: (e: { originalEvent: Event }) => {
             L.DomEvent.stopPropagation(e as unknown as Event);
-            if (onCBGClick)
-              onCBGClick(cbgId, feature.properties as Record<string, unknown>);
+            if (onCBGClickRef.current)
+              onCBGClickRef.current(cbgId, feature.properties as Record<string, unknown>);
           },
           mouseover: (e: { target: { setStyle: (s: object) => void } }) => {
             e.target.setStyle({ weight: 3, fillOpacity: 0.9 });
@@ -128,17 +131,7 @@ function GeoJSONLayer({
           geoJsonLayerRef.current as Parameters<typeof map.removeLayer>[0]
         );
     };
-  }, [
-    map,
-    cbgData,
-    geoJsonLayerRef,
-    getStyleForCbg,
-    hasFittedRef,
-    layersRef.current.clear,
-    layersRef.current.set,
-    onCBGClick,
-    selectedRef.current?.includes
-  ]);
+  }, [map, cbgData, geoJsonLayerRef, getStyleForCbg, hasFittedRef, layersRef, selectedRef]);
 
   useEffect(() => {
     layersRef.current.forEach((layer, cbgId) => {
@@ -149,7 +142,7 @@ function GeoJSONLayer({
         `<strong>CBG:</strong> ${cbgId}<br/><strong>Population:</strong> ${pop}<br/><strong>Status:</strong> ${isSelected ? 'In Zone' : 'Click to Add'}`
       );
     });
-  }, [selectedCBGs, getStyleForCbg, layersRef.current.forEach]);
+  }, [selectedCBGs, getStyleForCbg, layersRef]);
 
   return null;
 }

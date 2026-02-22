@@ -24,12 +24,15 @@ export default function InterventionTimeline() {
     const unused = Array.from({ length: hours }, (_, i) => i + 1).filter(
       (v) => !values.includes(v)
     );
+
     for (let i = 0; i < values.length; i++) {
       if (values[i] > hours) {
-        const newtime = unused.pop()!;
-        setInterventions(values[i], { time: newtime });
-        setValues((cur) => [...cur].with(i, newtime));
-        if (curtime === values[i]) setCurtime(newtime);
+        const newtime = unused.pop();
+        if (newtime !== undefined) {
+          setInterventions(values[i], { time: newtime });
+          setValues((cur) => [...cur].with(i, newtime));
+          if (curtime === values[i]) setCurtime(newtime);
+        }
       }
     }
   }, [curtime, setInterventions, hours, values]);
@@ -68,14 +71,15 @@ export default function InterventionTimeline() {
 
   return (
     <div className="flex flex-col w-full max-w-250 gap-4">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: custom slider track; range inputs inside handle keyboard accessibility */}
       <div
         className="relative flex items-center w-full h-6 select-none"
         onDoubleClick={addThumb}
       >
-        <div className="absolute top-0 left-0 w-full h-2 bg-[var(--color-text-main)] rounded-md outline-0" />
+        <div className="absolute top-0 left-0 w-full h-2 bg-(--color-text-main) rounded-md outline-0" />
         {values.map((value, i) => (
           <input
-            key={i}
+            key={value}
             className={`iv_timeline absolute top-0 left-0 w-full h-1.5 ${curtime === value ? 'current ' : ''}`}
             type="range"
             min={0}
@@ -100,13 +104,15 @@ export default function InterventionTimeline() {
 
       <div className="flex w-full items-center justify-center gap-2">
         <button
-          className="iv_timeline bg-[var(--color-bg-dark)] disabled:bg-stone-600 px-4!"
+          type="button"
+          className="iv_timeline bg-(--color-bg-dark) disabled:bg-stone-600 px-4!"
           onClick={moveLeft}
         >
           &lt;
         </button>
         <div className={values.length <= 1 ? 'cursor-not-allowed' : ''}>
           <button
+            type="button"
             className="iv_timeline bg-red-400 disabled:bg-red-800"
             onClick={() => deleteThumb(values.indexOf(curtime))}
             disabled={values.length <= 1}
@@ -116,7 +122,8 @@ export default function InterventionTimeline() {
         </div>
         <div className={values.length >= 10 ? 'cursor-not-allowed' : ''}>
           <button
-            className="iv_timeline bg-[var(--color-bg-dark)] disabled:bg-stone-600"
+            type="button"
+            className="iv_timeline bg-(--color-bg-dark) disabled:bg-stone-600"
             onClick={() => {
               const newvalue = Array.from(
                 { length: hours },
@@ -132,7 +139,8 @@ export default function InterventionTimeline() {
           </button>
         </div>
         <button
-          className="iv_timeline bg-[var(--color-bg-dark)] disabled:bg-stone-600 px-4!"
+          type="button"
+          className="iv_timeline bg-(--color-bg-dark) disabled:bg-stone-600 px-4!"
           onClick={moveRight}
         >
           &gt;

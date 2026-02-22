@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import 'animate.css';
 import '@/styles/team.css';
@@ -94,12 +95,14 @@ function MemberImage({ name }: { name: string }) {
   );
 
   return (
-    <img
+    <Image
       key={src}
       className="member bg-(--color-accent-teal)"
       onError={() => setSrc('/images/delineo.svg')}
       src={src}
       alt={name}
+      width={130}
+      height={130}
     />
   );
 }
