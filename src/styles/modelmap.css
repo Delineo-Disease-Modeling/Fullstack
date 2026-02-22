@@ -1,0 +1,113 @@
+div.mapcontainer {
+  width: 56rem;
+  height: 32rem;
+  max-width: 90vw;
+  position: relative;
+  z-index: 0;
+}
+
+.pulse-icon {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  background-color: transparent;
+  border-radius: 50%;
+  animation: pulse 1.2s infinite;
+  box-shadow: 0 0 10px 4px rgba(255, 0, 0, 0.6);
+}
+
+.pulse-intense {
+  animation: pulse-intense 0.8s infinite;
+  box-shadow: 0 0 15px 6px rgba(255, 0, 0, 0.8);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow:
+      0 0 10px 4px rgba(255, 0, 0, 0.6),
+      0 0 0 0 rgba(255, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 20px 10px rgba(255, 0, 0, 0.3),
+      0 0 0 15px rgba(255, 0, 0, 0);
+  }
+  100% {
+    box-shadow:
+      0 0 10px 4px rgba(255, 0, 0, 0.6),
+      0 0 0 0 rgba(255, 0, 0, 0.4);
+  }
+}
+
+@keyframes pulse-intense {
+  0% {
+    box-shadow:
+      0 0 15px 6px rgba(255, 0, 0, 0.8),
+      0 0 0 0 rgba(255, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 30px 15px rgba(255, 0, 0, 0.5),
+      0 0 0 20px rgba(255, 0, 0, 0);
+  }
+  100% {
+    box-shadow:
+      0 0 15px 6px rgba(255, 0, 0, 0.8),
+      0 0 0 0 rgba(255, 0, 0, 0.6);
+  }
+}
+
+.pulsing-cluster {
+  animation: cluster-pulse 1.2s infinite;
+  box-shadow: 0 0 15px 6px rgba(255, 0, 0, 0.6);
+  border-radius: 50%;
+}
+
+@keyframes cluster-pulse {
+  0% {
+    box-shadow:
+      0 0 15px 6px rgba(255, 0, 0, 0.6),
+      0 0 0 0 rgba(255, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 30px 15px rgba(255, 0, 0, 0.3),
+      0 0 0 15px rgba(255, 0, 0, 0);
+  }
+  100% {
+    box-shadow:
+      0 0 15px 6px rgba(255, 0, 0, 0.6),
+      0 0 0 0 rgba(255, 0, 0, 0.4);
+  }
+}
+
+/* Heatmap toggle controls */
+.heatmap-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.heatmap-toggle-btn {
+  padding: 0.375rem 0.75rem;
+  border: 2px solid var(--color-primary-blue);
+  border-radius: 9999px;
+  background: var(--color-bg-ivory);
+  font-family: "Poppins", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.heatmap-toggle-btn:hover {
+  background: #e8f4fa;
+}
+
+.heatmap-toggle-btn.active {
+  background: var(--color-primary-blue);
+  color: #fff;
+  border-color: var(--color-primary-blue);
+}

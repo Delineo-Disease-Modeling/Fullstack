@@ -1,0 +1,124 @@
+div.teamheader {
+  width: 100%;
+  text-align: center;
+  margin: auto;
+  padding: 100px;
+  padding-bottom: 20px;
+}
+
+header.teamheader {
+  font-weight: 500;
+  font-size: 50px;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+p.teamheader {
+  font-weight: 100px;
+  line-height: 20px;
+  font-size: 30px;
+}
+
+div.PIheader {
+  width: 100%;
+  text-align: center;
+  margin: auto;
+  padding: 100px;
+  padding-bottom: 60px;
+}
+
+header.PIheader {
+  font-weight: 500;
+  font-size: 50px;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+div.team-section {
+  width: 100%;
+}
+
+h1.teamheader {
+  font-weight: 500;
+  font-size: 32px;
+  text-align: center;
+  padding: 20px 0 16px;
+}
+
+div.team {
+  padding-left: 15%;
+  padding-right: 15%;
+  padding-bottom: 60px;
+  column-gap: 20px;
+  row-gap: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+div.member {
+  margin: 10px;
+  text-align: center;
+  width: 200px;
+  transition: transform 0.3s;
+}
+
+img.member {
+  margin: auto;
+  width: 100%;
+  height: 100%;
+  max-width: 130px;
+  max-height: 130px;
+  border-radius: 15%;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  outline: 2px solid var(--color-primary-blue);
+}
+
+h1.name {
+  margin: auto;
+  font-weight: 500;
+  font-size: 14px;
+  padding-top: 6px;
+  width: 100%;
+  max-width: 150px;
+}
+
+h2.role {
+  margin: auto;
+  font-weight: lighter;
+  font-size: 12px;
+  width: 100%;
+  max-width: 150px;
+}
+
+h2.gradYear {
+  margin: auto;
+  font-weight: 400;
+  font-size: 13px;
+  width: 100%;
+  max-width: 150px;
+}
+
+i.socials {
+  margin: auto;
+  padding-left: 5px;
+  padding-right: 5px;
+  transition: 200ms;
+}
+
+i.socials:hover {
+  filter: brightness(80%);
+}
+
+a.email {
+  text-decoration: none;
+  font-weight: 500;
+  transition: 200ms;
+}
+
+a.email:active {
+  filter: brightness(80%);
+}
