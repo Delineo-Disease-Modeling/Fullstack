@@ -42,6 +42,7 @@
 
 html {
   background-color: var(--color-bg-dark);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 body {
