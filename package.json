@@ -2,6 +2,7 @@
   "name": "delineo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.29.1",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
