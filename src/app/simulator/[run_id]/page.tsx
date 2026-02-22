@@ -84,6 +84,7 @@ export default function SimulatorRun() {
         if (!response.ok) throw new Error('Run not found');
 
         const reader = response.body?.getReader();
+        if (!reader) throw new Error('No response body');
         const decoder = new TextDecoder();
 
         let totalSteps = 0;
