@@ -12,7 +12,7 @@ export default function Home() {
         <div className="left relative">
           <div className="bubble" />
           <h1 className="title">Delineo</h1>
-          <h2 className="title">Community-level disease modeling</h2>
+          <h2 className="title">Community-level infectious disease modeling</h2>
           <Link href="/simulator">
             <button className="app">Start</button>
           </Link>
