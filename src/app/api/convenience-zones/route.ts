@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 
 const getSchema = z.object({
   user_id: z.string().optional()
@@ -15,7 +16,7 @@ const postSchema = z.object({
   start_date: z.string().datetime(),
   length: z.number().nonnegative(),
   size: z.number().nonnegative(),
-  user_id: z.string().min(1)
+  user_id: z.string().min(1).optional()
 });
 
 export async function GET(request: NextRequest) {
@@ -64,8 +65,18 @@ export async function POST(request: NextRequest) {
       start_date,
       length,
       size,
-      user_id
+      user_id: bodyUserId
     } = parsed.data;
+
+    const session = await auth.api.getSession({ headers: request.headers });
+    const user_id = session?.user?.id ?? bodyUserId;
+
+    if (!user_id) {
+      return Response.json(
+        { message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     const zone = await prisma.convenienceZone.create({
       data: {

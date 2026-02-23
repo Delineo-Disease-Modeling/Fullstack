@@ -436,7 +436,7 @@ export default function CZGeneration() {
             />
 
             {hasGenerated && (
-              <div className="mt-4 p-3 bg-[var(--color-bg-ivory)] outline outline-2 outline-[var(--color-primary-blue)] rounded-lg">
+              <div className="mt-4 p-3 bg-(--color-bg-ivory) outline-2 outline-(--color-primary-blue) rounded-lg">
                 <div className="text-sm font-semibold mb-2">
                   Zone Statistics
                 </div>

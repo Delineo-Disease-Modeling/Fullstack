@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import EditDeleteActions from '@/components/edit-delete-actions';
 import InstructionBanner from '@/components/instruction-banner';
 import OutputGraphs from '@/components/outputgraphs';
 import useMapData from '@/stores/mapdata';
@@ -36,33 +37,6 @@ export default function SimulatorRun() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-
-  const handleRename = async () => {
-    if (!sim_id || !runName || runName.length < 2) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/simdata/${sim_id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: runName })
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to rename');
-      }
-
-      const json = await res.json();
-      if (json.data?.name) {
-        setRunName(json.data.name);
-      }
-    } catch (error) {
-      console.error('Rename failed:', error);
-    }
-  };
 
   useEffect(() => {
     if (!run_id) {
@@ -228,68 +202,59 @@ export default function SimulatorRun() {
       <div className="sim_output px-4">
         <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4 text-center">
-            <h2 className="text-xl font-semibold">
-              Convenience Zone: {selectedZone.name}
-            </h2>
-            <p className="text-sm text-gray-600">
-              Created on:{' '}
-              {new Date(selectedZone.created_at).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex gap-2 items-center">
-              <label htmlFor="run-name" className="text-sm text-gray-700">
-                Run Name:
-              </label>
-              <input
-                id="run-name"
-                type="text"
-                value={runName || ''}
-                onChange={(e) => setRunName(e.target.value)}
-                onBlur={handleRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleRename();
-                    e.currentTarget.blur();
+          <div className='flex justify-between'>
+            <span className='flex flex-col gap-1'>
+              <h2 className="text-xl font-semibold">
+                {selectedZone.name}
+              </h2>
+              <p className="text-sm italic text-gray-600">
+                Created on:{' '}
+                {new Date(selectedZone.created_at).toLocaleDateString()}
+              </p>
+            </span>
+
+            <span className='flex flex-col gap-1 items-end'>
+              <h3 className="text-md font-semibold text-(--color-text-dark)">
+                {runName || 'Untitled Run'}
+              </h3>
+              <EditDeleteActions
+                align="right"
+                fields={[{ key: 'name', label: 'Name' }]}
+                itemName={runName || 'Untitled Run'}
+                getInitialValues={() => ({ name: runName || '' })}
+                onSave={async (values) => {
+                  const res = await fetch(`/api/simdata/${sim_id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: values.name.trim() }),
+                  });
+
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json.data?.name) setRunName(json.data.name);
+                    return true;
                   }
+                  
+                  return false;
                 }}
-                className="rounded px-2 py-1 text-sm bg-(--color-bg-ivory) outline-solid outline-2 outline-(--color-primary-blue)"
-                placeholder="Untitled Run"
-              />
-            </div>
-            <button
-              onClick={async () => {
-                if (
-                  window.confirm(
-                    'Are you sure you want to delete this run? This action cannot be undone.'
-                  )
-                ) {
-                  try {
-                    const res = await fetch(`/api/simdata/${sim_id}`, {
-                      method: 'DELETE'
-                    });
+                onDelete={async () => {
+                  const res = await fetch(`/api/simdata/${sim_id}`, {
+                    method: 'DELETE',
+                  });
 
-                    if (!res.ok) {
-                      throw new Error('Failed to delete');
-                    }
-
-                    setSimData(null);
-                    setPapData(null);
-                    setRunName('');
-                    setSettings({ sim_id: null });
-
-                    router.push('/simulator');
-                  } catch (error) {
-                    console.error('Delete failed:', error);
-                    alert('Failed to delete run');
+                  if (!res.ok) {
+                    return false;
                   }
-                }
-              }}
-              className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded-md"
-            >
-              Delete Run
-            </button>
+
+                  setSimData(null);
+                  setPapData(null);
+                  setRunName('');
+                  setSettings({ sim_id: null });
+                  router.push('/simulator');
+                  return true;
+                }}
+              />
+            </span>
           </div>
           <ModelMap
             selectedZone={selectedZone}

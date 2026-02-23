@@ -6,6 +6,7 @@ import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { createGunzip } from 'zlib';
 import { z } from 'zod';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
@@ -268,7 +269,25 @@ export async function PATCH(
     return Response.json({ message: 'Invalid id' }, { status: 400 });
   }
 
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user?.id) {
+    return Response.json({ message: 'Authentication required' }, { status: 401 });
+  }
+
   try {
+    const existing = await prisma.simData.findUnique({
+      where: { id },
+      include: { czone: { select: { user_id: true } } }
+    });
+
+    if (!existing) {
+      return Response.json({ message: `Could not find simdata #${id}` }, { status: 404 });
+    }
+
+    if (existing.czone.user_id !== session.user.id) {
+      return Response.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
@@ -290,7 +309,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
@@ -300,7 +319,25 @@ export async function DELETE(
     return Response.json({ message: 'Invalid id' }, { status: 400 });
   }
 
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user?.id) {
+    return Response.json({ message: 'Authentication required' }, { status: 401 });
+  }
+
   try {
+    const existing = await prisma.simData.findUnique({
+      where: { id },
+      include: { czone: { select: { user_id: true } } }
+    });
+
+    if (!existing) {
+      return Response.json({ message: `Could not find simdata #${id}` }, { status: 404 });
+    }
+
+    if (existing.czone.user_id !== session.user.id) {
+      return Response.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
     const simdata = await prisma.simData.delete({ where: { id } });
 
     // Clean up all files associated with this run
