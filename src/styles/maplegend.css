@@ -21,12 +21,6 @@
   filter: brightness(95%);
 }
 
-.maplegend-toggle-icon {
-  font-size: 10px;
-  line-height: 1;
-  width: 10px;
-}
-
 .maplegend-dropdown {
   position: absolute;
   top: 100%;

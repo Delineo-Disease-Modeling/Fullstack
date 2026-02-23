@@ -1,9 +1,11 @@
 input.iv_timeline {
+  display: block;
   appearance: none;
   -webkit-appearance: none;
   pointer-events: none;
   background: transparent;
   height: 1.5rem;
+  outline: 0;
   visibility: hidden;
 }
 
@@ -32,11 +34,21 @@ input.iv_timeline::-webkit-slider-thumb {
   width: 0.85rem;
   height: 1.75rem;
   -webkit-appearance: none;
-  margin-top: -0.75rem;
-  /* Centers thumb since track height is 0 */
+  margin-top: -0.875rem;
   border-radius: 0.25rem;
-  background-color: var(--color-gray-mid);
-  border: 1px solid var(--color-gray-dark);
+  background-color: var(--color-primary-blue);
+  border: 1px solid var(--color-text-main);
+  cursor: pointer;
+  transition: 0.2s ease-in-out;
+}
+
+input.iv_timeline::-webkit-slider-thumb:hover {
+  filter: brightness(0.9);
+}
+
+input.iv_timeline::-webkit-slider-thumb:active {
+  transform: translateY(1px);
+  filter: brightness(0.9);
 }
 
 input.iv_timeline::-moz-range-thumb {
@@ -45,41 +57,33 @@ input.iv_timeline::-moz-range-thumb {
   width: 0.625rem;
   height: 1.5rem;
   border-radius: 0.25rem;
-  background-color: var(--color-gray-mid);
-  border: 1px solid var(--color-gray-dark);
+  background-color: var(--color-primary-blue);
+  border: 2px solid var(--color-text-main);
+  cursor: pointer;
+  transition: 0.2s ease-in-out;
+}
+
+input.iv_timeline::-moz-range-thumb:hover {
+  filter: brightness(0.9);
+}
+
+input.iv_timeline::-moz-range-thumb:active {
+  transform: translateY(1px);
+  filter: brightness(0.9);
 }
 
 input.iv_timeline.current::-webkit-slider-thumb {
   background-color: var(--color-text-light);
 }
 
+input.iv_timeline.current::-webkit-slider-thumb:hover {
+  background-color: var(--color-border-light);
+}
+
 input.iv_timeline.current::-moz-range-thumb {
   background-color: var(--color-text-light);
 }
 
-button.iv_timeline {
-  cursor: pointer;
-  transition: all 200ms ease-in-out;
-  outline: solid 1px var(--color-bg-ivory);
-  padding: 0.25rem 2rem;
-  text-wrap: nowrap;
-  font-size: 14px;
-  border-radius: 0.375rem;
-  color: var(--color-text-light);
-}
-
-button.iv_timeline:hover {
-  transform: scale(1.05);
-  background-color: var(--color-bg-ivory);
-  color: var(--color-bg-dark);
-  outline: solid 1px var(--color-border-dark);
-  cursor: pointer;
-}
-
-button.iv_timeline:active {
-  filter: brightness(80%);
-}
-
-button.iv_timeline:disabled {
-  pointer-events: none;
+input.iv_timeline.current::-moz-range-thumb:hover {
+  background-color: var(--color-border-light);
 }

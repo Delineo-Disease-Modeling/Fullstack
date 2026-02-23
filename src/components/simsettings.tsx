@@ -12,6 +12,7 @@ import {
   SimParameter,
   SimRunSelector
 } from './settings-components';
+import Button from '@/components/ui/button';
 
 interface SimSettingsProps {
   sendData: () => void;
@@ -79,9 +80,8 @@ export default function SimSettings({
       />
 
       <div className="flex flex-col items-center gap-8 w-full">
-        <button
-          type="button"
-          className="simset_button w-32 disabled:bg-gray-400! disabled:pointer-events-none"
+        <Button
+          className="w-32 disabled:bg-gray-400!"
           disabled={loading}
           onClick={() => {
             if (!zone?.name) {
@@ -96,7 +96,7 @@ export default function SimSettings({
           }}
         >
           {loading ? 'Processing...' : 'Simulate'}
-        </button>
+        </Button>
         {loading && progress > 0 && (
           <div className="w-64 rounded-full h-2.5 bg-(--color-bg-dark) mb-4">
             <div

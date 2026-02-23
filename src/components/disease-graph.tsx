@@ -33,8 +33,8 @@ export default function DiseaseGraph() {
     const COLOR_REMOVED =
       styles.getPropertyValue('--color-gray-dark').trim() || '#505050';
 
-    let nodes: any[] = [];
-    let transmissions: any[] = [];
+    let nodes: Node[] = [];
+    let transmissions: Transmission[] = [];
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -92,11 +92,11 @@ export default function DiseaseGraph() {
     }
 
     class Transmission {
-      startNode: any;
-      endNode: any;
+      startNode: Node;
+      endNode: Node;
       progress: number;
       isComplete: boolean;
-      constructor(startNode: any, endNode: any) {
+      constructor(startNode: Node, endNode: Node) {
         this.startNode = startNode;
         this.endNode = endNode;
         this.progress = 0;

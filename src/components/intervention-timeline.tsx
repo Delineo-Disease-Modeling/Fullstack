@@ -5,6 +5,7 @@ import useSimSettings from '@/stores/simsettings';
 
 import '@/styles/intervention-timeline.css';
 import Interventions from './interventions';
+import Button from './ui/button';
 
 export default function InterventionTimeline() {
   const hours = useSimSettings((state) => state.hours);
@@ -76,11 +77,11 @@ export default function InterventionTimeline() {
         className="relative flex items-center w-full h-6 select-none"
         onDoubleClick={addThumb}
       >
-        <div className="absolute top-0 left-0 w-full h-2 bg-(--color-text-main) rounded-md outline-0" />
+        <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-2 bg-(--color-text-main) rounded-md outline-0" />
         {values.map((value, i) => (
           <input
             key={i}
-            className={`iv_timeline absolute top-0 left-0 w-full ${curtime === value ? 'current ' : ''}`}
+            className={`iv_timeline absolute top-1/2 -translate-y-1/2 left-0 w-full ${curtime === value ? 'current ' : ''}`}
             type="range"
             min={0}
             max={hours}
@@ -103,27 +104,28 @@ export default function InterventionTimeline() {
       </div>
 
       <div className="flex w-full items-center justify-center gap-2">
-        <button
+        <Button
           type="button"
-          className="iv_timeline bg-(--color-bg-dark) disabled:bg-stone-600 px-4!"
+          className="py-1! px-4! text-sm text-nowrap disabled:bg-stone-600!"
           onClick={moveLeft}
         >
           &lt;
-        </button>
+        </Button>
         <div className={values.length <= 1 ? 'cursor-not-allowed' : ''}>
-          <button
+          <Button
             type="button"
-            className="iv_timeline bg-red-400 disabled:bg-red-800"
+            variant="destructive"
+            className="py-1! px-8! text-sm text-nowrap disabled:bg-red-800!"
             onClick={() => deleteThumb(values.indexOf(curtime))}
             disabled={values.length <= 1}
           >
             Delete
-          </button>
+          </Button>
         </div>
         <div className={values.length >= 10 ? 'cursor-not-allowed' : ''}>
-          <button
+          <Button
             type="button"
-            className="iv_timeline bg-(--color-bg-dark) disabled:bg-stone-600"
+            className="py-1! px-8! text-sm text-nowrap disabled:bg-stone-600!"
             onClick={() => {
               const newvalue = Array.from(
                 { length: hours },
@@ -136,15 +138,15 @@ export default function InterventionTimeline() {
             disabled={values.length >= 10}
           >
             + Add
-          </button>
+          </Button>
         </div>
-        <button
+        <Button
           type="button"
-          className="iv_timeline bg-(--color-bg-dark) disabled:bg-stone-600 px-4!"
+          className="py-1! px-4! text-sm text-nowrap disabled:bg-stone-600!"
           onClick={moveRight}
         >
           &gt;
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-col gap-4">

@@ -5,6 +5,7 @@
   --color-primary-blue: #70b4d4;
   --color-accent-teal: #88d2d8;
   --color-accent-red: #f05464;
+  --color-accent-red-light: #f47a87;
 
   /* Backgrounds */
   --color-bg-cream: #fffae3;
@@ -50,4 +51,10 @@ body {
   color: var(--color-text-main);
   font-family: "Poppins", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body > footer.site_footer {
+  margin-top: auto;
 }

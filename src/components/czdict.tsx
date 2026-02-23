@@ -7,6 +7,7 @@ import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
 import EditDeleteActions from './edit-delete-actions';
 import InstructionBanner from './instruction-banner';
+import Button from './ui/button';
 
 interface CzDictProps {
   zone: ConvenienceZone | null;
@@ -21,7 +22,6 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
 
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
-  const [hoveredLocId, setHoveredLocId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const zoneRef = useRef(zone);
   zoneRef.current = zone;
@@ -61,7 +61,6 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       setTab(0);
     }
   }, [hasUserZones]);
-
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -111,7 +110,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
               <button
                 type="button"
                 key={loc.id}
-                className={`flex w-full text-left px-1 justify-between items-center py-1 relative select-none rounded-md hover:outline-solid hover:outline-1 ${zone?.id === loc.id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
+                className={`flex w-full text-left px-1 justify-between items-center py-1 relative select-none rounded-md hover:cursor-pointer hover:outline-solid hover:outline-1 ${zone?.id === loc.id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
                 style={
                   !loc.ready
                     ? {
@@ -130,15 +129,13 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
                   if (loc.ready) setZone(loc);
                   setSettings({ sim_id: null });
                 }}
-                onMouseEnter={() => setHoveredLocId(loc.id)}
-                onMouseLeave={() => setHoveredLocId(null)}
               >
                 <p className="flex-1">{loc.name}</p>
                 <p className="flex-1 text-center">{loc.size}</p>
                 <p className="flex-1 text-right">
                   {new Date(loc.created_at).toLocaleDateString()}
                 </p>
-                {!loc.ready && hoveredLocId === loc.id && (
+                {!loc.ready && (
                   <div className="absolute z-10 px-2 py-1 text-xs text-white -translate-x-1/2 -translate-y-1/2 bg-black rounded-sm shadow-lg top-1/2 left-1/2">
                     Currently Generating
                   </div>
@@ -202,13 +199,13 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       )}
 
       {user ? (
-        <button
+        <Button
           type="button"
-          className="w-42 simset_button"
+          className="w-42 p-2!"
           onClick={() => router.push('/cz-generation')}
         >
           + Generate Zone
-        </button>
+        </Button>
       ) : (
         <InstructionBanner text="Login to generate a Convenience Zone" />
       )}

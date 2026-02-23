@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Layer, Map, Popup, Source } from 'react-map-gl/maplibre';
+import type { MapRef } from 'react-map-gl/maplibre';
 import useMapData from '@/stores/mapdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/modelmap.css';
 import MapLegend from './maplegend';
+import Slider from '@/components/ui/slider';
+import Button from '@/components/ui/button';
 
 const icon_lookup: Record<string, string> = {
   'Depository Credit Intermediation': '🏦',
@@ -236,14 +239,14 @@ interface ClusteredMapProps {
 }
 
 function ClusteredMap({
-  currentTime,
+  currentTime: _currentTime,
   mapCenter,
   pois,
   hotspots,
   onMarkerClick,
   heatmapMode
 }: ClusteredMapProps) {
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<MapRef>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [popupInfo, setPopupInfo] = useState<any>(null);
   const hasFitBounds = useRef(false);
@@ -776,27 +779,27 @@ export default function ModelMap({
       <div className="heatmap-toggle">
         <MapLegend icon_lookup={icon_lookup} />
         <div className="heatmap-toggle-group">
-          <button
-            className={`heatmap-toggle-btn ${heatmapMode === 'markers' ? 'active' : ''}`}
+          <Button
+            variant={heatmapMode === 'markers' ? 'primary' : 'secondary'}
+            className='text-xs'
             onClick={() => setHeatmapMode('markers')}
-            title="Show location markers"
           >
-            📍 Markers
-          </button>
-          <button
-            className={`heatmap-toggle-btn ${heatmapMode === 'population' ? 'active' : ''}`}
+            Markers
+          </Button>
+          <Button
+            variant={heatmapMode === 'population' ? 'primary' : 'secondary'}
+            className='text-xs'
             onClick={() => setHeatmapMode('population')}
-            title="Show population density heatmap"
           >
-            👥 Population
-          </button>
-          <button
-            className={`heatmap-toggle-btn ${heatmapMode === 'infection' ? 'active' : ''}`}
+            Population
+          </Button>
+          <Button
+            variant={heatmapMode === 'infection' ? 'primary' : 'secondary'}
+            className='text-xs'
             onClick={() => setHeatmapMode('infection')}
-            title="Show infection density heatmap"
           >
-            🦠 Infections
-          </button>
+            Infection
+          </Button>
         </div>
       </div>
       <ClusteredMap
@@ -822,8 +825,9 @@ export default function ModelMap({
         })}
       </div>
       <div className="flex items-center justify-center gap-3 mt-3">
-        <button
-          className="bg-(--color-primary-blue) text-white px-4 py-2 rounded-md font-semibold hover:brightness-90 transition"
+        <Button
+          variant='primary'
+          className='py-1!'
           onClick={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
@@ -831,10 +835,9 @@ export default function ModelMap({
           ) : (
             <i className="bi bi-play-fill" />
           )}
-        </button>
-        <input
+        </Button>
+        <Slider
           className="w-full max-w-[90vw]"
-          type="range"
           min={1}
           max={maxHours}
           value={currentTime}

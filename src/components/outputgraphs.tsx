@@ -15,6 +15,7 @@ import useSimSettings from '@/stores/simsettings';
 import { CustomTooltip } from './customtooltip';
 
 import '@/styles/outputgraphs.css';
+import Button from './ui/button';
 
 const COLORS = [
   '#8884d8',
@@ -68,9 +69,10 @@ export default function OutputGraphs({
   return (
     <div className="outputgraphs_container">
       <div className="p-2.5">
-        <label>Select Chart Type: </label>
+        <label htmlFor="chart-type-select">Select Chart Type: </label>
         <select
-          className="px-1 outline-2 outline-solid bg-[var(--color-bg-ivory)] outline-[var(--color-primary-blue)]"
+          id="chart-type-select"
+          className="px-1 outline-2 outline-solid bg-(--color-bg-ivory) outline-(--color-primary-blue)"
           value={chartType}
           onChange={(e) => setChartType(e.target.value)}
         >
@@ -127,12 +129,13 @@ export default function OutputGraphs({
       </div>
       {selected_loc && (
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <button
+          <Button
+            variant="destructive"
+            className="px-4! py-2! mt-4"
             onClick={onReset}
-            className="px-4 py-2 mt-4 text-white bg-red-500 rounded-md hover:bg-red-600"
           >
             Reset Selection
-          </button>
+          </Button>
         </div>
       )}
     </div>

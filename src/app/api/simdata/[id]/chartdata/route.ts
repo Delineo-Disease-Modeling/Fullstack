@@ -38,7 +38,7 @@ async function getPapData(czone_id: number) {
 
   const buffer = await new Promise<Buffer>((resolve, reject) => {
     const unzip = createGunzip();
-    const chunks: any[] = [];
+    const chunks: Buffer[] = [];
     unzip.on('data', (c) => chunks.push(c));
     unzip.on('end', () => resolve(Buffer.concat(chunks)));
     unzip.on('error', reject);

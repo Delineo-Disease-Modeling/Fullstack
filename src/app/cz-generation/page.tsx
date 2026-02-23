@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
+import Button from '@/components/ui/button';
 import '@/styles/cz-generation.css';
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
@@ -495,21 +496,19 @@ export default function CZGeneration() {
             {error}
           </div>
         )}
-        <input
+        <Button
           type={phase === 'input' ? 'submit' : 'button'}
-          value={
-            loading
-              ? 'Clustering...'
-              : isFinalizing
-                ? 'Generating Patterns...'
-                : phase === 'input'
-                  ? 'Preview CBGs'
-                  : 'Finalize & Generate'
-          }
           onClick={() => phase === 'edit' && finalizeCZ()}
           disabled={loading || isFinalizing}
-          className="bg-(--color-bg-dark) text-(--color-text-light) w-42 p-2 rounded-md transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
-        />
+        >
+          {loading
+            ? 'Clustering...'
+            : isFinalizing
+              ? 'Generating Patterns...'
+              : phase === 'input'
+                ? 'Preview CBGs'
+                : 'Finalize & Generate'}
+        </Button>
       </form>
     </div>
   );

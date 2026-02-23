@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import '@/styles/settings-components.css';
+import Slider from './ui/slider';
 
 interface SimParameterProps {
   label: string;
@@ -28,9 +29,8 @@ export function SimParameter({
         {label}: {percent ? Math.ceil(value * 100) : value}
         {percent ? '%' : units}
       </div>
-      <input
-        type="range"
-        className="simset_slider_input w-75"
+      <Slider
+        className="w-75"
         min={min}
         max={max}
         value={percent ? value * 100.0 : value}
@@ -145,7 +145,7 @@ export function SimRunSelector({
         <p className="flex-1">Name</p>
         <p className="flex-1 text-right">Created Date</p>
       </div>
-      <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1 px-1 py-1">
+      <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1 px-1 py-1" style={{ overflowAnchor: 'none' }}>
         {loading ? (
           <p className="text-center text-wrap my-auto">Loading...</p>
         ) : !data?.length && (

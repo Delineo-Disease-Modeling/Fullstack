@@ -41,31 +41,6 @@ div.mselect_varadder {
   row-gap: 4px;
 }
 
-button.mselect_button {
-  border: none;
-  border-radius: 0.375rem;
-  width: 10%;
-  height: 20px;
-  background-color: var(--color-bg-dark);
-  color: var(--color-text-light);
-  text-decoration: none;
-  text-align: center;
-  line-height: 2px;
-  font-size: 14px;
-  font-family: "Poppins";
-  transition: 200ms ease-in-out;
-}
-
-button.mselect_button:hover {
-  transform: scale(1.05);
-  background-color: var(--color-text-light);
-  color: var(--color-bg-dark);
-  cursor: pointer;
-}
-
-button.mselect_button:active {
-  filter: brightness(80%);
-}
 
 input.mselect_input {
   background-color: var(--color-bg-ivory);

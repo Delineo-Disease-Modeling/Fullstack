@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Button from './ui/button';
 
 interface EditField {
   key: string;
@@ -39,9 +40,9 @@ export default function EditDeleteActions({
   return (
     <div className="flex gap-2">
       <div className="relative">
-        <button
+        <Button
           type="button"
-          className="simset_button text-sm py-1! px-3!"
+          className="text-sm py-1! px-3!"
           onClick={() => {
             if (!editOpen) {
               setValues(getInitialValues());
@@ -51,7 +52,7 @@ export default function EditDeleteActions({
           }}
         >
           Edit
-        </button>
+        </Button>
         {editOpen && (
           <div className={`absolute ${alignClass} top-full mt-1 z-20 w-72 bg-(--color-bg-ivory) outline-solid outline-2 outline-(--color-primary-blue) rounded-md p-3 flex flex-col gap-2 shadow-lg`}>
             {fields.map((field) =>
@@ -78,16 +79,18 @@ export default function EditDeleteActions({
               ),
             )}
             <div className="flex gap-2 justify-end">
-              <button
+              <Button
                 type="button"
-                className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 cursor-pointer"
+                variant="neutral"
+                className="text-sm py-1! px-3!"
                 onClick={() => setEditOpen(false)}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="text-sm px-3 py-1 rounded bg-(--color-primary-blue) text-white hover:brightness-90 cursor-pointer disabled:opacity-50"
+                variant="primary"
+                className="text-sm py-1! px-3!"
                 disabled={saving || !allFieldsFilled}
                 onClick={async () => {
                   setSaving(true);
@@ -100,38 +103,41 @@ export default function EditDeleteActions({
                 }}
               >
                 {saving ? 'Saving...' : 'Save'}
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </div>
 
       <div className="relative">
-        <button
+        <Button
           type="button"
-          className="simset_button text-sm py-1! px-3! bg-red-700! hover:bg-red-500!"
+          variant="destructive"
+          className="text-sm py-1! px-3!"
           onClick={() => {
             setDeleteOpen(!deleteOpen);
             setEditOpen(false);
           }}
         >
           Delete
-        </button>
+        </Button>
         {deleteOpen && (
           <div className={`absolute ${alignClass} top-full mt-1 z-20 w-64 bg-(--color-bg-ivory) outline-solid outline-2 outline-red-600 rounded-md p-3 flex flex-col gap-2 shadow-lg`}>
             <p className="text-sm font-semibold">Delete &quot;{itemName}&quot;?</p>
             <p className="text-xs text-gray-600">This action cannot be undone.</p>
             <div className="flex gap-2 justify-end">
-              <button
+              <Button
                 type="button"
-                className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 cursor-pointer"
+                variant="neutral"
+                className="text-sm py-1! px-3!"
                 onClick={() => setDeleteOpen(false)}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="text-sm px-3 py-1 rounded bg-red-700 text-white hover:bg-red-500 cursor-pointer disabled:opacity-50"
+                variant="destructive"
+                className="text-sm py-1! px-3!"
                 disabled={deleting}
                 onClick={async () => {
                   setDeleting(true);
@@ -144,7 +150,7 @@ export default function EditDeleteActions({
                 }}
               >
                 {deleting ? 'Deleting...' : 'Delete'}
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -10,6 +10,7 @@ import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
 import '@/styles/settings-components.css';
+import Button from '@/components/ui/button';
 
 const ModelMap = dynamic(() => import('@/components/modelmap'), { ssr: false });
 
@@ -140,7 +141,7 @@ export default function SimulatorRun() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run_id]);
+  }, [run_id, router.replace, setHotspots, setPapData, setRunName, setSettings, setSimData]);
 
   const handleMarkerClick = ({
     id,
@@ -183,6 +184,7 @@ export default function SimulatorRun() {
         <div className="flex flex-col items-center justify-center gap-4 mt-20">
           <div className="text-red-500 text-lg">{error}</div>
           <button
+            type="button"
             onClick={() => router.push('/simulator')}
             className="bg-(--color-bg-dark) text-(--color-text-light) w-32 h-12 p-3 rounded-md transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
           >
@@ -266,14 +268,12 @@ export default function SimulatorRun() {
 
         <OutputGraphs selected_loc={selectedLoc} onReset={onReset} />
       </div>
-      <div className="flex justify-center w-full">
-        <button
-          onClick={() => router.push('/simulator')}
-          className="simset_button w-32"
-        >
-          Return
-        </button>
-      </div>
+      <Button
+        className='w-32'
+        onClick={() => router.push('/simulator')}
+      >
+        Return
+      </Button>
     </div>
   );
 }

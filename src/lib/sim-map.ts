@@ -1,9 +1,9 @@
-import { createReadStream } from 'fs';
-import { readFile, writeFile } from 'fs/promises';
+import { createReadStream } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
-import { createGunzip, gunzipSync } from 'zlib';
+import { createGunzip, gunzipSync } from 'node:zlib';
 
 /**
  * Pre-generates the map data cache file for a simulation run.
@@ -82,7 +82,7 @@ export async function generateMapData(
     const placesArray: number[] = [];
 
     for (const id of homeIds) {
-      const pop = pvalue['homes'][id];
+      const pop = pvalue.homes[id];
       if (pop) {
         homesArray.push(
           pop.length,
@@ -94,7 +94,7 @@ export async function generateMapData(
     }
 
     for (const id of placeIds) {
-      const pop = pvalue['places'][id];
+      const pop = pvalue.places[id];
       if (pop) {
         const infCount = pop.filter((v: string) => curinfected.has(v)).length;
         placesArray.push(pop.length, infCount);

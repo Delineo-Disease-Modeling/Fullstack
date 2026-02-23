@@ -10,6 +10,7 @@ import useAuthStore from '@/stores/useAuthStore';
 import LoginModal from './login-modal';
 
 import '@/styles/navbar.css';
+import Button from './ui/button';
 
 export default function Navbar({ initialUser }: { initialUser: CachedUser | null }) {
   const [modalOpen, setModalOpen] = useState('');
@@ -55,20 +56,21 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
           <li>{navLink('/team', 'Team')}</li>
           <li>
             {!user ? (
-              <button className="link" onClick={() => setModalOpen('login')}>
+              <button type="button" className="link" onClick={() => setModalOpen('login')}>
                 Login
               </button>
             ) : (
               <div className="user-dropdown-container" ref={dropdownRef}>
-                <button className="link" onClick={() => setDropdownOpen((v) => !v)}>
+                <button type="button" className="link" onClick={() => setDropdownOpen((v) => !v)}>
                   Hi, {user.name}!
                 </button>
                 {dropdownOpen && (
                   <div className="user-dropdown">
                     <p className="user-dropdown-name">{user.name}</p>
                     <p className="user-dropdown-org italic">{user.organization}</p>
-                    <button
-                      className="user-dropdown-logout"
+                    <Button
+                      className='py-1.5! text-xs mt-2'
+                      variant="dark-destructive"
                       onClick={() => {
                         signOut();
                         setUser(null);
@@ -76,7 +78,7 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
                       }}
                     >
                       Logout
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>

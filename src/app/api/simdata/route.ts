@@ -1,5 +1,5 @@
-import { constants } from 'fs';
-import { access, mkdir } from 'fs/promises';
+import { constants } from 'node:fs';
+import { access, mkdir } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { saveFileStream } from '@/lib/filestream';
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (papdata_obj) {
       let papPath = DB_FOLDER + papdata_obj.id;
       try {
-        await access(papPath + '.gz', constants.F_OK);
+        await access(`${papPath}.gz`, constants.F_OK);
         papPath += '.gz';
       } catch {
         // plain file
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
         DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
         papPath,
-        DB_FOLDER + simdata_obj.simdata + '.stats.json'
+        `${DB_FOLDER + simdata_obj.simdata}.stats.json`
       ).catch((e) => console.error('Stats generation failed:', e));
 
       processSimData(
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
         DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
         papPath,
-        DB_FOLDER + simdata_obj.simdata + '.map.json'
+        `${DB_FOLDER + simdata_obj.simdata}.map.json`
       ).catch((e) => console.error('Map cache generation failed:', e));
     }
 

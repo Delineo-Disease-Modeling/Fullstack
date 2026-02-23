@@ -10,5 +10,6 @@ div.outputgraph_chart {
   height: 100%;
   background-color: var(--color-bg-ivory);
   padding: 50px;
-  outline: 2px solid var(--color-primary-blue);
+  border: 2px solid var(--color-primary-blue);
+  border-radius: 0.375rem;
 }

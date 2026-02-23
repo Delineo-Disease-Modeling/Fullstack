@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import '@/styles/matrixselector.css';
+import Button from './ui/button';
 
 const matrix_files = ['default1.csv', 'default2.csv'];
 const default_variants = ['delta', 'omicron'];
@@ -141,15 +142,15 @@ export default function MatrixSelector({
           maxLength={32}
           onChange={(e) => setCurName(e.target.value)}
         />
-        <button className="mselect_button" onClick={() => addVariant(curName)}>
+        <Button className="w-[10%] p-0! h-5" onClick={() => addVariant(curName)}>
           +
-        </button>
-        <button
-          className="mselect_button"
+        </Button>
+        <Button
+          className="w-[10%] p-0! h-5"
           onClick={() => removeVariant(curVariant)}
         >
           -
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import '@/styles/about.css';
 export default function About() {
   return (
     <div className="w-full flex justify-center items-center flex-wrap">
-      <header className="about_title">About Delineo</header>
+      <header className="about_title" data-aos="fade-up" data-aos-once="true">About Delineo</header>
 
       <div className="timeline">
         <div className="entry" data-aos="fade-up" data-aos-once="true">

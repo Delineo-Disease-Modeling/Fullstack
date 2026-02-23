@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import DiseaseGraph from '@/components/disease-graph';
+import Button from '@/components/ui/button';
 import '@/styles/home.css';
 
 export default function Home() {
@@ -15,7 +16,7 @@ export default function Home() {
           <h1 className="title">Delineo</h1>
           <h2 className="title">Community-level infectious disease modeling</h2>
           <Link href="/simulator">
-            <button className="app">Start</button>
+            <Button variant="destructive" className="w-25 p-2! border-0!">Start</Button>
           </Link>
         </div>
         <Image className="logo" src="/images/logo.png" alt="logo" width={400} height={400} />

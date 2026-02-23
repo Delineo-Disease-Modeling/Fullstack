@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import '@/styles/maplegend.css';
+import Button from '@/components/ui/button';
 
 interface MapLegendProps {
   icon_lookup: Record<string, string>;
@@ -25,13 +26,14 @@ export default function MapLegend({ icon_lookup }: MapLegendProps) {
 
   return (
     <div className="maplegend-container" ref={ref}>
-      <button
-        className="maplegend-toggle"
+      <Button
+        variant={open ? 'primary' : 'secondary'}
+        className='text-xs flex gap-1'
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="maplegend-toggle-icon">{open ? '▾' : '▸'}</span>
+        <span className="w-2">{open ? '▾' : '▸'}</span>
         Legend
-      </button>
+      </Button>
       <div className={`maplegend-dropdown ${open ? 'open' : ''}`}>
         {Object.entries(icon_lookup).map(([label, icon]) => (
           <div key={label} className="maplegend-row">

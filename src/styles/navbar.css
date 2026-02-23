@@ -97,23 +97,6 @@ button.link:hover {
   margin: 0;
 }
 
-.user-dropdown-logout {
-  margin-top: 0.5rem;
-  padding: 0.3rem 0.75rem;
-  font-size: 12px;
-  cursor: pointer;
-  background: none;
-  color: #f87171;
-  border: 1px solid #f87171;
-  border-radius: 0.375rem;
-  transition: all 100ms ease-in-out;
-}
-
-.user-dropdown-logout:hover {
-  background: #f87171;
-  color: var(--color-bg-dark);
-}
-
 button.modal {
   cursor: pointer;
   transition: all 100ms ease-in-out;
