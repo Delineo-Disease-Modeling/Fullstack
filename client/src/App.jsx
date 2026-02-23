@@ -17,6 +17,7 @@ import CZGeneration from './pages/cz-generation.jsx';
 
 function App() {
   const { pathname } = useLocation();
+  const hideFooter = pathname === '/cz-generation';
 
   useEffect(() => {
     AOS.init();
@@ -37,7 +38,7 @@ function App() {
         <Route path='/team' element={<Team />} />
         <Route path='/about' element={<About />} />
       </Routes>
-      <Footer />
+      {!hideFooter && <Footer />}
     </div>
   );
 }
