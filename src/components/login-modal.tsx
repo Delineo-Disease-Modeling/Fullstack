@@ -129,7 +129,7 @@ function AuthForm({ curTab, closeModal, error, setError }: AuthFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="modal outline-solid outline-1 px-8 py-1 rounded-lg mt-2 w-full hover:bg-(--color-primary-blue) transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="modal outline-solid outline-1 px-8 py-1 rounded-md mt-2 w-full hover:bg-(--color-primary-blue) transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {loading ? (curTab === 0 ? 'Logging in…' : 'Registering…') : (curTab === 0 ? 'Login' : 'Register')}
       </button>

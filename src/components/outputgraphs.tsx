@@ -37,9 +37,11 @@ export default function OutputGraphs({
   const sim_id = useSimSettings((state) => state.sim_id);
   const [chartType, setChartType] = useState('iot');
   const [chartData, setChartData] = useState<any>(null);
+  const [chartError, setChartError] = useState<string | null>(null);
 
   useEffect(() => {
     setChartData(null);
+    setChartError(null);
     const url = new URL(
       `/api/simdata/${sim_id}/chartdata`,
       window.location.origin
@@ -51,11 +53,15 @@ export default function OutputGraphs({
     const abortController = new AbortController();
     fetch(url, { signal: abortController.signal })
       .then((res) => {
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error(`Failed to fetch chart data (${res.status})`);
         return res.json();
       })
       .then((json) => setChartData(json.data))
-      .catch(console.error);
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        console.error(err);
+        setChartError(err.message || 'Failed to load chart data');
+      });
     return () => abortController.abort();
   }, [sim_id, selected_loc]);
 
@@ -79,7 +85,11 @@ export default function OutputGraphs({
           Infection Distribution Over Time
           {selected_loc && <span> for {selected_loc.label}</span>}
         </h6>
-        {!chartData ? (
+        {chartError ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center">
+            <p className="text-lg text-red-500">{chartError}</p>
+          </div>
+        ) : !chartData ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center">
             <p className="text-lg">Loading...</p>
           </div>
@@ -119,7 +129,7 @@ export default function OutputGraphs({
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
           <button
             onClick={onReset}
-            className="px-4 py-2 mt-4 text-white bg-red-500 rounded-sm hover:bg-red-600"
+            className="px-4 py-2 mt-4 text-white bg-red-500 rounded-md hover:bg-red-600"
           >
             Reset Selection
           </button>

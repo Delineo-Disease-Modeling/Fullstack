@@ -210,7 +210,7 @@ export default function SimulatorRun() {
           <div className="text-red-500 text-lg">{error}</div>
           <button
             onClick={() => router.push('/simulator')}
-            className="bg-(--color-bg-dark) text-(--color-text-light) w-32 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
+            className="bg-(--color-bg-dark) text-(--color-text-light) w-32 h-12 p-3 rounded-md transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
           >
             Return
           </button>
@@ -286,7 +286,7 @@ export default function SimulatorRun() {
                   }
                 }
               }}
-              className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded"
+              className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-2 rounded-md"
             >
               Delete Run
             </button>

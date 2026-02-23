@@ -156,7 +156,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       {user ? (
         <button
           type="button"
-          className="w-48 simset_button"
+          className="w-42 simset_button"
           onClick={() => router.push('/cz-generation')}
         >
           + Generate Zone

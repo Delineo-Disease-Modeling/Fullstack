@@ -508,7 +508,7 @@ export default function CZGeneration() {
           }
           onClick={() => phase === 'edit' && finalizeCZ()}
           disabled={loading || isFinalizing}
-          className="bg-[var(--color-bg-dark)] text-[var(--color-text-light)] w-48 h-12 p-3 rounded-3xl transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
+          className="bg-(--color-bg-dark) text-(--color-text-light) w-42 p-2 rounded-md transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75 disabled:bg-gray-500"
         />
       </form>
     </div>

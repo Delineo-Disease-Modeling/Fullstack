@@ -3,8 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import Modal from 'react-modal';
+import { useEffect, useRef, useState } from 'react';
 import { signOut, useSession } from '@/lib/auth-client';
 import type { CachedUser } from '@/stores/useAuthStore';
 import useAuthStore from '@/stores/useAuthStore';
@@ -14,7 +13,21 @@ import '@/styles/navbar.css';
 
 export default function Navbar({ initialUser }: { initialUser: CachedUser | null }) {
   const [modalOpen, setModalOpen] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
 
   const { data: session, isPending } = useSession();
   const setUser = useAuthStore((state) => state.setUser);
@@ -46,9 +59,27 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
                 Login
               </button>
             ) : (
-              <button className="link" onClick={() => setModalOpen('logout')}>
-                Hi, {user.name}!
-              </button>
+              <div className="user-dropdown-container" ref={dropdownRef}>
+                <button className="link" onClick={() => setDropdownOpen((v) => !v)}>
+                  Hi, {user.name}!
+                </button>
+                {dropdownOpen && (
+                  <div className="user-dropdown">
+                    <p className="user-dropdown-name">{user.name}</p>
+                    <p className="user-dropdown-org italic">{user.organization}</p>
+                    <button
+                      className="user-dropdown-logout"
+                      onClick={() => {
+                        signOut();
+                        setUser(null);
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </li>
         </ul>
@@ -57,53 +88,6 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
         isOpen={modalOpen === 'login'}
         onRequestClose={() => setModalOpen('')}
       />
-      <Modal
-        ariaHideApp={false}
-        style={{
-          overlay: {
-            backgroundColor: 'rgba(0, 0, 0, 0)',
-            backdropFilter: 'blur(10px)',
-            zIndex: 9999
-          },
-          content: {
-            top: '50%',
-            left: '50%',
-            right: 'auto',
-            bottom: 'auto',
-            marginRight: '-50%',
-            transform: 'translate(-50%, -50%)',
-            maxWidth: '80vw',
-            borderRadius: '0.5rem',
-            background: 'var(--color-bg-dark)',
-            border: '1px solid var(--color-border-light)',
-            color: 'var(--color-text-light)',
-            maxHeight: '90vh',
-            overflowY: 'scroll'
-          }
-        }}
-        isOpen={modalOpen === 'logout'}
-        onRequestClose={() => setModalOpen('')}
-        closeTimeoutMS={100}
-      >
-        <div className="flex flex-col gap-4 items-center">
-          <header>Are you sure you want to logout?</header>
-          <div className="flex gap-4 w-full justify-center">
-            <button className="modal" onClick={() => setModalOpen('')}>
-              Cancel
-            </button>
-            <button
-              className="modal bg-red-400"
-              onClick={() => {
-                signOut();
-                setUser(null);
-                setModalOpen('');
-              }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

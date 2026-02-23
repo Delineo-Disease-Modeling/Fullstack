@@ -17,7 +17,7 @@ const icon_lookup: Record<string, string> = {
   'Child Day Care Services': '🏫',
   'Death Care Services': '🪦',
   'Elementary and Secondary Schools': '🏫',
-  Florists: '💐',
+  'Florists': '💐',
   'Museums, Historical Sites, and Similar Institutions': '🏛️',
   'Grocery Stores': '🛒',
   'Nursing Care Facilities (Skilled Nursing Facilities)': '🏥',
@@ -32,7 +32,7 @@ const icon_lookup: Record<string, string> = {
   'Coating, Engraving, Heat Treating, and Allied Activities': '🏢',
   'Building Material and Supplies Dealers': '🏢',
   'Postal Service': '📬',
-  Home: '🏠'
+  'Home': '🏠'
 };
 
 let household_locs: Record<string, [number, number]> = {};
@@ -184,7 +184,7 @@ function EmojiOverlay({
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.font = `${size}px 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif`;
+        ctx.font = `${size}px 'Noto Color Emoji', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(props.icon, pixel.x, pixel.y);
@@ -395,7 +395,7 @@ function ClusteredMap({
   ];
 
   return (
-    <div className="mapcontainer outline-solid outline-2 outline-[var(--color-primary-blue)] relative">
+    <div className="mapcontainer">
       <Map
         ref={mapRef}
         onLoad={handleMapLoad}
@@ -658,10 +658,10 @@ function ClusteredMap({
             anchor="top"
             closeButton={false}
             onClose={() => setPopupInfo(null)}
-            style={{ zIndex: 10 }}
+            style={{ zIndex: 10, marginTop: '1rem' }}
           >
             <div className="max-w-36 whitespace-pre-line font-[Poppins] text-center">
-              <div className="text-2xl mb-0.5">{popupInfo.icon}</div>
+              <div className="text-2xl mb-0.5 font-['Noto_Color_Emoji']">{popupInfo.icon}</div>
               <header className="text-sm font-bold mb-0.5">
                 {popupInfo.label}
               </header>
@@ -773,29 +773,31 @@ export default function ModelMap({
 
   return (
     <div>
-      <MapLegend icon_lookup={icon_lookup} />
       <div className="heatmap-toggle">
-        <button
-          className={`heatmap-toggle-btn ${heatmapMode === 'markers' ? 'active' : ''}`}
-          onClick={() => setHeatmapMode('markers')}
-          title="Show location markers"
-        >
-          📍 Markers
-        </button>
-        <button
-          className={`heatmap-toggle-btn ${heatmapMode === 'population' ? 'active' : ''}`}
-          onClick={() => setHeatmapMode('population')}
-          title="Show population density heatmap"
-        >
-          👥 Population
-        </button>
-        <button
-          className={`heatmap-toggle-btn ${heatmapMode === 'infection' ? 'active' : ''}`}
-          onClick={() => setHeatmapMode('infection')}
-          title="Show infection density heatmap"
-        >
-          🦠 Infections
-        </button>
+        <MapLegend icon_lookup={icon_lookup} />
+        <div className="heatmap-toggle-group">
+          <button
+            className={`heatmap-toggle-btn ${heatmapMode === 'markers' ? 'active' : ''}`}
+            onClick={() => setHeatmapMode('markers')}
+            title="Show location markers"
+          >
+            📍 Markers
+          </button>
+          <button
+            className={`heatmap-toggle-btn ${heatmapMode === 'population' ? 'active' : ''}`}
+            onClick={() => setHeatmapMode('population')}
+            title="Show population density heatmap"
+          >
+            👥 Population
+          </button>
+          <button
+            className={`heatmap-toggle-btn ${heatmapMode === 'infection' ? 'active' : ''}`}
+            onClick={() => setHeatmapMode('infection')}
+            title="Show infection density heatmap"
+          >
+            🦠 Infections
+          </button>
+        </div>
       </div>
       <ClusteredMap
         currentTime={currentTime}
@@ -821,7 +823,7 @@ export default function ModelMap({
       </div>
       <div className="flex items-center justify-center gap-3 mt-3">
         <button
-          className="bg-[var(--color-primary-blue)] text-white px-4 py-2 rounded-full font-semibold hover:brightness-90 transition"
+          className="bg-(--color-primary-blue) text-white px-4 py-2 rounded-md font-semibold hover:brightness-90 transition"
           onClick={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
@@ -841,7 +843,7 @@ export default function ModelMap({
       </div>
       <div className="flex justify-center mt-3">
         <input
-          className="w-[10%] px-1 bg-[var(--color-bg-ivory)] outline-solid outline-2 outline-[var(--color-primary-blue)]"
+          className="w-[10%] px-1 bg-(--color-bg-ivory) outline-solid outline-2 outline-(--color-primary-blue)"
           type="number"
           min={1}
           max={maxHours}
