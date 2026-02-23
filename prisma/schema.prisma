@@ -96,11 +96,12 @@ model PaPData {
 model SimData {
   id            Int @id @default(autoincrement())
   name          String @default("Untitled Run")
-  created_at    DateTime @default(now())          
+  created_at    DateTime @default(now())
   patterns      String @unique @default(uuid())
   simdata       String @unique @default(uuid())
   czone_id      Int
   length        Int
+  global_stats  Json?
   czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
   stats         LocationStats[]
 }

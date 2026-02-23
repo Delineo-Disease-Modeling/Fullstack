@@ -69,9 +69,15 @@ export async function POST(request: NextRequest) {
       generateGlobalStats(
         DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
         DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
-        papPath,
-        `${DB_FOLDER + simdata_obj.simdata}.stats.json`
-      ).catch((e) => console.error('Stats generation failed:', e));
+        papPath
+      )
+        .then((stats) =>
+          prisma.simData.update({
+            where: { id: simdata_obj.id },
+            data: { global_stats: stats }
+          })
+        )
+        .catch((e) => console.error('Stats generation failed:', e));
 
       processSimData(
         simdata_obj.id,

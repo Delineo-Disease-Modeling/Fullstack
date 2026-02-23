@@ -344,7 +344,6 @@ export async function DELETE(
     const base = DB_FOLDER + simdata.simdata;
     await Promise.allSettled([
       unlink(`${base}.gz`),
-      unlink(`${base}.stats.json`),
       unlink(`${base}.map.json`),
       unlink(`${DB_FOLDER + simdata.patterns}.gz`)
     ]);

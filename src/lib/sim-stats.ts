@@ -1,5 +1,4 @@
 import { createReadStream } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { createGunzip, gunzipSync } from 'node:zlib';
 import chain from 'stream-chain';
 import parser from 'stream-json';
@@ -35,8 +34,7 @@ type ChartData = {
 export async function generateGlobalStats(
   simdataPath: string,
   patternsPath: string,
-  papDataPath: string,
-  outputPath: string
+  papDataPath: string
 ) {
   const papDataRaw = await import('node:fs/promises').then((fs) =>
     fs.readFile(papDataPath)
@@ -137,6 +135,5 @@ export async function generateGlobalStats(
     ppl = await patternspl.next();
   }
 
-  await writeFile(outputPath, JSON.stringify(data));
   return data;
 }

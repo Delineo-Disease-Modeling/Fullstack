@@ -39,10 +39,12 @@ export default function OutputGraphs({
   const [chartType, setChartType] = useState('iot');
   const [chartData, setChartData] = useState<any>(null);
   const [chartError, setChartError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     setChartData(null);
     setChartError(null);
+    setProcessing(false);
     const url = new URL(
       `/api/simdata/${sim_id}/chartdata`,
       window.location.origin
@@ -52,17 +54,32 @@ export default function OutputGraphs({
       url.searchParams.append('loc_id', selected_loc.id);
     }
     const abortController = new AbortController();
-    fetch(url, { signal: abortController.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch chart data (${res.status})`);
-        return res.json();
-      })
-      .then((json) => setChartData(json.data))
-      .catch((err) => {
-        if (err.name === 'AbortError') return;
-        console.error(err);
-        setChartError(err.message || 'Failed to load chart data');
-      });
+
+    const fetchData = () => {
+      fetch(url, { signal: abortController.signal })
+        .then((res) => {
+          if (res.status === 202) {
+            setProcessing(true);
+            setTimeout(fetchData, 15000);
+            return null;
+          }
+          if (!res.ok) throw new Error(`Failed to fetch chart data (${res.status})`);
+          return res.json();
+        })
+        .then((json) => {
+          if (json) {
+            setProcessing(false);
+            setChartData(json.data);
+          }
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') return;
+          console.error(err);
+          setChartError(err.message || 'Failed to load chart data');
+        });
+    };
+    fetchData();
+
     return () => abortController.abort();
   }, [sim_id, selected_loc]);
 
@@ -92,8 +109,9 @@ export default function OutputGraphs({
             <p className="text-lg text-red-500">{chartError}</p>
           </div>
         ) : !chartData ? (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center">
-            <p className="text-lg">Loading...</p>
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center gap-2">
+            <p className="text-md">{processing ? 'Processing simulation chart data' : 'Loading...'}</p>
+            {processing && <p className="text-sm italic">this may take a few minutes for large simulations...</p>}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

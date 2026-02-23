@@ -4,7 +4,6 @@ import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
 import { getStats } from '@/lib/postgres-store';
 import { prisma } from '@/lib/prisma';
-import { generateGlobalStats } from '@/lib/sim-stats';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
@@ -72,38 +71,13 @@ export async function GET(
 
   // Global stats (no loc_id)
   if (!loc_id || !loc_type) {
-    try {
-      const stats = await readFile(
-        `${DB_FOLDER + simdata.simdata}.stats.json`,
-        'utf8'
-      );
-      return Response.json({ data: JSON.parse(stats) });
-    } catch {
-      // Generate on the fly
-      const papdata_obj = await prisma.paPData.findUnique({
-        where: { czone_id: simdata.czone_id }
-      });
-      if (papdata_obj) {
-        try {
-          await Promise.all([
-            access(DB_FOLDER + simdata.simdata, constants.F_OK),
-            access(DB_FOLDER + simdata.patterns, constants.F_OK)
-          ]);
-          const stats = await generateGlobalStats(
-            DB_FOLDER + simdata.simdata,
-            DB_FOLDER + simdata.patterns,
-            DB_FOLDER + papdata_obj.id,
-            `${DB_FOLDER + simdata.simdata}.stats.json`
-          );
-          return Response.json({ data: stats });
-        } catch {
-          return Response.json(
-            { message: 'Simulation source files missing' },
-            { status: 404 }
-          );
-        }
-      }
+    if (simdata.global_stats) {
+      return Response.json({ data: simdata.global_stats });
     }
+    return Response.json(
+      { message: 'Global stats are still being processed. This may take a few minutes for large simulations.' },
+      { status: 202 }
+    );
   }
 
   // Location-specific stats
