@@ -3,6 +3,8 @@ input.iv_timeline {
   -webkit-appearance: none;
   pointer-events: none;
   background: transparent;
+  height: 1.5rem;
+  visibility: hidden;
 }
 
 input.iv_timeline::-webkit-slider-runnable-track {
@@ -17,7 +19,15 @@ input.iv_timeline::-moz-range-track {
   height: 0;
 }
 
+input.iv_timeline::-ms-track {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+  height: 0;
+}
+
 input.iv_timeline::-webkit-slider-thumb {
+  visibility: visible;
   pointer-events: auto;
   width: 0.85rem;
   height: 1.75rem;
@@ -30,6 +40,7 @@ input.iv_timeline::-webkit-slider-thumb {
 }
 
 input.iv_timeline::-moz-range-thumb {
+  visibility: visible;
   pointer-events: auto;
   width: 0.625rem;
   height: 1.5rem;
