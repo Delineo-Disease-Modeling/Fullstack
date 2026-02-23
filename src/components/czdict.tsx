@@ -22,6 +22,12 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
   const [hoveredLocId, setHoveredLocId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const zoneRef = useRef(zone);
   zoneRef.current = zone;
 
@@ -90,13 +96,13 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
           </div>
         )}
 
-        <div className="flex px-1 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
+        <div className="flex px-2 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
           <p className="flex-1">Name</p>
           <p className="flex-1 text-center">Population Size</p>
           <p className="flex-1 text-right">Created Date</p>
         </div>
 
-        <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1" style={{ overflowAnchor: 'none' }}>
+        <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1 px-1 py-1" style={{ overflowAnchor: 'none' }}>
           {loading ? (
             <p className="text-center my-auto">Loading...</p>
           ) : locations.length === 0 && (
@@ -110,7 +116,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
               <button
                 type="button"
                 key={loc.id}
-                className="flex w-full text-left px-1 justify-between items-center hover:scale-[0.98] py-1 relative select-none"
+                className={`flex w-full text-left px-1 justify-between items-center py-1 relative select-none rounded-md hover:outline-solid hover:outline-1 ${zone?.id === loc.id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
                 style={
                   !loc.ready
                     ? {
@@ -150,6 +156,136 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       {zone && (
         <div className="w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory) italic whitespace-pre-line">
           {zone.description}
+        </div>
+      )}
+
+      {zone && user && zone.user_id === user.id && zone.ready && (
+        <div className="flex gap-2 w-120 max-w-[90vw] justify-center">
+          <div className="relative">
+            <button
+              type="button"
+              className="simset_button text-sm py-1! px-3!"
+              onClick={() => {
+                if (!editOpen) {
+                  setEditName(zone.name);
+                  setEditDesc(zone.description);
+                }
+                setEditOpen(!editOpen);
+                setDeleteOpen(false);
+              }}
+            >
+              Edit
+            </button>
+            {editOpen && (
+              <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-(--color-bg-ivory) outline-solid outline-2 outline-(--color-primary-blue) rounded-md p-3 flex flex-col gap-2 shadow-lg">
+                <label className="flex flex-col gap-1 text-sm font-semibold">
+                  Name
+                  <input
+                    type="text"
+                    className="border border-gray-300 rounded px-2 py-1 text-sm font-normal"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold">
+                  Description
+                  <textarea
+                    className="border border-gray-300 rounded px-2 py-1 text-sm font-normal resize-y min-h-16"
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 cursor-pointer"
+                    onClick={() => setEditOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="text-sm px-3 py-1 rounded bg-(--color-primary-blue) text-white hover:brightness-90 cursor-pointer disabled:opacity-50"
+                    disabled={saving || (!editName.trim())}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        const res = await fetch(`/api/convenience-zones/${zone.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: editName.trim(), description: editDesc }),
+                        });
+                        if (res.ok) {
+                          const { data } = await res.json();
+                          setZone(data);
+                          setLocations((prev) => prev.map((l) => (l.id === data.id ? data : l)));
+                          setEditOpen(false);
+                        }
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              className="simset_button text-sm py-1! px-3! bg-red-700! hover:bg-red-500!"
+              onClick={() => {
+                setDeleteOpen(!deleteOpen);
+                setEditOpen(false);
+              }}
+            >
+              Delete
+            </button>
+            {deleteOpen && (
+              <div className="absolute left-0 top-full mt-1 z-20 w-64 bg-(--color-bg-ivory) outline-solid outline-2 outline-red-600 rounded-md p-3 flex flex-col gap-2 shadow-lg">
+                <p className="text-sm font-semibold">Delete &quot;{zone.name}&quot;?</p>
+                <p className="text-xs text-gray-600">This action cannot be undone.</p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 cursor-pointer"
+                    onClick={() => setDeleteOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="text-sm px-3 py-1 rounded bg-red-700 text-white hover:bg-red-500 cursor-pointer disabled:opacity-50"
+                    disabled={deleting}
+                    onClick={async () => {
+                      setDeleting(true);
+                      try {
+                        const res = await fetch(`/api/convenience-zones/${zone.id}`, {
+                          method: 'DELETE',
+                        });
+                        if (res.ok) {
+                          const remaining = locations.filter((l) => l.id !== zone.id);
+                          setLocations(remaining);
+                          setDeleteOpen(false);
+                          if (remaining.length > 0) {
+                            setZone(remaining[0]);
+                          }
+                        }
+                      } finally {
+                        setDeleting(false);
+                      }
+                    }}
+                  >
+                    {deleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -141,11 +141,11 @@ export function SimRunSelector({
       <div className="bg-(--color-primary-blue) text-center text-white w-full h-6">
         Visit a Previous Run
       </div>
-      <div className="flex px-1 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
+      <div className="flex px-2 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
         <p className="flex-1">Name</p>
         <p className="flex-1 text-right">Created Date</p>
       </div>
-      <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1">
+      <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1 px-1 py-1">
         {loading ? (
           <p className="text-center text-wrap my-auto">Loading...</p>
         ) : !data?.length && (
@@ -157,7 +157,7 @@ export function SimRunSelector({
           <button
             type="button"
             key={run.sim_id}
-            className="flex w-full text-left px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none bg-transparent border-none p-0 font-[inherit] text-inherit"
+            className={`flex w-full text-left px-1 justify-between items-center hover:cursor-pointer py-1 relative select-none bg-transparent border-none p-0 font-[inherit] text-inherit rounded-md hover:outline-solid hover:outline-1 ${run.sim_id === sim_id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
             style={
               run.sim_id === sim_id
                 ? { background: 'var(--color-primary-blue)', color: 'white' }
