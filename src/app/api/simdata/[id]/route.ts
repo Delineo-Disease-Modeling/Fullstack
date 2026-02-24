@@ -1,5 +1,5 @@
-import { constants, createReadStream } from 'node:fs';
-import { access, readFile, unlink, writeFile } from 'node:fs/promises';
+import { constants, createReadStream, createWriteStream } from 'node:fs';
+import { access, readFile, rename, stat, unlink } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
 import chain from 'stream-chain';
 import parser from 'stream-json';
@@ -15,8 +15,85 @@ const updateSchema = z.object({
   name: z.string().min(2).optional()
 });
 
+// Helper Functions
+
+/** Load and process papdata for a convenience zone. */
+async function loadPapData(czoneId: number) {
+  const papObj = await prisma.paPData.findUnique({
+    where: { czone_id: czoneId }
+  });
+  if (!papObj) return null;
+
+  const papPath = `${DB_FOLDER}${papObj.id}.gz`;
+  try {
+    await access(papPath, constants.F_OK);
+  } catch {
+    return null;
+  }
+
+  const raw = await readFile(papPath);
+  const buffer = await new Promise<Buffer>((resolve, reject) => {
+    const unzip = createGunzip();
+    const chunks: Buffer[] = [];
+    unzip.on('data', (c: Buffer) => chunks.push(c));
+    unzip.on('end', () => resolve(Buffer.concat(chunks)));
+    unzip.on('error', reject);
+    unzip.end(raw);
+  });
+
+  const json = JSON.parse(buffer.toString());
+  const homeIds = Object.keys(json.homes).sort(
+    (a, b) => Number(a) - Number(b)
+  );
+  const placeIds = Object.keys(json.places).sort(
+    (a, b) => Number(a) - Number(b)
+  );
+
+  return {
+    homeIds,
+    placeIds,
+    arrays: {
+      homes: homeIds.map((id) => ({ id })),
+      places: placeIds.map((id) => ({
+        id,
+        latitude: json.places[id].latitude,
+        longitude: json.places[id].longitude,
+        label: json.places[id].label,
+        top_category: json.places[id].top_category
+      }))
+    }
+  };
+}
+
+/** Optionally gzip-compress a response body if the client accepts it. */
+function maybeCompress(
+  body: BodyInit,
+  acceptEncoding: string | null,
+  headers: Record<string, string>
+): Response {
+  if (
+    acceptEncoding?.includes('gzip') &&
+    typeof CompressionStream !== 'undefined'
+  ) {
+    const compressed = new Response(body).body?.pipeThrough(
+      new CompressionStream('gzip')
+    );
+    if (!compressed) return new Response(body, { headers });
+    return new Response(compressed, {
+      headers: {
+        ...headers,
+        'Content-Encoding': 'gzip',
+        Vary: 'Accept-Encoding'
+      }
+    });
+  }
+  return new Response(body, { headers });
+}
+
+// HTTPS requests
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
@@ -38,54 +115,14 @@ export async function GET(
     );
   }
 
-  const simPath = `${DB_FOLDER + simdata.simdata}.gz`;
-  const patPath = `${DB_FOLDER + simdata.patterns}.gz`;
-
-  let optimizedPapData: any = null;
+  const simPath = `${DB_FOLDER}${simdata.simdata}.gz`;
+  const patPath = `${DB_FOLDER}${simdata.patterns}.gz`;
 
   try {
     await Promise.all([
       access(simPath, constants.F_OK),
       access(patPath, constants.F_OK)
     ]);
-
-    const papdata_obj = await prisma.paPData.findUnique({
-      where: { czone_id: simdata.czone_id }
-    });
-
-    if (papdata_obj) {
-      const papPath = `${DB_FOLDER + papdata_obj.id}.gz`;
-      try {
-        await access(papPath, constants.F_OK);
-        const raw = await readFile(papPath);
-        const buffer = await new Promise<Buffer>((resolve, reject) => {
-          const unzip = createGunzip();
-          const chunks: Buffer[] = [];
-          unzip.on('data', (c) => chunks.push(c));
-          unzip.on('end', () => resolve(Buffer.concat(chunks)));
-          unzip.on('error', reject);
-          unzip.end(raw);
-        });
-
-        const json = JSON.parse(buffer.toString());
-        optimizedPapData = { homes: {}, places: {} };
-
-        for (const [id] of Object.entries(json.homes)) {
-          optimizedPapData.homes[id] = {};
-        }
-        for (const [id, val] of Object.entries(json.places) as any) {
-          optimizedPapData.places[id] = {
-            id,
-            latitude: val.latitude,
-            longitude: val.longitude,
-            label: val.label,
-            top_category: val.top_category
-          };
-        }
-      } catch (e) {
-        console.error('Failed to load/optimize papdata for embedding', e);
-      }
-    }
   } catch {
     return Response.json(
       { message: 'Simulation resource files not found on server.' },
@@ -93,165 +130,276 @@ export async function GET(
     );
   }
 
-  const encoder = new TextEncoder();
-  const safePap = optimizedPapData || { homes: {}, places: {} };
+  const acceptEncoding = request.headers.get('accept-encoding');
+  const mapCachePath = `${DB_FOLDER}${simdata.simdata}.map.json`;
 
-  const homeIds = Object.keys(safePap.homes).sort(
-    (a, b) => Number(a) - Number(b)
-  );
-  const placeIds = Object.keys(safePap.places).sort(
-    (a, b) => Number(a) - Number(b)
-  );
+  // Optional pagination, allows clients to request a subset of timesteps
+  const { searchParams } = request.nextUrl;
+  const fromStep = Number(searchParams.get('from') ?? 0);
+  const toStep = searchParams.has('to')
+    ? Number(searchParams.get('to'))
+    : Infinity;
+  const paginated = searchParams.has('from') || searchParams.has('to');
 
-  const papDataArrays = {
-    homes: homeIds.map((id) => ({ id, ...safePap.homes[id] })),
-    places: placeIds.map((id) => safePap.places[id])
-  };
-
-  // The header contains fields that may change (name) or are cheap to fetch
-  // (zone, papdata). The expensive simdata+hotspots computation is cached.
-  const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)},"papdata":${JSON.stringify(papDataArrays)}`;
-  const mapCachePath = `${DB_FOLDER + simdata.simdata}.map.json`;
-
-  // --- Cache hit: read file atomically and return combined response ---
+  // Cache hit?
   try {
-    const cacheData = await readFile(mapCachePath);
+    const [cacheData, cacheStat] = await Promise.all([
+      readFile(mapCachePath),
+      stat(mapCachePath)
+    ]);
+
+    // ETag based on file mtime + size
+    const etag = `"${cacheStat.mtimeMs.toString(36)}-${cacheStat.size.toString(36)}"`;
+    if (!paginated && request.headers.get('if-none-match') === etag) {
+      return new Response(null, { status: 304 });
+    }
+
+    // Paginated request: parse cache, filter timesteps, return JSON object
+    if (paginated) {
+      const parsed = JSON.parse(`{"_":0${cacheData.toString('utf8')}}`);
+
+      const filteredSimdata: Record<string, unknown> = {};
+      if (parsed.simdata) {
+        for (const [key, val] of Object.entries(parsed.simdata)) {
+          const step = Number(key);
+          if (step >= fromStep && step <= toStep) {
+            filteredSimdata[key] = val;
+          }
+        }
+      }
+
+      const body = JSON.stringify({
+        data: {
+          name: simdata.name,
+          length: simdata.length,
+          zone: simdata.czone,
+          papdata: parsed.papdata,
+          simdata: filteredSimdata,
+          hotspots: parsed.hotspots ?? {}
+        }
+      });
+
+      return maybeCompress(body, acceptEncoding, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'private, max-age=30'
+      });
+    }
+
+    // Non-paginated: splice header + raw cache bytes + suffix (zero-parse)
+    const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)}`;
+
     const body = Buffer.concat([
       Buffer.from(headerStr, 'utf8'),
       cacheData,
       Buffer.from('}}', 'utf8')
     ]);
-    return new Response(body, {
-      headers: { 'Content-Type': 'application/json' }
+
+    return maybeCompress(body, acceptEncoding, {
+      'Content-Type': 'application/json',
+      ETag: etag,
+      'Cache-Control': 'private, max-age=30'
     });
-  } catch (e: any) {
-    if (e?.code !== 'ENOENT') {
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException)?.code !== 'ENOENT') {
       console.error('Map cache read error:', e);
     }
-    // Cache miss — fall through to full computation below
+    // Cache miss: fall through to streaming computation
   }
 
-  // --- Cache miss: compute, stream to client, and save cache for next time ---
+  // Cache miss: stream to client + write cache to disk
+  const pap = await loadPapData(simdata.czone_id);
+  const papArrays = pap?.arrays ?? { homes: [], places: [] };
+  const homeIds = pap?.homeIds ?? [];
+  const placeIds = pap?.placeIds ?? [];
+
+  const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)}`;
+  const papFragment = `,"papdata":${JSON.stringify(papArrays)}`;
+
+  const encoder = new TextEncoder();
+  const { signal } = request;
+
   const stream = new ReadableStream({
     async start(controller) {
+      // Write cache to a temp file, then rename atomically to avoid races
+      const tmpCachePath = `${mapCachePath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+      const cacheStream = createWriteStream(tmpCachePath);
+
       try {
-        controller.enqueue(encoder.encode(`${headerStr},"simdata":{`));
+        // New-format cache: papdata first, then simdata
+        cacheStream.write(papFragment);
+        cacheStream.write(',"simdata":{');
 
-        let first = true;
-        const hotspots: { [key: string]: number[] } = {};
-        const prevInfected: { [key: string]: number } = {};
+        controller.enqueue(
+          encoder.encode(`${headerStr}${papFragment},"simdata":{`)
+        );
 
-        // cacheParts accumulates the fragment written to .map.json:
-        //   ,"simdata":{...entries...},"hotspots":{...}
-        const cacheParts: string[] = [',"simdata":{'];
+        let firstCache = true;
+        let firstClient = true;
+        const hotspots: Record<string, number[]> = {};
+        const prevInfected: Record<string, number> = {};
 
-        const simdatapl = chain([
-          createReadStream(simPath),
-          createGunzip(),
-          parser(),
-          StreamObject.streamObject()
-        ]);
-        const patternspl = chain([
-          createReadStream(patPath),
-          createGunzip(),
-          parser(),
-          StreamObject.streamObject()
-        ]);
+        const simIter = (
+          chain([
+            createReadStream(simPath),
+            createGunzip(),
+            parser(),
+            StreamObject.streamObject()
+          ]) as any
+        )[Symbol.asyncIterator]();
 
-        const simIter = (simdatapl as any)[Symbol.asyncIterator]();
-        const patIter = (patternspl as any)[Symbol.asyncIterator]();
+        const patIter = (
+          chain([
+            createReadStream(patPath),
+            createGunzip(),
+            parser(),
+            StreamObject.streamObject()
+          ]) as any
+        )[Symbol.asyncIterator]();
 
         let spl = await simIter.next();
         let ppl = await patIter.next();
 
         while (!spl.done && !ppl.done) {
-          const skey = spl.value.key;
-          const pkey = ppl.value.key;
+          // Abort early if the client disconnected
+          if (signal.aborted) break;
+
+          const skey: string = spl.value.key;
+          const pkey: string = ppl.value.key;
 
           if (skey !== pkey) {
             if (+skey < +pkey) {
               spl = await simIter.next();
               continue;
-            } else {
-              ppl = await patIter.next();
-              continue;
             }
+            ppl = await patIter.next();
+            continue;
           }
-
-          if (!first) {
-            controller.enqueue(encoder.encode(','));
-            cacheParts.push(',');
-          }
-          first = false;
 
           const svalue = spl.value.value;
           const pvalue = ppl.value.value;
 
-          const curinfected = new Set(
-            Object.values(svalue).flatMap((people) =>
-              Object.keys(people as any)
-            )
-          );
+          // Build infected Set incrementally
+          const curinfected = new Set<string>();
+          for (const people of Object.values(svalue)) {
+            for (const key of Object.keys(
+              people as Record<string, unknown>
+            )) {
+              curinfected.add(key);
+            }
+          }
 
           const homesArray: number[] = [];
-          const placesArray: number[] = [];
-
-          for (const id of homeIds) {
-            const pop = pvalue.homes[id];
+          for (const hid of homeIds) {
+            const pop: string[] | undefined = pvalue.homes[hid];
             if (pop) {
-              homesArray.push(
-                pop.length,
-                pop.filter((v: any) => curinfected.has(v)).length
-              );
+              let inf = 0;
+              for (const v of pop) {
+                if (curinfected.has(v)) inf++;
+              }
+              homesArray.push(pop.length, inf);
             } else {
               homesArray.push(0, 0);
             }
           }
 
-          for (const id of placeIds) {
-            const pop = pvalue.places[id];
+          const placesArray: number[] = [];
+          for (const pid of placeIds) {
+            const pop: string[] | undefined = pvalue.places[pid];
             if (pop) {
-              const len = pop.length;
-              const infCount = pop.filter((v: any) =>
-                curinfected.has(v)
-              ).length;
-              placesArray.push(len, infCount);
-              const prevInf = prevInfected[id] || 0;
-              if (infCount > 0 && prevInf > 0 && infCount >= prevInf * 5) {
-                if (!hotspots[id]) hotspots[id] = [];
-                hotspots[id].push(Number(skey));
+              let inf = 0;
+              for (const v of pop) {
+                if (curinfected.has(v)) inf++;
               }
-              prevInfected[id] = infCount;
+              placesArray.push(pop.length, inf);
+              const prevInf = prevInfected[pid] || 0;
+              if (inf > 0 && prevInf > 0 && inf >= prevInf * 5) {
+                if (!hotspots[pid]) hotspots[pid] = [];
+                hotspots[pid].push(Number(skey));
+              }
+              prevInfected[pid] = inf;
             } else {
               placesArray.push(0, 0);
-              prevInfected[id] = 0;
+              prevInfected[pid] = 0;
             }
           }
 
-          const entry = `"${skey}":${JSON.stringify({ h: homesArray, p: placesArray })}`;
-          controller.enqueue(encoder.encode(entry));
-          cacheParts.push(entry);
+          const payload = JSON.stringify({
+            h: homesArray,
+            p: placesArray
+          });
+          const entryBody = `"${skey}":${payload}`;
+
+          // Always write every entry to the cache (full dataset)
+          if (!firstCache) cacheStream.write(',');
+          firstCache = false;
+          cacheStream.write(entryBody);
+
+          // Only stream to client if within the requested range
+          const step = Number(skey);
+          if (!paginated || (step >= fromStep && step <= toStep)) {
+            if (!signal.aborted) {
+              if (!firstClient) controller.enqueue(encoder.encode(','));
+              firstClient = false;
+              controller.enqueue(encoder.encode(entryBody));
+            }
+          }
 
           spl = await simIter.next();
           ppl = await patIter.next();
         }
 
-        const tail = `},"hotspots":${JSON.stringify(hotspots)}`;
-        controller.enqueue(encoder.encode(`${tail}}}`));
-        cacheParts.push(tail);
+        const hotspotsTail = `},"hotspots":${JSON.stringify(hotspots)}`;
 
-        controller.close();
+        if (!signal.aborted) {
+          controller.enqueue(encoder.encode(`${hotspotsTail}}}`));
+          controller.close();
+        }
 
-        // Save cache in background — does not affect the already-sent response
-        writeFile(mapCachePath, cacheParts.join('')).catch((e) =>
-          console.error('Map cache write failed:', e)
-        );
+        if (signal.aborted) {
+          // Incomplete computation, discard partial cache
+          cacheStream.destroy();
+          unlink(tmpCachePath).catch(() => {});
+        } else {
+          // Finalize cache: close stream, wait for flush, atomic rename
+          cacheStream.write(hotspotsTail);
+          await new Promise<void>((resolve, reject) => {
+            cacheStream.on('error', reject);
+            cacheStream.end(resolve);
+          });
+          await rename(tmpCachePath, mapCachePath);
+        }
       } catch (e) {
         console.error('SimData stream error:', e);
-        try { controller.close(); } catch {}
+        if (!signal.aborted) {
+          try {
+            controller.error(
+              e instanceof Error ? e : new Error('Stream processing failed')
+            );
+          } catch {
+            /* controller may already be errored/closed */
+          }
+        }
+
+        // Clean up partial cache
+        cacheStream.destroy();
+        unlink(tmpCachePath).catch(() => {});
       }
     }
   });
+
+  // Compress the streaming response if the client accepts gzip
+  if (
+    acceptEncoding?.includes('gzip') &&
+    typeof CompressionStream !== 'undefined'
+  ) {
+    return new Response(stream.pipeThrough(new CompressionStream('gzip')), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Encoding': 'gzip',
+        Vary: 'Accept-Encoding'
+      }
+    });
+  }
 
   return new Response(stream, {
     headers: { 'Content-Type': 'application/json' }

@@ -109,7 +109,15 @@ export async function processSimData(
     }
 
     if (batch.length >= BATCH_SIZE) {
-      await prisma.locationStats.createMany({ data: batch });
+      try {
+        await prisma.locationStats.createMany({ data: batch });
+      } catch (e: any) {
+        if (e?.code === 'P2003') {
+          console.log(`Ingestion aborted for SimData #${simDataId}: parent record was deleted`);
+          return;
+        }
+        throw e;
+      }
       batch = [];
     }
 
@@ -118,7 +126,15 @@ export async function processSimData(
   }
 
   if (batch.length > 0) {
-    await prisma.locationStats.createMany({ data: batch });
+    try {
+      await prisma.locationStats.createMany({ data: batch });
+    } catch (e: any) {
+      if (e?.code === 'P2003') {
+        console.log(`Ingestion aborted for SimData #${simDataId}: parent record was deleted`);
+        return;
+      }
+      throw e;
+    }
   }
 }
 
