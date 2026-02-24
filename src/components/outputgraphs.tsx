@@ -57,14 +57,15 @@ export default function OutputGraphs({
 
     const fetchData = () => {
       fetch(url, { signal: abortController.signal })
-        .then((res) => {
+        .then(async (res) => {
           if (res.status === 202) {
             setProcessing(true);
             setTimeout(fetchData, 15000);
             return null;
           }
-          if (!res.ok) throw new Error(`Failed to fetch chart data (${res.status})`);
-          return res.json();
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.message || `Failed to fetch chart data (${res.status})`);
+          return json;
         })
         .then((json) => {
           if (json) {
@@ -75,6 +76,7 @@ export default function OutputGraphs({
         .catch((err) => {
           if (err.name === 'AbortError') return;
           console.error(err);
+          setProcessing(false);
           setChartError(err.message || 'Failed to load chart data');
         });
     };

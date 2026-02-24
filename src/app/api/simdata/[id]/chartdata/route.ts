@@ -72,7 +72,14 @@ export async function GET(
   // Global stats (no loc_id)
   if (!loc_id || !loc_type) {
     if (simdata.global_stats) {
-      return Response.json({ data: simdata.global_stats });
+      const stats = simdata.global_stats as any;
+      if (stats.error) {
+        return Response.json(
+          { message: `Chart generation failed: ${stats.error}` },
+          { status: 500 }
+        );
+      }
+      return Response.json({ data: stats });
     }
     return Response.json(
       { message: 'Global stats are still being processed. This may take a few minutes for large simulations.' },

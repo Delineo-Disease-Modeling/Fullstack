@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
 
       generateGlobalStats(
         DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
-        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
         papPath
       )
         .then((stats) =>
@@ -77,7 +76,19 @@ export async function POST(request: NextRequest) {
             data: { global_stats: stats }
           })
         )
-        .catch((e) => console.error('Stats generation failed:', e));
+        .catch((e) => {
+          console.error('Stats generation failed:', e);
+          prisma.simData.update({
+            where: { id: simdata_obj.id },
+            data: {
+              global_stats: {
+                error: e instanceof Error ? e.message : String(e)
+              }
+            }
+          }).catch((dbErr) =>
+            console.error('Failed to persist stats error state:', dbErr)
+          );
+        });
 
       processSimData(
         simdata_obj.id,
