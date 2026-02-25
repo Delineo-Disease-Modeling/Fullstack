@@ -5,7 +5,8 @@
   "packageManager": "pnpm@10.29.1",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
+    "build": "next build",
     "start": "next start",
     "lint": "biome lint ./src",
     "db:generate": "prisma generate",
