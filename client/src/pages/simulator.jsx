@@ -8,6 +8,7 @@ import SimSettings from '../components/simsettings.jsx';
 import ModelMap from '../components/modelmap.jsx';
 import OutputGraphs from '../components/outputgraphs.jsx';
 import InstructionBanner from '../components/instruction-banner.jsx';
+import PersonPathPanel from '../components/person-path-panel.jsx';
 
 import './simulator.css';
 
@@ -237,6 +238,7 @@ export default function Simulator() {
           capacity: json?.data?.capacity,
           lockdown: json?.data?.lockdown
         });
+        setRawSimData(null);
         setShowRunParams(false);
         setLoadError(null);
         return;
@@ -423,6 +425,7 @@ export default function Simulator() {
                 capacity: data?.data?.capacity,
                 lockdown: data?.data?.lockdown
               });
+              setRawSimData(null);
               setShowRunParams(false);
               setLoadError(null);
             })
@@ -500,6 +503,7 @@ export default function Simulator() {
     setSimData(null);
     setPapData(null);
     setRunName('');
+    setRawSimData(null);
     setLoadError(null);
 
     // Switch "pages"
@@ -648,6 +652,13 @@ export default function Simulator() {
               <ModelMap
                 selectedZone={selectedZone}
                 onMarkerClick={handleMarkerClick}
+              />
+
+              <PersonPathPanel
+                selectedZone={selectedZone}
+                simId={settings.sim_id}
+                rawMovement={rawSimData?.movement}
+                papdata={papdata}
               />
             </div>
 

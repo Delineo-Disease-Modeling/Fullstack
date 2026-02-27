@@ -48,6 +48,10 @@ const getChartQuerySchema = z.object({
   loc_id: z.string().nonempty().optional()
 });
 
+const getPersonPathQuerySchema = z.object({
+  person_id: z.coerce.number().int().nonnegative()
+});
+
 const getSimDataCacheSchema = z.object({
   czone_id: z.coerce.number().nonnegative()
 });
@@ -60,6 +64,90 @@ const getSimDataRunCacheSchema = z.object({
 const updateSimDataSchema = z.object({
   name: z.string().min(2).optional()
 });
+
+const DAY_MINUTES = 24 * 60;
+
+type LocationType = 'homes' | 'places' | 'unknown';
+type KnownLocation = { type: 'homes' | 'places'; id: string };
+
+type TimelinePoint = {
+  minute: number;
+  location_type: LocationType;
+  location_id: string;
+};
+
+type PathSegment = {
+  location_type: LocationType;
+  location_id: string;
+  location_label: string;
+  start_minute: number;
+  end_minute: number;
+};
+
+type DayStop = {
+  location_type: LocationType;
+  location_id: string;
+  location_label: string;
+  start_minute: number;
+  end_minute: number;
+  duration_minutes: number;
+  start_time_iso: string;
+  end_time_iso: string;
+};
+
+function includesPersonId(values: unknown, personId: string): boolean {
+  if (!Array.isArray(values)) return false;
+  return values.some((value) => String(value) === personId);
+}
+
+function inferStepMinutes(minutes: number[]): number {
+  if (minutes.length < 2) return 60;
+
+  const diffs: number[] = [];
+  for (let i = 1; i < minutes.length; i++) {
+    const diff = minutes[i] - minutes[i - 1];
+    if (Number.isFinite(diff) && diff > 0) {
+      diffs.push(diff);
+    }
+  }
+
+  if (diffs.length === 0) return 60;
+  diffs.sort((a, b) => a - b);
+  return diffs[Math.floor(diffs.length / 2)] || 60;
+}
+
+function toIsoTime(startDate: Date, minute: number): string {
+  return new Date(startDate.getTime() + minute * 60_000).toISOString();
+}
+
+function getLocationLabel(locationType: LocationType, locationId: string, papdata: any): string {
+  if (locationType === 'homes') return `Home #${locationId}`;
+  if (locationType === 'places') return papdata?.places?.[locationId]?.label ?? `Place #${locationId}`;
+  return 'Unknown';
+}
+
+function findPersonLocation(movement: any, personId: string, previous: KnownLocation | null): { type: LocationType; id: string } {
+  if (previous) {
+    const previousPeople = movement?.[previous.type]?.[previous.id];
+    if (includesPersonId(previousPeople, personId)) {
+      return previous;
+    }
+  }
+
+  for (const [id, people] of Object.entries(movement?.homes ?? {})) {
+    if (includesPersonId(people, personId)) {
+      return { type: 'homes', id };
+    }
+  }
+
+  for (const [id, people] of Object.entries(movement?.places ?? {})) {
+    if (includesPersonId(people, personId)) {
+      return { type: 'places', id };
+    }
+  }
+
+  return { type: 'unknown', id: 'unknown' };
+}
 
 async function getSimData(id: number) {
   const simdata = await prisma.simData.findUnique({
@@ -341,6 +429,224 @@ simdata_route.get(
         capacity: simdata.capacity,
         lockdown: simdata.lockdown,
         created_at: simdata.created_at
+      }
+    });
+  }
+);
+
+simdata_route.get(
+  '/simdata/:id/person-path',
+  zValidator('param', getSimDataSchema),
+  zValidator('query', getPersonPathQuerySchema),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const { person_id } = c.req.valid('query');
+
+    const simdata = await prisma.simData.findUnique({
+      where: { id },
+      include: {
+        czone: {
+          select: {
+            start_date: true
+          }
+        }
+      }
+    });
+
+    if (!simdata) {
+      throw new HTTPException(404, {
+        message: `Could not find simdata #${id}`
+      });
+    }
+
+    const papdata = await getPapData(simdata.czone_id);
+    const personKey = String(person_id);
+    const startDate = simdata.czone.start_date;
+
+    const points: TimelinePoint[] = [];
+    let previousLocation: KnownLocation | null = null;
+
+    const patternspl = chain([
+      createReadStream(DB_FOLDER + simdata.patterns),
+      parser(),
+      StreamObject.streamObject()
+    ])[Symbol.asyncIterator]();
+
+    let ppl = await patternspl.next();
+    while (!ppl.done) {
+      const minute = Number(ppl.value.key);
+      if (Number.isFinite(minute)) {
+        const movement = ppl.value.value ?? {};
+        const location = findPersonLocation(movement, personKey, previousLocation);
+        points.push({
+          minute,
+          location_type: location.type,
+          location_id: location.id
+        });
+
+        previousLocation = location.type === 'homes' || location.type === 'places'
+          ? { type: location.type, id: location.id }
+          : null;
+      }
+
+      ppl = await patternspl.next();
+    }
+
+    if (points.length === 0) {
+      return c.json({
+        data: {
+          person_id,
+          person: null,
+          step_minutes: 60,
+          total_minutes: 0,
+          total_hours: 0,
+          days: []
+        }
+      });
+    }
+
+    points.sort((a, b) => a.minute - b.minute);
+    const inferredStepMinutes = inferStepMinutes(points.map((point) => point.minute));
+
+    const segments: PathSegment[] = [];
+    for (let i = 0; i < points.length; i++) {
+      const current = points[i];
+      const nextMinute = i < points.length - 1
+        ? points[i + 1].minute
+        : current.minute + inferredStepMinutes;
+
+      if (!Number.isFinite(nextMinute) || nextMinute <= current.minute) {
+        continue;
+      }
+
+      const currentLabel = getLocationLabel(current.location_type, current.location_id, papdata);
+      const previousSegment = segments[segments.length - 1];
+      if (
+        previousSegment
+        && previousSegment.location_type === current.location_type
+        && previousSegment.location_id === current.location_id
+        && previousSegment.end_minute === current.minute
+      ) {
+        previousSegment.end_minute = nextMinute;
+      } else {
+        segments.push({
+          location_type: current.location_type,
+          location_id: current.location_id,
+          location_label: currentLabel,
+          start_minute: current.minute,
+          end_minute: nextMinute
+        });
+      }
+    }
+
+    const daysMap = new Map<number, {
+      day_index: number;
+      day_date_iso: string;
+      start_minute: number;
+      end_minute: number;
+      total_minutes: number;
+      stops: DayStop[];
+    }>();
+
+    let totalMinutes = 0;
+
+    for (const segment of segments) {
+      let cursor = segment.start_minute;
+      while (cursor < segment.end_minute) {
+        const dayIndex = Math.floor(cursor / DAY_MINUTES) + 1;
+        const dayStartMinute = (dayIndex - 1) * DAY_MINUTES;
+        const dayEndMinute = dayStartMinute + DAY_MINUTES;
+        const pieceEndMinute = Math.min(segment.end_minute, dayEndMinute);
+        const durationMinutes = pieceEndMinute - cursor;
+
+        if (durationMinutes <= 0) break;
+
+        if (!daysMap.has(dayIndex)) {
+          daysMap.set(dayIndex, {
+            day_index: dayIndex,
+            day_date_iso: toIsoTime(startDate, dayStartMinute).slice(0, 10),
+            start_minute: dayStartMinute,
+            end_minute: dayEndMinute,
+            total_minutes: 0,
+            stops: []
+          });
+        }
+
+        const day = daysMap.get(dayIndex)!;
+        day.stops.push({
+          location_type: segment.location_type,
+          location_id: segment.location_id,
+          location_label: segment.location_label,
+          start_minute: cursor,
+          end_minute: pieceEndMinute,
+          duration_minutes: durationMinutes,
+          start_time_iso: toIsoTime(startDate, cursor),
+          end_time_iso: toIsoTime(startDate, pieceEndMinute)
+        });
+        day.total_minutes += durationMinutes;
+        totalMinutes += durationMinutes;
+        cursor = pieceEndMinute;
+      }
+    }
+
+    const days = Array.from(daysMap.values())
+      .sort((a, b) => a.day_index - b.day_index)
+      .map((day) => {
+        const totalsByLocation = new Map<string, {
+          location_type: LocationType;
+          location_id: string;
+          location_label: string;
+          duration_minutes: number;
+          duration_hours: number;
+          visits: number;
+        }>();
+
+        for (const stop of day.stops) {
+          const key = `${stop.location_type}:${stop.location_id}`;
+          const existing = totalsByLocation.get(key);
+
+          if (existing) {
+            existing.duration_minutes += stop.duration_minutes;
+            existing.duration_hours = Number((existing.duration_minutes / 60).toFixed(2));
+            existing.visits += 1;
+          } else {
+            totalsByLocation.set(key, {
+              location_type: stop.location_type,
+              location_id: stop.location_id,
+              location_label: stop.location_label,
+              duration_minutes: stop.duration_minutes,
+              duration_hours: Number((stop.duration_minutes / 60).toFixed(2)),
+              visits: 1
+            });
+          }
+        }
+
+        return {
+          ...day,
+          total_hours: Number((day.total_minutes / 60).toFixed(2)),
+          totals: Array.from(totalsByLocation.values())
+            .sort((a, b) => b.duration_minutes - a.duration_minutes)
+        };
+      });
+
+    const personData = papdata?.people?.[personKey];
+    const person = personData
+      ? {
+        id: person_id,
+        age: personData?.age ?? null,
+        sex: personData?.sex === 0 ? 'Male' : (personData?.sex === 1 ? 'Female' : 'Unknown'),
+        home: personData?.home ?? null
+      }
+      : null;
+
+    return c.json({
+      data: {
+        person_id,
+        person,
+        step_minutes: inferredStepMinutes,
+        total_minutes: totalMinutes,
+        total_hours: Number((totalMinutes / 60).toFixed(2)),
+        days
       }
     });
   }
