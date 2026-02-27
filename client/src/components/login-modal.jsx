@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from 'react-modal';
 import useAuth from '../stores/auth';
 
@@ -7,21 +7,35 @@ Modal.setAppElement(document.getElementById('root'));
 function FormData({ curTab, closeModal }) {
   const login = useAuth((state) => state.login);
   const register = useAuth((state) => state.register);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const formSubmit = (formdata) => {
+  useEffect(() => {
+    setError('');
+  }, [curTab]);
+
+  const formSubmit = async (formdata) => {
     const request = {};
     formdata.forEach((value, key) => request[key] = value);
 
-    if (curTab === 0) {
-      login(request)
-        .then(closeModal)
-        .catch(console.error);
-    } else {
-      register(request)
-        .then(closeModal)
-        .catch(console.error);
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      if (curTab === 0) {
+        await login(request);
+      } else {
+        await register(request);
+      }
+
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to complete authentication.');
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <form
@@ -74,10 +88,18 @@ function FormData({ curTab, closeModal }) {
       </>}
       <button
         type='submit'
+        disabled={isSubmitting}
         className='modal outline-solid outline-1 px-8 py-1 rounded-lg mt-2'
       >
-        {curTab === 0 ? 'Login' : 'Register'}
+        {isSubmitting
+          ? (curTab === 0 ? 'Logging in...' : 'Registering...')
+          : (curTab === 0 ? 'Login' : 'Register')}
       </button>
+      {error && (
+        <div className='text-sm text-red-300 text-center max-w-xs'>
+          {error}
+        </div>
+      )}
     </form>
   );
 }

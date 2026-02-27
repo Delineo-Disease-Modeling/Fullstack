@@ -479,6 +479,7 @@ export default function CZGeneration() {
   const [ minPop, setMinPop ] = useState(5000);
   const [ clusterAlgorithm, setClusterAlgorithm ] = useState('czi_balanced');
   const [ showAdvancedClustering, setShowAdvancedClustering ] = useState(false);
+  const [ useDistancePenalty, setUseDistancePenalty ] = useState(true);
   const [ distancePenaltyWeight, setDistancePenaltyWeight ] = useState(0.02);
   const [ distanceScaleKm, setDistanceScaleKm ] = useState(20);
   const [ optimalClusteringParams, setOptimalClusteringParams ] = useState(null);
@@ -621,7 +622,37 @@ export default function CZGeneration() {
     return 'Outside Current Frontier';
   })();
   const selectedAnalysisStatus = traceLayer ? selectedTraceStatus : selectedManualStatus;
-  const activeMapTraceLayer = zoneEditMode ? null : traceLayer;
+  const manualHeatmapLayer = useMemo(() => {
+    if (!manualEditPanelsActive) {
+      return null;
+    }
+
+    const clusterSet = new Set(selectedCBGs.map((cbg) => normalizeCbgId(cbg)).filter(Boolean));
+    const candidateByCbg = new Map();
+    let minScore = Infinity;
+    let maxScore = -Infinity;
+
+    for (const candidate of (manualFrontierCandidates || [])) {
+      const cbgId = normalizeCbgId(candidate?.cbg);
+      if (!cbgId) continue;
+      const score = Number(candidate?.score ?? 0);
+      if (Number.isFinite(score)) {
+        minScore = Math.min(minScore, score);
+        maxScore = Math.max(maxScore, score);
+      }
+      candidateByCbg.set(cbgId, { ...candidate, score });
+    }
+
+    const hasScoreRange = Number.isFinite(minScore) && Number.isFinite(maxScore);
+    return {
+      clusterSet,
+      candidateByCbg,
+      selectedCbg: normalizeCbgId(selectedTraceCandidateCbg),
+      minScore: hasScoreRange ? minScore : 0,
+      maxScore: hasScoreRange ? maxScore : 1,
+    };
+  }, [manualEditPanelsActive, selectedCBGs, manualFrontierCandidates, selectedTraceCandidateCbg]);
+  const activeMapTraceLayer = manualEditPanelsActive ? manualHeatmapLayer : traceLayer;
   const showTraceControls = Boolean(growthTrace) && !zoneEditMode;
 
   useEffect(() => {
@@ -856,7 +887,9 @@ export default function CZGeneration() {
     if (clusterAlgorithm === 'czi_balanced') {
       const weight = Number(distancePenaltyWeight);
       const scale = Number(distanceScaleKm);
-      if (Number.isFinite(weight)) {
+      if (!useDistancePenalty) {
+        req.distance_penalty_weight = 0;
+      } else if (Number.isFinite(weight)) {
         req.distance_penalty_weight = weight;
       }
       if (Number.isFinite(scale)) {
@@ -903,7 +936,8 @@ export default function CZGeneration() {
     startDate,
     useTestData,
     distancePenaltyWeight,
-    distanceScaleKm
+    distanceScaleKm,
+    useDistancePenalty
   ]);
 
   useEffect(() => {
@@ -921,6 +955,7 @@ export default function CZGeneration() {
     axios.post(`${ALG_URL}cz-metrics`, {
       seed_cbg: seedCBG,
       cbg_list: selectedCBGs,
+      start_date: startDate,
       use_test_data: useTestData,
     }).then((resp) => {
       if (cancelled) return;
@@ -937,7 +972,7 @@ export default function CZGeneration() {
     return () => {
       cancelled = true;
     };
-  }, [manualEditPanelsActive, seedCBG, selectedCBGs, useTestData]);
+  }, [manualEditPanelsActive, seedCBG, selectedCBGs, startDate, useTestData]);
 
   // Finalize CZ - create DB record and generate patterns with the final CBG list
   const finalizeCZ = async () => {
@@ -970,6 +1005,7 @@ export default function CZGeneration() {
 
       if (clusterAlgorithm === 'czi_balanced') {
         generatedDescription.push(
+          `Use distance penalty: ${useDistancePenalty ? 'Yes' : 'No'}`,
           `Distance penalty weight: ${distancePenaltyWeight}`,
           `Distance scale (km): ${distanceScaleKm}`
         );
@@ -1213,7 +1249,9 @@ export default function CZGeneration() {
       if (clusterAlgorithm === 'czi_balanced') {
         const weight = Number(distancePenaltyWeight);
         const scale = Number(distanceScaleKm);
-        if (Number.isFinite(weight)) {
+        if (!useDistancePenalty) {
+          clusterReq.distance_penalty_weight = 0;
+        } else if (Number.isFinite(weight)) {
           clusterReq.distance_penalty_weight = weight;
         }
         if (Number.isFinite(scale)) {
@@ -1309,10 +1347,10 @@ export default function CZGeneration() {
                     center={null}
                     onCBGClick={handleCBGClick}
                     onMapBackgroundClick={handleMapBackgroundClick}
-                    onTraceCbgInspect={handleTraceCbgInspect}
+                    onTraceCbgInspect={manualEditPanelsActive ? null : handleTraceCbgInspect}
                     selectedCBGs={selectedCBGs}
                     traceLayer={activeMapTraceLayer}
-                    editingEnabled={!activeMapTraceLayer}
+                    editingEnabled={manualEditPanelsActive || !activeMapTraceLayer}
                     focusedCbgId={resolvedFocusedTraceCbg || focusedTraceCbg}
                     focusNonce={focusedTraceNonce}
                   />
@@ -1638,6 +1676,15 @@ export default function CZGeneration() {
                   </button>
                   {showAdvancedClustering && (
                     <div className='mt-3 flex flex-col gap-3'>
+                      <label className='flex items-center gap-2 text-sm'>
+                        <input
+                          type='checkbox'
+                          checked={useDistancePenalty}
+                          onChange={(e) => setUseDistancePenalty(e.target.checked)}
+                          disabled={loading}
+                        />
+                        Use distance penalty
+                      </label>
                       <FormField
                         label='Distance Penalty Weight'
                         name='distance_penalty_weight'
@@ -1646,7 +1693,7 @@ export default function CZGeneration() {
                         min={0}
                         max={1}
                         onChange={(e) => setDistancePenaltyWeight(e.target.value)}
-                        disabled={loading}
+                        disabled={loading || !useDistancePenalty}
                       />
                       <FormField
                         label='Distance Scale (km)'
@@ -1656,11 +1703,17 @@ export default function CZGeneration() {
                         min={0.1}
                         max={500}
                         onChange={(e) => setDistanceScaleKm(e.target.value)}
-                        disabled={loading}
+                        disabled={loading || !useDistancePenalty}
                       />
                       <div className='text-xs text-gray-600'>
-                        Higher `Distance Penalty Weight` favors closer CBGs more strongly.
-                        `Distance Scale` controls how quickly distance penalty grows (larger = softer penalty).
+                        {useDistancePenalty ? (
+                          <>
+                            Higher `Distance Penalty Weight` favors closer CBGs more strongly.
+                            {' '}Distance Scale controls how quickly distance penalty grows (larger = softer penalty).
+                          </>
+                        ) : (
+                          'Balanced CZI will rank using CZI-after only (no distance penalty).'
+                        )}
                       </div>
                     </div>
                   )}

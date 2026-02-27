@@ -12,19 +12,49 @@ export default function CzDict({ zone, setZone }) {
 
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState([]);
+  const [loadError, setLoadError] = useState('');
   const [hoveredLocId, setHoveredLocId] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     fetch(`${DB_URL}convenience-zones`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (!zone && json['data']?.[0]) {
-          setZone(json['data'][0]);
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        const zones = Array.isArray(json?.data) ? json.data : [];
+
+        if (cancelled) {
+          return;
         }
-        setLocations(json['data']);
+
+        if (!res.ok) {
+          setLocations([]);
+          setLoadError(`Failed to load zones (${res.status}).`);
+          return;
+        }
+
+        if (!zone && zones[0]) {
+          setZone(zones[0]);
+        }
+        setLocations(zones);
+        setLoadError('');
       })
-      .catch(console.error);
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        console.error(error);
+        setLocations([]);
+        setLoadError('Unable to reach the API. Check that the backend is running.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [zone, setZone]);
+
+  const visibleLocations = (Array.isArray(locations) ? locations : [])
+    .filter((loc) => tab === 0 ? true : loc.user_id === user?.id);
 
   const deleteZone = async (loc, e) => {
     e?.stopPropagation?.();
@@ -86,7 +116,7 @@ export default function CzDict({ zone, setZone }) {
 
         {/* List */}
         <div className='relative flex flex-col h-auto overflow-y-scroll gap-y-1'>
-          {locations.filter((loc) => tab === 0 ? true : loc.user_id === user?.id).map((loc) => (
+          {visibleLocations.map((loc) => (
             <div
               key={loc.id}
               className='flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none'
@@ -129,6 +159,11 @@ export default function CzDict({ zone, setZone }) {
               )}
             </div>
           ))}
+          {visibleLocations.length === 0 && (
+            <div className='px-2 py-3 text-sm text-gray-500'>
+              {loadError || 'No convenience zones found.'}
+            </div>
+          )}
         </div>
       </div>
 

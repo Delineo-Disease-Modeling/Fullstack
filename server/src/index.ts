@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { trimTrailingSlash } from 'hono/trailing-slash';
+import { Prisma } from '@prisma/client';
 import { DB_FOLDER, PORT } from './env.js';
 import { HTTPException } from 'hono/http-exception';
 import { auth } from './middleware/auth.js';
@@ -43,6 +44,12 @@ app.use('*', bodyLimit({
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
     return c.json({ message: error.message }, error.status);
+  }
+
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return c.json({
+      message: 'Database is unavailable. Please make sure PostgreSQL is running on localhost:5432.'
+    }, 503);
   }
 
   console.error('Unhandled error:', error);
