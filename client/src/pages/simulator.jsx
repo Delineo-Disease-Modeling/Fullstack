@@ -31,6 +31,9 @@ function getStateFromCBG(cbgList) {
   return FIPS_TO_STATE[fips] || 'OK';
 }
 
+// Keep enough timesteps to preserve visible movement in long runs without freezing the UI.
+const MAX_RENDER_TIMESTAMPS = 2000;
+
 // Helper function to transform simulation data for the UI
 function transformSimData(result, movement, sampledTimestamps) {
   const transformed = {};
@@ -185,10 +188,21 @@ export default function Simulator() {
       return new Date(isoString).toISOString().split('T')[0];
     };
     
+    const zoneStart = settings.zone?.start_date;
+    const zoneLengthHours = Number(settings.zone?.length ?? settings.hours ?? 0);
     const startDate = formatDate(settings.zone?.start_date);
-    const endDate = settings.zone?.start_date && settings.zone?.length
-      ? formatDate(new Date(new Date(settings.zone.start_date).getTime() + settings.zone.length * 60 * 60 * 1000).toISOString())
+    const endDate = zoneStart && zoneLengthHours > 0
+      ? formatDate(new Date(new Date(zoneStart).getTime() + zoneLengthHours * 60 * 60 * 1000).toISOString())
       : null;
+
+    const missing = [];
+    if (!startDate) missing.push('start_date');
+    if (!endDate) missing.push('end_date');
+    if (!state) missing.push('state');
+    if (missing.length > 0) {
+      setLoadError(`Missing required simulation fields: ${missing.join(', ')}. Re-select or regenerate the convenience zone.`);
+      return;
+    }
     
     const reqbody = {
       start_date: startDate,
@@ -337,7 +351,10 @@ export default function Simulator() {
           
           // OPTIMIZATION: Sample timesteps to prevent UI freeze
           const allTimestamps = Object.keys(movement).map(Number).sort((a, b) => a - b);
-          const maxTimestamps = 100;
+          const maxTimestamps = Math.min(
+            MAX_RENDER_TIMESTAMPS,
+            Math.max(400, Number(settings.hours || 0))
+          );
           const sampleRate = Math.max(1, Math.ceil(allTimestamps.length / maxTimestamps));
           const sampledTimestamps = allTimestamps.filter((_, i) => i % sampleRate === 0 || i === allTimestamps.length - 1);
           
@@ -421,7 +438,10 @@ export default function Simulator() {
           
           // OPTIMIZATION: Sample timesteps to prevent UI freeze
           const allTimestamps = Object.keys(movement).map(Number).sort((a, b) => a - b);
-          const maxTimestamps = 100;
+          const maxTimestamps = Math.min(
+            MAX_RENDER_TIMESTAMPS,
+            Math.max(400, Number(settings.hours || 0))
+          );
           const sampleRate = Math.max(1, Math.ceil(allTimestamps.length / maxTimestamps));
           const sampledTimestamps = allTimestamps.filter((_, i) => i % sampleRate === 0 || i === allTimestamps.length - 1);
           
@@ -466,7 +486,12 @@ export default function Simulator() {
       })
       .catch((error) => {
         console.error(error);
-        setLoadError(error?.response?.data?.message || error?.message || 'Failed to run simulation.');
+        setLoadError(
+          error?.response?.data?.error
+          || error?.response?.data?.message
+          || error?.message
+          || 'Failed to run simulation.'
+        );
       });
   };
 

@@ -125,8 +125,13 @@ export default function SimSettings({ sendData }) {
       <button
         className='simset_button w-32'
         onClick={() => {
-          if (!settings.zone?.ready) {
-            alert('Please pick a valid convenience zone first!');
+          if (!settings.zone) {
+            alert('Please pick a convenience zone first.');
+            return;
+          }
+
+          if (!settings.zone.ready) {
+            alert('This convenience zone is still generating. Try again in a moment.');
             return;
           }
 

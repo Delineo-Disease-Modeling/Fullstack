@@ -6,29 +6,38 @@ import { PrismaClient } from "@prisma/client";
 const reports_route = new Hono();
 const prisma = new PrismaClient();
 
+function safeParseJson<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 // Schema for creating a new report
 const createReportSchema = z.object({
   run_type: z.enum(["cz_generation", "simulation"]),
   name: z.string(),
   started_at: z.string().datetime(),
-  czone_id: z.number().optional(),
-  sim_id: z.number().optional(),
-  user_id: z.string().optional(),
-  parameters: z.record(z.any()).optional(),
+  czone_id: z.number().nullable().optional(),
+  sim_id: z.number().nullable().optional(),
+  user_id: z.string().nullable().optional(),
+  parameters: z.record(z.any()).nullable().optional(),
 });
 
 // Schema for updating a report
 const updateReportSchema = z.object({
-  status: z.enum(["running", "completed", "failed"]).optional(),
-  completed_at: z.string().datetime().optional(),
-  duration_ms: z.number().optional(),
-  summary: z.record(z.any()).optional(),
+  status: z.enum(["running", "completed", "failed"]).nullable().optional(),
+  completed_at: z.string().datetime().nullable().optional(),
+  duration_ms: z.number().nullable().optional(),
+  summary: z.record(z.any()).nullable().optional(),
   logs: z.array(z.object({
     timestamp: z.string(),
     level: z.enum(["info", "warn", "error", "debug"]),
     message: z.string(),
-  })).optional(),
-  error: z.string().optional(),
+  })).nullable().optional(),
+  error: z.string().nullable().optional(),
 });
 
 // Schema for appending logs
@@ -57,9 +66,9 @@ reports_route.get('/reports', async (c) => {
   return c.json({
     data: reports.map((r) => ({
       ...r,
-      parameters: r.parameters ? JSON.parse(r.parameters) : null,
-      summary: r.summary ? JSON.parse(r.summary) : null,
-      logs: r.logs ? JSON.parse(r.logs) : [],
+      parameters: safeParseJson<Record<string, unknown> | null>(r.parameters, null),
+      summary: safeParseJson<Record<string, unknown> | null>(r.summary, null),
+      logs: safeParseJson<Array<{ timestamp: string; level: string; message: string }>>(r.logs, []),
     })),
   });
 });
@@ -79,9 +88,9 @@ reports_route.get('/reports/:id', async (c) => {
   return c.json({
     data: {
       ...report,
-      parameters: report.parameters ? JSON.parse(report.parameters) : null,
-      summary: report.summary ? JSON.parse(report.summary) : null,
-      logs: report.logs ? JSON.parse(report.logs) : [],
+      parameters: safeParseJson<Record<string, unknown> | null>(report.parameters, null),
+      summary: safeParseJson<Record<string, unknown> | null>(report.summary, null),
+      logs: safeParseJson<Array<{ timestamp: string; level: string; message: string }>>(report.logs, []),
     },
   });
 });
@@ -123,7 +132,7 @@ reports_route.patch(
     // Handle logs - merge with existing
     let logsJson = existing.logs || '[]';
     if (data.logs) {
-      const existingLogs = JSON.parse(logsJson);
+      const existingLogs = safeParseJson<Array<{ timestamp: string; level: string; message: string }>>(logsJson, []);
       logsJson = JSON.stringify([...existingLogs, ...data.logs]);
     }
 
@@ -156,7 +165,7 @@ reports_route.post(
       return c.json({ message: 'Report not found' }, 404);
     }
 
-    const existingLogs = JSON.parse(existing.logs || '[]');
+    const existingLogs = safeParseJson<Array<{ timestamp: string; level: string; message: string }>>(existing.logs, []);
     const mergedLogs = [...existingLogs, ...newLogs];
 
     await prisma.runReport.update({

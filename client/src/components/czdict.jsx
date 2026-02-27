@@ -17,9 +17,11 @@ export default function CzDict({ zone, setZone }) {
 
   useEffect(() => {
     let cancelled = false;
+    let timerId = null;
 
-    fetch(`${DB_URL}convenience-zones`)
-      .then(async (res) => {
+    const refreshZones = async () => {
+      try {
+        const res = await fetch(`${DB_URL}convenience-zones`);
         const json = await res.json().catch(() => ({}));
         const zones = Array.isArray(json?.data) ? json.data : [];
 
@@ -30,28 +32,44 @@ export default function CzDict({ zone, setZone }) {
         if (!res.ok) {
           setLocations([]);
           setLoadError(`Failed to load zones (${res.status}).`);
+          timerId = window.setTimeout(refreshZones, 5000);
           return;
         }
 
         if (!zone && zones[0]) {
           setZone(zones[0]);
+        } else if (zone?.id) {
+          const updatedSelected = zones.find((z) => z.id === zone.id);
+          if (updatedSelected && updatedSelected.ready !== zone.ready) {
+            setZone(updatedSelected);
+          }
         }
+
         setLocations(zones);
         setLoadError('');
-      })
-      .catch((error) => {
+
+        const hasPendingGeneration = zones.some((z) => !z.ready);
+        timerId = window.setTimeout(refreshZones, hasPendingGeneration ? 4000 : 30000);
+      } catch (error) {
         if (cancelled) {
           return;
         }
         console.error(error);
         setLocations([]);
         setLoadError('Unable to reach the API. Check that the backend is running.');
-      });
+        timerId = window.setTimeout(refreshZones, 5000);
+      }
+    };
+
+    refreshZones();
 
     return () => {
       cancelled = true;
+      if (timerId) {
+        clearTimeout(timerId);
+      }
     };
-  }, [zone, setZone]);
+  }, [zone?.id, zone?.ready, setZone]);
 
   const visibleLocations = (Array.isArray(locations) ? locations : [])
     .filter((loc) => tab === 0 ? true : loc.user_id === user?.id);
@@ -121,17 +139,18 @@ export default function CzDict({ zone, setZone }) {
               key={loc.id}
               className='flex px-1 justify-between items-center hover:cursor-pointer hover:scale-[0.98] py-1 relative select-none'
               style={
-                !loc.ready
-                  ? { background: '#11111140', color: 'white', cursor: 'not-allowed' }
-                  : zone?.id === loc.id
-                    ? { background: '#70B4D4', color: 'white' }
+                zone?.id === loc.id
+                  ? (
+                    loc.ready
+                      ? { background: '#70B4D4', color: 'white' }
+                      : { background: '#11111175', color: 'white' }
+                  )
+                  : !loc.ready
+                    ? { background: '#11111140', color: 'white' }
                     : undefined
               }
               onClick={() => {
-                if (loc.ready) {
-                  setZone(loc);
-                }
-
+                setZone(loc);
                 setSettings({ sim_id: null });
               }}
               onMouseEnter={() => setHoveredLocId(loc.id)}

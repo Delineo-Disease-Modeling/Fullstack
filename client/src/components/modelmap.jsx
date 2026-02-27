@@ -32,6 +32,10 @@ const icon_lookup = {
   "Home": "🏠"
 }
 
+const MAX_PERSON_DOTS = 8000;
+const MAX_DOTS_PER_LOCATION = 300;
+const DOT_JITTER_DEGREES = 0.0035;
+
 var household_locs = {};
 var place_locs = {};
 
@@ -249,7 +253,88 @@ function makeGeoJSON(pois) {
   };
 }
 
-function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, heatmapMode }) {
+function hashString(input) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function hashUnit(seed, salt = 0) {
+  let x = (seed + salt * 374761393) >>> 0;
+  x ^= x >>> 16;
+  x = Math.imul(x, 2246822519);
+  x ^= x >>> 13;
+  x = Math.imul(x, 3266489917);
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967295;
+}
+
+function makePeopleDotGeoJSON(pois, mode) {
+  const countKey = mode === 'infection' ? 'infected' : 'population';
+  const totalPeople = pois.reduce((sum, poi) => {
+    const value = Number(poi?.[countKey] ?? 0);
+    return sum + (Number.isFinite(value) ? Math.max(0, value) : 0);
+  }, 0);
+  const peoplePerDot = Math.max(1, Math.ceil(totalPeople / MAX_PERSON_DOTS));
+
+  const features = [];
+  let reachedCap = false;
+
+  for (const poi of pois) {
+    const count = Math.max(0, Number(poi?.[countKey] ?? 0));
+    if (!count || !Number.isFinite(poi?.latitude) || !Number.isFinite(poi?.longitude)) {
+      continue;
+    }
+
+    const dotCount = Math.min(MAX_DOTS_PER_LOCATION, Math.ceil(count / peoplePerDot));
+    const baseSeed = hashString(`${poi.type}:${poi.id}`);
+
+    for (let i = 0; i < dotCount; i++) {
+      if (features.length >= MAX_PERSON_DOTS) {
+        reachedCap = true;
+        break;
+      }
+
+      const angle = hashUnit(baseSeed, i) * Math.PI * 2;
+      const radius = Math.sqrt(hashUnit(baseSeed, i + 100_000)) * DOT_JITTER_DEGREES;
+      const lat = poi.latitude + Math.sin(angle) * radius;
+      const lng = poi.longitude + Math.cos(angle) * radius;
+
+      features.push({
+        type: "Feature",
+        properties: {
+          id: `${poi.type}-${poi.id}-${i}`,
+          loc_id: poi.id,
+          loc_type: poi.type,
+          label: poi.label,
+        },
+        geometry: {
+          type: "Point",
+          coordinates: [lng, lat],
+        },
+      });
+    }
+
+    if (reachedCap) {
+      break;
+    }
+  }
+
+  return {
+    geojson: {
+      type: "FeatureCollection",
+      features,
+    },
+    peoplePerDot,
+    dotCount: features.length,
+    totalPeople,
+  };
+}
+
+function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, mapMode, peopleDotGeoJSON, peopleDotColor }) {
   const mapRef = useRef();
   const [mapInstance, setMapInstance] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
@@ -287,28 +372,20 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
     hasFitBounds.current = true;
   }, [mapInstance, pois]);
 
-  // Toggle layer visibility based on heatmapMode
+  // Toggle layer visibility based on map mode
   useEffect(() => {
     if (!mapInstance) return;
     const markerLayers = ['clusters', 'cluster-count', 'unclustered-point-circle', 'unclustered-point-emoji'];
-    const isMarkers = heatmapMode === 'markers';
+    const isMarkers = mapMode === 'markers';
     for (const id of markerLayers) {
       if (mapInstance.getLayer(id)) {
         mapInstance.setLayoutProperty(id, 'visibility', isMarkers ? 'visible' : 'none');
       }
     }
-    if (mapInstance.getLayer('heatmap-population')) {
-      mapInstance.setLayoutProperty('heatmap-population', 'visibility', heatmapMode === 'population' ? 'visible' : 'none');
+    if (mapInstance.getLayer('people-dots')) {
+      mapInstance.setLayoutProperty('people-dots', 'visibility', isMarkers ? 'none' : 'visible');
     }
-    if (mapInstance.getLayer('heatmap-infection')) {
-      mapInstance.setLayoutProperty('heatmap-infection', 'visibility', heatmapMode === 'infection' ? 'visible' : 'none');
-    }
-    // Show location dots on heatmap modes
-    const isHeatmap = heatmapMode === 'population' || heatmapMode === 'infection';
-    if (mapInstance.getLayer('heatmap-location-dots')) {
-      mapInstance.setLayoutProperty('heatmap-location-dots', 'visibility', isHeatmap ? 'visible' : 'none');
-    }
-  }, [heatmapMode, mapInstance]);
+  }, [mapMode, mapInstance]);
 
   const handleMapLoad = (event) => {
     const map = event.target;
@@ -346,11 +423,11 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
       const data = makeGeoJSON(pois);
       const source = mapInstance.getSource("points");
       if (source && source.setData) source.setData(data);
-      const heatmapSource = mapInstance.getSource("heatmap-points");
-      if (heatmapSource && heatmapSource.setData) heatmapSource.setData(data);
+      const peopleDotSource = mapInstance.getSource("people-dots");
+      if (peopleDotSource && peopleDotSource.setData) peopleDotSource.setData(peopleDotGeoJSON);
     });
     return () => cancelAnimationFrame(frame);
-  }, [pois, mapInstance]);
+  }, [pois, mapInstance, peopleDotGeoJSON]);
 
   useEffect(() => {
     setPopupInfo(null);
@@ -425,7 +502,6 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
           "clusters",
           "unclustered-point-circle",
           "unclustered-point-emoji",
-          "heatmap-location-dots",
         ]}
         onClick={handleClick}
       >
@@ -528,110 +604,30 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
             }}
           />
 
-          {/* 🔥 Population density heatmap */}
-          {/* (moved to separate unclustered source below) */}
-
-          {/* 🦠 Infection density heatmap */}
-          {/* (moved to separate unclustered source below) */}
         </Source>
 
-        {/* Separate unclustered source for heatmap layers */}
+        {/* Dot cloud representation for population/infections */}
         <Source
-          id="heatmap-points"
+          id="people-dots"
           type="geojson"
-          data={geojson}
+          data={peopleDotGeoJSON}
         >
           <Layer
-            id="heatmap-population"
-            type="heatmap"
-            layout={{ "visibility": heatmapMode === 'population' ? 'visible' : 'none' }}
-            paint={{
-              "heatmap-weight": [
-                "interpolate", ["linear"], ["get", "population"],
-                0, 0,
-                5, 0.3,
-                20, 0.7,
-                50, 1
-              ],
-              "heatmap-intensity": [
-                "interpolate", ["linear"], ["zoom"],
-                10, 0.5,
-                15, 1.5
-              ],
-              "heatmap-radius": [
-                "interpolate", ["linear"], ["zoom"],
-                10, 30,
-                13, 50,
-                16, 80
-              ],
-              "heatmap-color": [
-                "interpolate", ["linear"], ["heatmap-density"],
-                0, "rgba(0,0,0,0)",
-                0.1, "rgba(65,105,225,0.3)",
-                0.3, "rgba(0,191,255,0.5)",
-                0.5, "rgba(0,255,127,0.6)",
-                0.7, "rgba(255,255,0,0.7)",
-                0.9, "rgba(255,165,0,0.85)",
-                1.0, "rgba(255,0,0,0.9)"
-              ],
-              "heatmap-opacity": 0.85
-            }}
-          />
-          <Layer
-            id="heatmap-infection"
-            type="heatmap"
-            layout={{ "visibility": heatmapMode === 'infection' ? 'visible' : 'none' }}
-            paint={{
-              "heatmap-weight": [
-                "interpolate", ["linear"], ["get", "infected"],
-                0, 0,
-                1, 0.3,
-                5, 0.6,
-                15, 1
-              ],
-              "heatmap-intensity": [
-                "interpolate", ["linear"], ["zoom"],
-                10, 0.6,
-                15, 2
-              ],
-              "heatmap-radius": [
-                "interpolate", ["linear"], ["zoom"],
-                10, 30,
-                13, 50,
-                16, 80
-              ],
-              "heatmap-color": [
-                "interpolate", ["linear"], ["heatmap-density"],
-                0, "rgba(0,0,0,0)",
-                0.1, "rgba(255,255,200,0.3)",
-                0.3, "rgba(255,200,50,0.5)",
-                0.5, "rgba(255,130,0,0.65)",
-                0.7, "rgba(220,50,0,0.8)",
-                0.9, "rgba(170,0,0,0.9)",
-                1.0, "rgba(100,0,0,0.95)"
-              ],
-              "heatmap-opacity": 0.85
-            }}
-          />
-
-          {/* 📍 Location dots overlay for heatmap modes */}
-          <Layer
-            id="heatmap-location-dots"
+            id="people-dots"
             type="circle"
-            minzoom={14}
-            layout={{ "visibility": (heatmapMode === 'population' || heatmapMode === 'infection') ? 'visible' : 'none' }}
+            layout={{ "visibility": mapMode === 'markers' ? 'none' : 'visible' }}
             paint={{
               "circle-radius": [
                 "interpolate", ["linear"], ["zoom"],
-                10, 4,
-                14, 8,
-                18, 12
+                9, 1.2,
+                13, 2.2,
+                16, 3.4
               ],
-              "circle-color": "#ffffff",
-              "circle-opacity": 0.9,
-              "circle-stroke-color": "#333333",
-              "circle-stroke-width": 1.5,
-              "circle-stroke-opacity": 0.8
+              "circle-color": peopleDotColor,
+              "circle-opacity": 0.45,
+              "circle-stroke-width": 0.35,
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-opacity": 0.65
             }}
           />
         </Source>
@@ -655,7 +651,7 @@ function ClusteredMap({ currentTime, mapCenter, pois, hotspots, onMarkerClick, h
         )}
       </Map>
 
-      {mapInstance && heatmapMode === 'markers' && <EmojiOverlay map={mapInstance} hotspots={hotspots} />}
+      {mapInstance && mapMode === 'markers' && <EmojiOverlay map={mapInstance} hotspots={hotspots} />}
     </div>
   );
 }
@@ -670,7 +666,7 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
 
   const [currentTime, setCurrentTime] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [heatmapMode, setHeatmapMode] = useState('markers'); // 'markers' | 'population' | 'infection'
+  const [mapMode, setMapMode] = useState('markers'); // 'markers' | 'population' | 'infection'
 
   // Clear cached home/place positions when papdata changes (new CZ or new sim)
   useEffect(() => {
@@ -684,27 +680,30 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
     return Object.keys(sim_data).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
   }, [sim_data]);
 
-  // Find the nearest available timestep for a given target time (memoized)
-  const findNearestTimestep = useCallback((targetMinutes) => {
+  // Find latest available timestep at or before the requested time.
+  const findTimestepAtOrBefore = useCallback((targetMinutes) => {
     if (availableTimesteps.length === 0) return null;
-    // Binary search for closest
-    let closest = availableTimesteps[0];
+    let selected = availableTimesteps[0];
     for (const ts of availableTimesteps) {
-      if (Math.abs(ts - targetMinutes) < Math.abs(closest - targetMinutes)) {
-        closest = ts;
+      if (ts > targetMinutes) {
+        break;
       }
-      if (ts > targetMinutes) break;
+      selected = ts;
     }
-    return closest;
+    return selected;
   }, [availableTimesteps]);
 
   const mapCenter = useMemo(() => [selectedZone.latitude, selectedZone.longitude], [selectedZone]);
   const pois = useMemo(() => {
     const targetMinutes = currentTime * 60;
-    const nearestTs = findNearestTimestep(targetMinutes);
-    const dataForTime = nearestTs !== null ? sim_data[nearestTs.toString()] : null;
+    const timestep = findTimestepAtOrBefore(targetMinutes);
+    const dataForTime = timestep !== null ? sim_data[timestep.toString()] : null;
     return updateIcons(mapCenter, dataForTime, pap_data, hotspots);
-  }, [currentTime, hotspots, mapCenter, pap_data, sim_data, findNearestTimestep]);
+  }, [currentTime, hotspots, mapCenter, pap_data, sim_data, findTimestepAtOrBefore]);
+
+  const peopleDotMode = mapMode === 'infection' ? 'infection' : 'population';
+  const peopleDotData = useMemo(() => makePeopleDotGeoJSON(pois, peopleDotMode), [pois, peopleDotMode]);
+  const peopleDotColor = mapMode === 'infection' ? '#dc2626' : '#2563eb';
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -712,22 +711,21 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
         return;
       }
 
-      if (availableTimesteps.length === 0) {
+      if (maxHours <= 0) {
         return;
       }
 
-      setCurrentTime(prev => {
-        const currentMinutes = Math.round(prev * 60);
-        const nextIndex = availableTimesteps.findIndex(ts => ts > currentMinutes);
-        if (nextIndex === -1) {
-          return prev;
-        }
-        return availableTimesteps[nextIndex] / 60;
-      });
+      setCurrentTime((prev) => Math.min(maxHours, prev + 1));
     }, 750);
 
     return () => clearInterval(interval);
-  }, [isPlaying, availableTimesteps]);
+  }, [isPlaying, maxHours]);
+
+  useEffect(() => {
+    if (isPlaying && currentTime >= maxHours) {
+      setIsPlaying(false);
+    }
+  }, [currentTime, isPlaying, maxHours]);
 
   useEffect(() => {
     const new_hotspots = {};
@@ -755,39 +753,49 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
 
     const simDataKeys = Object.keys(sim_data).map(Number).filter(n => !isNaN(n));
     const maxTime = simDataKeys.length > 0 ? Math.max(...simDataKeys) : 60;
-    setMaxHours(maxTime / 60 || 1);
+    setMaxHours(Math.max(1, Math.ceil(maxTime / 60)));
     setHotspots(new_hotspots);
   }, [sim_data, pap_data, mapCenter]);
+
+  useEffect(() => {
+    setCurrentTime((prev) => Math.min(prev, maxHours));
+  }, [maxHours]);
 
   return (
     <div>
       <MapLegend icon_lookup={icon_lookup} />
 
       {/* Map Container */}
-      {/* Heatmap mode toggle */}
+      {/* Map mode toggle */}
       <div className="heatmap-toggle">
         <button
-          className={`heatmap-toggle-btn ${heatmapMode === 'markers' ? 'active' : ''}`}
-          onClick={() => setHeatmapMode('markers')}
+          className={`heatmap-toggle-btn ${mapMode === 'markers' ? 'active' : ''}`}
+          onClick={() => setMapMode('markers')}
           title="Show location markers"
         >
           📍 Markers
         </button>
         <button
-          className={`heatmap-toggle-btn ${heatmapMode === 'population' ? 'active' : ''}`}
-          onClick={() => setHeatmapMode('population')}
-          title="Show population density heatmap"
+          className={`heatmap-toggle-btn ${mapMode === 'population' ? 'active' : ''}`}
+          onClick={() => setMapMode('population')}
+          title="Show population dots"
         >
-          👥 Population
+          👥 Population Dots
         </button>
         <button
-          className={`heatmap-toggle-btn ${heatmapMode === 'infection' ? 'active' : ''}`}
-          onClick={() => setHeatmapMode('infection')}
-          title="Show infection density heatmap"
+          className={`heatmap-toggle-btn ${mapMode === 'infection' ? 'active' : ''}`}
+          onClick={() => setMapMode('infection')}
+          title="Show infection dots"
         >
-          🦠 Infections
+          🦠 Infection Dots
         </button>
       </div>
+      {mapMode !== 'markers' && (
+        <div className='text-center text-xs text-gray-600 mb-2'>
+          1 dot represents {peopleDotData.peoplePerDot.toLocaleString()} {peopleDotData.peoplePerDot === 1 ? 'person' : 'people'}.
+          {' '}Dots are anchored to locations; movement is shown by changing dot counts over time.
+        </div>
+      )}
 
       <ClusteredMap
         currentTime={currentTime}
@@ -795,7 +803,9 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
         pois={pois}
         hotspots={hotspots}
         onMarkerClick={onMarkerClick}
-        heatmapMode={heatmapMode}
+        mapMode={mapMode}
+        peopleDotGeoJSON={peopleDotData.geojson}
+        peopleDotColor={peopleDotColor}
       />
 
       <div className='mt-3 text-center w-full'>
@@ -824,8 +834,12 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
           type="range"
           min={1}
           max={maxHours}
+          step={1}
           value={currentTime}
-          onChange={(e) => setCurrentTime(parseInt(e.target.value))}
+          onChange={(e) => {
+            const next = Math.round(Number(e.target.value) || 1);
+            setCurrentTime(Math.min(maxHours, Math.max(1, next)));
+          }}
         />
       </div>
 
@@ -836,8 +850,12 @@ export default function ModelMap({ onMarkerClick, selectedZone }) {
           type="number"
           min={1}
           max={maxHours}
+          step={1}
           value={currentTime}
-          onChange={(e) => setCurrentTime(parseInt(e.target.value))}
+          onChange={(e) => {
+            const next = Math.round(Number(e.target.value) || 1);
+            setCurrentTime(Math.min(maxHours, Math.max(1, next)));
+          }}
         />
       </div>
     </div>
