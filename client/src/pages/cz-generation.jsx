@@ -13,6 +13,7 @@ import './cz-generation.css';
 
 const CLUSTER_ALGORITHM_OPTIONS = [
   { value: 'czi_balanced', label: 'Balanced CZI (Recommended)' },
+  { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' },
   { value: 'czi_optimal_cap', label: 'CZI Optimal (MILP, Beta)' },
   { value: 'greedy_fast', label: 'Greedy Fast (Legacy)' },
   { value: 'greedy_weight', label: 'Greedy Weight (Legacy)' },
@@ -38,6 +39,33 @@ function normalizeCbgId(cbgId) {
 
 function getFeatureCbgId(feature) {
   return normalizeCbgId(feature?.properties?.GEOID || feature?.properties?.CensusBlockGroup);
+}
+
+function getFeatureCenterFromGeoJson(geoJson, cbgId) {
+  if (!geoJson || !Array.isArray(geoJson.features)) {
+    return null;
+  }
+
+  const normalized = normalizeCbgId(cbgId);
+  if (!normalized) {
+    return null;
+  }
+
+  const feature = geoJson.features.find((item) => getFeatureCbgId(item) === normalized);
+  if (!feature) {
+    return null;
+  }
+
+  try {
+    const bounds = L.geoJSON(feature).getBounds();
+    if (bounds?.isValid?.()) {
+      return bounds.getCenter();
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function mergeGeoJsonFeatures(baseGeoJson, extraGeoJson) {
@@ -101,8 +129,19 @@ function interpolateHexColor(startHex, endHex, t) {
   });
 }
 
-function InteractiveMap({ onLocationSelect, disabled }) {
+function InteractiveMap({
+  onLocationSelect,
+  disabled,
+  seedGeoJSON = null,
+  seedCbgId = '',
+  seedGuardRadiusKm = 0,
+  showSeedGuardCircle = false
+}) {
   const [ markerPosition, setMarkerPosition ] = useState(null);
+  const seedCircleCenter = useMemo(
+    () => getFeatureCenterFromGeoJson(seedGeoJSON, seedCbgId),
+    [seedGeoJSON, seedCbgId]
+  );
 
   function LocationMarker() {
     useMapEvents({
@@ -126,6 +165,81 @@ function InteractiveMap({ onLocationSelect, disabled }) {
     );
   }
 
+  function SeedPreviewLayer() {
+    const map = useMap();
+    const geoJsonLayerRef = useRef(null);
+    const circleLayerRef = useRef(null);
+
+    useEffect(() => {
+      if (geoJsonLayerRef.current) {
+        map.removeLayer(geoJsonLayerRef.current);
+        geoJsonLayerRef.current = null;
+      }
+      if (circleLayerRef.current) {
+        map.removeLayer(circleLayerRef.current);
+        circleLayerRef.current = null;
+      }
+
+      if (seedGeoJSON?.features?.length) {
+        const seedLayer = L.geoJSON(seedGeoJSON, {
+          style: {
+            fillColor: '#93c5fd',
+            weight: 2,
+            opacity: 1,
+            color: '#2563eb',
+            fillOpacity: 0.22,
+          }
+        });
+        seedLayer.addTo(map);
+        geoJsonLayerRef.current = seedLayer;
+
+        const bounds = seedLayer.getBounds();
+        if (bounds?.isValid?.()) {
+          map.invalidateSize();
+          map.fitBounds(bounds, { padding: [24, 24], maxZoom: 13 });
+        }
+      }
+
+      const radiusKm = Number(seedGuardRadiusKm);
+      const radiusMeters = radiusKm * 1000;
+      if (
+        showSeedGuardCircle &&
+        seedCircleCenter &&
+        Number.isFinite(radiusMeters) &&
+        radiusMeters >= 0
+      ) {
+        const circle = L.circle(seedCircleCenter, {
+          radius: radiusMeters,
+          color: '#2563eb',
+          weight: 2.5,
+          opacity: 0.95,
+          fillColor: '#60a5fa',
+          fillOpacity: 0.06,
+          dashArray: '10 8',
+          interactive: false,
+        });
+        circle.addTo(map);
+        if (circle.bringToBack) {
+          circle.bringToBack();
+        }
+        circleLayerRef.current = circle;
+      }
+
+      return () => {
+        if (geoJsonLayerRef.current) {
+          map.removeLayer(geoJsonLayerRef.current);
+          geoJsonLayerRef.current = null;
+        }
+        if (circleLayerRef.current) {
+          map.removeLayer(circleLayerRef.current);
+          circleLayerRef.current = null;
+        }
+      };
+    }, [map, seedGeoJSON, seedCircleCenter, seedGuardRadiusKm, showSeedGuardCircle]);
+
+    return null;
+  }
+
   return (
     <MapContainer
       center={[39.3290708, -76.6219753]}
@@ -138,6 +252,7 @@ function InteractiveMap({ onLocationSelect, disabled }) {
       />
 
       <LocationMarker />
+      <SeedPreviewLayer />
     </MapContainer>
   );
 }
@@ -150,6 +265,9 @@ function CBGMap({
   onMapBackgroundClick,
   onTraceCbgInspect,
   selectedCBGs,
+  seedCbgId,
+  seedGuardRadiusKm,
+  showSeedGuardCircle = false,
   traceLayer,
   editingEnabled = true,
   focusedCbgId,
@@ -174,6 +292,35 @@ function CBGMap({
   useEffect(() => {
     focusedRef.current = normalizeCbgId(focusedCbgId);
   }, [focusedCbgId]);
+
+  const seedCircleCenter = useMemo(() => {
+    if (!showSeedGuardCircle || !seedCbgId || !Array.isArray(cbgData?.features)) {
+      return null;
+    }
+
+    const normalizedSeed = normalizeCbgId(seedCbgId);
+    if (!normalizedSeed) {
+      return null;
+    }
+
+    const feature = cbgData.features.find(
+      (item) => getFeatureCbgId(item) === normalizedSeed
+    );
+    if (!feature) {
+      return null;
+    }
+
+    try {
+      const bounds = L.geoJSON(feature).getBounds();
+      if (bounds?.isValid?.()) {
+        return bounds.getCenter();
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }, [cbgData, seedCbgId, showSeedGuardCircle]);
 
   const focusCbgOnMap = (map, cbgId) => {
     const normalized = normalizeCbgId(cbgId);
@@ -373,6 +520,53 @@ function CBGMap({
     return null;
   }
 
+  function SeedGuardCircleLayer() {
+    const map = useMap();
+    const circleRef = useRef(null);
+
+    useEffect(() => {
+      if (circleRef.current) {
+        map.removeLayer(circleRef.current);
+        circleRef.current = null;
+      }
+
+      if (!showSeedGuardCircle || !seedCircleCenter) {
+        return;
+      }
+
+      const radiusKm = Number(seedGuardRadiusKm);
+      const radiusMeters = radiusKm * 1000;
+      if (!Number.isFinite(radiusMeters) || radiusMeters < 0) {
+        return;
+      }
+
+      const circle = L.circle(seedCircleCenter, {
+        radius: radiusMeters,
+        color: '#2563eb',
+        weight: 2.5,
+        opacity: 0.95,
+        fillColor: '#60a5fa',
+        fillOpacity: 0.06,
+        dashArray: '10 8',
+        interactive: false,
+      });
+      circle.addTo(map);
+      if (circle.bringToBack) {
+        circle.bringToBack();
+      }
+      circleRef.current = circle;
+
+      return () => {
+        if (circleRef.current) {
+          map.removeLayer(circleRef.current);
+          circleRef.current = null;
+        }
+      };
+    }, [map, seedCircleCenter, seedGuardRadiusKm]);
+
+    return null;
+  }
+
   function BackgroundClickLayer() {
     useMapEvents({
       click(e) {
@@ -400,6 +594,7 @@ function CBGMap({
       />
       <BackgroundClickLayer />
       <FocusController />
+      <SeedGuardCircleLayer />
       <GeoJSONLayer />
     </MapContainer>
   );
@@ -482,6 +677,12 @@ export default function CZGeneration() {
   const [ useDistancePenalty, setUseDistancePenalty ] = useState(true);
   const [ distancePenaltyWeight, setDistancePenaltyWeight ] = useState(0.02);
   const [ distanceScaleKm, setDistanceScaleKm ] = useState(20);
+  const [ seedGuardDistanceKm, setSeedGuardDistanceKm ] = useState(20);
+  const [ setupSeedCbg, setSetupSeedCbg ] = useState('');
+  const [ setupSeedGeoJSON, setSetupSeedGeoJSON ] = useState(null);
+  const [ setupResolvedCityName, setSetupResolvedCityName ] = useState('');
+  const [ resolvingSeed, setResolvingSeed ] = useState(false);
+  const [ seedResolveError, setSeedResolveError ] = useState('');
   const [ optimalClusteringParams, setOptimalClusteringParams ] = useState(null);
   const [ startDate, setStartDate ] = useState('2019-01-01');  // Default to 2019 (pattern files are from 2019)
   const [ endDate, setEndDate ] = useState('2019-01-15');      // Default 2 weeks
@@ -514,13 +715,16 @@ export default function CZGeneration() {
   const [ zoneMetrics, setZoneMetrics ] = useState(null);
   const [ zoneMetricsLoading, setZoneMetricsLoading ] = useState(false);
   const [ zoneMetricsError, setZoneMetricsError ] = useState('');
+  const [ savingHtmlMap, setSavingHtmlMap ] = useState(false);
   const attemptedTraceGeoJsonFetchRef = useRef(new Set());
   const editViewportHeightClass = 'h-[calc(100vh-13rem)] min-h-[34rem] max-h-[48rem]';
-  const setupViewportHeightClass = 'h-[calc(100vh-18rem)] min-h-[30rem] max-h-[44rem]';
+  const setupViewportHeightClass = 'h-[calc(100vh-10rem)] min-h-[36rem] lg:h-[calc(100vh-6rem)] lg:min-h-[42rem]';
+  const setupSidebarHeightClass = 'lg:h-[calc(100vh-6rem)] lg:overflow-y-auto';
 
   // Derived state
   const hasGenerated = phase === 'edit';
   const isFinalizing = phase === 'finalizing';
+  const isTestLocationInput = String(location ?? '').trim().toUpperCase() === 'TEST';
 
   if (!user) {
     navigate('/simulator');
@@ -654,6 +858,17 @@ export default function CZGeneration() {
   }, [manualEditPanelsActive, selectedCBGs, manualFrontierCandidates, selectedTraceCandidateCbg]);
   const activeMapTraceLayer = manualEditPanelsActive ? manualHeatmapLayer : traceLayer;
   const showTraceControls = Boolean(growthTrace) && !zoneEditMode;
+  const seedGuardNeedsResolvedSeed = clusterAlgorithm === 'greedy_weight_seed_guard' && !isTestLocationInput;
+
+  useEffect(() => {
+    if (phase !== 'input') {
+      return;
+    }
+    setSetupSeedCbg('');
+    setSetupSeedGeoJSON(null);
+    setSetupResolvedCityName('');
+    setSeedResolveError('');
+  }, [location, phase]);
 
   useEffect(() => {
     if (traceStepIndex > maxTraceStep) {
@@ -895,6 +1110,11 @@ export default function CZGeneration() {
       if (Number.isFinite(scale)) {
         req.distance_scale_km = scale;
       }
+    } else if (clusterAlgorithm === 'greedy_weight_seed_guard') {
+      const threshold = Number(seedGuardDistanceKm);
+      if (Number.isFinite(threshold)) {
+        req.seed_guard_distance_km = threshold;
+      }
     }
 
     axios.post(`${ALG_URL}frontier-candidates`, req).then((resp) => {
@@ -937,7 +1157,8 @@ export default function CZGeneration() {
     useTestData,
     distancePenaltyWeight,
     distanceScaleKm,
-    useDistancePenalty
+    useDistancePenalty,
+    seedGuardDistanceKm
   ]);
 
   useEffect(() => {
@@ -974,6 +1195,59 @@ export default function CZGeneration() {
     };
   }, [manualEditPanelsActive, seedCBG, selectedCBGs, startDate, useTestData]);
 
+  const saveCZHtmlMap = async () => {
+    if (!selectedCBGs.length) {
+      alert('Please select at least one CBG');
+      return;
+    }
+
+    setSavingHtmlMap(true);
+    try {
+      const suggestedName = String(cityName || location || 'cz-map').trim() || 'cz-map';
+      const resp = await axios.post(`${ALG_URL}export-cz-map-html`, {
+        cbg_list: selectedCBGs,
+        name: suggestedName,
+      }, {
+        responseType: 'blob',
+      });
+
+      let filename = `${suggestedName.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'cz-map'}.html`;
+      const disposition = String(resp?.headers?.['content-disposition'] || '');
+      const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+      const encodedName = filenameMatch?.[1] || filenameMatch?.[2];
+      if (encodedName) {
+        filename = decodeURIComponent(encodedName);
+      }
+
+      const blob = new Blob([resp.data], { type: 'text/html;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let message = 'Failed to save CZ map as HTML.';
+      const responseData = err?.response?.data;
+      if (responseData instanceof Blob) {
+        try {
+          const text = await responseData.text();
+          const parsed = JSON.parse(text);
+          message = parsed?.message || message;
+        } catch {
+          // Keep default message when blob is not parseable JSON.
+        }
+      } else {
+        message = err?.response?.data?.message || message;
+      }
+      alert(message);
+    } finally {
+      setSavingHtmlMap(false);
+    }
+  };
+
   // Finalize CZ - create DB record and generate patterns with the final CBG list
   const finalizeCZ = async () => {
     if (selectedCBGs.length === 0) {
@@ -1008,6 +1282,10 @@ export default function CZGeneration() {
           `Use distance penalty: ${useDistancePenalty ? 'Yes' : 'No'}`,
           `Distance penalty weight: ${distancePenaltyWeight}`,
           `Distance scale (km): ${distanceScaleKm}`
+        );
+      } else if (clusterAlgorithm === 'greedy_weight_seed_guard') {
+        generatedDescription.push(
+          `Seed guard distance (km): ${seedGuardDistanceKm}`
         );
       }
 
@@ -1200,6 +1478,96 @@ export default function CZGeneration() {
     return cbgs.find((cbg) => typeof cbg === 'string' && cbg.startsWith(bestCounty)) ?? cbgs[0];
   };
 
+  const resolveSeedFromLocationInput = async (rawLocationInput) => {
+    const trimmedLocation = String(rawLocationInput ?? '').trim();
+    const isTestMode = trimmedLocation.toUpperCase() === 'TEST';
+    const zipMatch = trimmedLocation.match(/^\d{5}(?:-\d{4})?$/);
+    const userZip = zipMatch ? trimmedLocation.slice(0, 5) : null;
+
+    let coreCbg = null;
+    let resolvedCityName = isTestMode ? 'TEST' : trimmedLocation;
+
+    if (isTestMode) {
+      return {
+        coreCbg: null,
+        cityName: resolvedCityName,
+        isTestMode: true,
+      };
+    }
+
+    if (userZip) {
+      coreCbg = zip_to_cbg(userZip);
+      if (coreCbg) {
+        resolvedCityName = trimmedLocation;
+      }
+    } else {
+      const locationLookup = await loc_lookup(trimmedLocation);
+      if (locationLookup?.zip_code) {
+        coreCbg = zip_to_cbg(locationLookup.zip_code);
+        resolvedCityName = locationLookup.city ?? trimmedLocation;
+      }
+    }
+
+    return {
+      coreCbg,
+      cityName: resolvedCityName,
+      isTestMode: false,
+    };
+  };
+
+  const fetchSeedGeoJSON = async (cbgId) => {
+    const resp = await axios.get(`${ALG_URL}cbg-geojson`, {
+      params: {
+        cbgs: cbgId,
+        include_neighbors: 'false'
+      }
+    });
+    return resp?.data || null;
+  };
+
+  const resolveSeedPreview = async () => {
+    const rawLocationInput = String(location ?? '').trim();
+    if (!rawLocationInput) {
+      setSeedResolveError('Enter a location or ZIP first.');
+      return;
+    }
+
+    if (rawLocationInput.toUpperCase() === 'TEST') {
+      setSeedResolveError('Seed preview is unavailable in TEST mode.');
+      return;
+    }
+
+    setResolvingSeed(true);
+    setSeedResolveError('');
+
+    try {
+      const { coreCbg, cityName } = await resolveSeedFromLocationInput(rawLocationInput);
+      if (!coreCbg) {
+        throw new Error('Could not resolve a seed CBG. Try a 5-digit ZIP code such as 21201.');
+      }
+
+      const seedGeoJson = await fetchSeedGeoJSON(coreCbg);
+      if (!seedGeoJson?.features?.length) {
+        throw new Error('Resolved the seed CBG, but could not load its map boundary.');
+      }
+
+      setSetupSeedCbg(coreCbg);
+      setSetupSeedGeoJSON(seedGeoJson);
+      setSetupResolvedCityName(cityName);
+    } catch (err) {
+      setSetupSeedCbg('');
+      setSetupSeedGeoJSON(null);
+      setSetupResolvedCityName('');
+      setSeedResolveError(
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to resolve the seed CBG.'
+      );
+    } finally {
+      setResolvingSeed(false);
+    }
+  };
+
   const generateCZ = (formdata) => {
     const func_body = async (formdata) => {
       console.log(formdata);
@@ -1207,32 +1575,20 @@ export default function CZGeneration() {
       const rawLocationInput = String(formdata.get('location') ?? '').trim();
       const isTestMode = rawLocationInput.toUpperCase() === 'TEST';
       setUseTestData(isTestMode);
-      const zipMatch = rawLocationInput.match(/^\d{5}(?:-\d{4})?$/);
-      const userZip = zipMatch ? rawLocationInput.slice(0, 5) : null;
+      let core_cbg = setupSeedCbg || null;
+      let cityName = setupResolvedCityName || (isTestMode ? 'TEST' : rawLocationInput);
 
-      // If user entered a valid ZIP, try to use it directly first
-      let core_cbg = null;
-      let location = null;
-      let cityName = isTestMode ? 'TEST' : rawLocationInput;
-
-      if (isTestMode) {
-        // Backend will pick a seed CBG from data/TEST/test.csv if cbg is not supplied.
-      } else if (userZip) {
-        // User entered a ZIP code - try local lookup first (no Google API needed)
-        core_cbg = zip_to_cbg(userZip);
-        // Avoid external ZIP lookup noise/failures; ZIP-only input is sufficient for clustering.
-        if (core_cbg) {
-          cityName = rawLocationInput;
-        }
-      } else {
-        // User entered a city/address - need Google API to resolve ZIP
-        location = await loc_lookup(rawLocationInput);
-        if (location?.['zip_code']) {
-          core_cbg = zip_to_cbg(location['zip_code']);
-          cityName = location['city'] ?? rawLocationInput;
-        }
+      if (seedGuardNeedsResolvedSeed && !core_cbg) {
+        alert('Resolve the seed first so you can verify the seed guard radius before previewing.');
+        return;
       }
-  
+
+      if (!isTestMode && !core_cbg) {
+        const resolved = await resolveSeedFromLocationInput(rawLocationInput);
+        core_cbg = resolved.coreCbg;
+        cityName = resolved.cityName;
+      }
+
       if (!isTestMode && !core_cbg) {
         console.error('Could not find location. Try entering a 5-digit ZIP code.');
         alert('Could not find location. Please try entering a 5-digit ZIP code (e.g., 21201 for Baltimore).');
@@ -1256,6 +1612,11 @@ export default function CZGeneration() {
         }
         if (Number.isFinite(scale)) {
           clusterReq.distance_scale_km = scale;
+        }
+      } else if (clusterAlgorithm === 'greedy_weight_seed_guard') {
+        const threshold = Number(seedGuardDistanceKm);
+        if (Number.isFinite(threshold)) {
+          clusterReq.seed_guard_distance_km = threshold;
         }
       } else if (clusterAlgorithm === 'czi_optimal_cap') {
         // Keep defaults explicit for repeatability.
@@ -1296,6 +1657,13 @@ export default function CZGeneration() {
         }
         if (rawScale !== null && rawScale !== undefined && Number.isFinite(nextScale)) {
           setDistanceScaleKm(nextScale);
+        }
+        setOptimalClusteringParams(null);
+      } else if (data.clustering_params && data.algorithm === 'greedy_weight_seed_guard') {
+        const rawThreshold = data.clustering_params.seed_guard_distance_km;
+        const nextThreshold = Number(rawThreshold);
+        if (rawThreshold !== null && rawThreshold !== undefined && Number.isFinite(nextThreshold)) {
+          setSeedGuardDistanceKm(nextThreshold);
         }
         setOptimalClusteringParams(null);
       } else if (data.clustering_params && data.algorithm === 'czi_optimal_cap') {
@@ -1349,6 +1717,9 @@ export default function CZGeneration() {
                     onMapBackgroundClick={handleMapBackgroundClick}
                     onTraceCbgInspect={manualEditPanelsActive ? null : handleTraceCbgInspect}
                     selectedCBGs={selectedCBGs}
+                    seedCbgId={seedCBG}
+                    seedGuardRadiusKm={seedGuardDistanceKm}
+                    showSeedGuardCircle={clusterAlgorithm === 'greedy_weight_seed_guard'}
                     traceLayer={activeMapTraceLayer}
                     editingEnabled={manualEditPanelsActive || !activeMapTraceLayer}
                     focusedCbgId={resolvedFocusedTraceCbg || focusedTraceCbg}
@@ -1430,7 +1801,16 @@ export default function CZGeneration() {
                         <div><span className='font-semibold'>Rank:</span> #{selectedAnalysisCandidate.rank ?? '?'}</div>
                         <div><span className='font-semibold'>Score:</span> {Number(selectedAnalysisCandidate.score ?? 0).toFixed(4)}</div>
                         <div><span className='font-semibold'>To Cluster:</span> {Number(selectedAnalysisCandidate.movement_to_cluster ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</div>
+                        {selectedAnalysisCandidate.movement_to_full_cluster !== undefined && (
+                          <div><span className='font-semibold'>To Full Cluster:</span> {Number(selectedAnalysisCandidate.movement_to_full_cluster ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</div>
+                        )}
                         <div><span className='font-semibold'>To Outside:</span> {Number(selectedAnalysisCandidate.movement_to_outside ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</div>
+                        {selectedAnalysisCandidate.seed_distance_km !== undefined && selectedAnalysisCandidate.seed_distance_km !== null && (
+                          <div><span className='font-semibold'>Seed Distance:</span> {Number(selectedAnalysisCandidate.seed_distance_km ?? 0).toFixed(2)} km</div>
+                        )}
+                        {selectedAnalysisCandidate.movement_contributes_after_selection !== undefined && (
+                          <div><span className='font-semibold'>Contributes After Add:</span> {selectedAnalysisCandidate.movement_contributes_after_selection ? 'Yes' : 'No'}</div>
+                        )}
                         {selectedAnalysisCandidate.czi_after !== undefined && (
                           <div><span className='font-semibold'>CZI After Add:</span> {Number(selectedAnalysisCandidate.czi_after ?? 0).toFixed(4)}</div>
                         )}
@@ -1539,6 +1919,26 @@ export default function CZGeneration() {
                   </>
                 )}
               </div>
+              {clusterAlgorithm === 'greedy_weight_seed_guard' && manualEditPanelsActive && (
+                <div className='min-w-[15rem] max-w-[18rem] flex flex-col gap-1'>
+                  <label htmlFor='seed_guard_distance_live' className='text-sm font-semibold'>
+                    Seed Guard Radius (km)
+                  </label>
+                  <input
+                    id='seed_guard_distance_live'
+                    className='formfield'
+                    type='number'
+                    min={0}
+                    max={500}
+                    value={seedGuardDistanceKm}
+                    onChange={(e) => setSeedGuardDistanceKm(e.target.value)}
+                    disabled={loading || isFinalizing}
+                  />
+                  <div className='text-xs text-gray-600'>
+                    Blue ring shows the seed guard radius and updates live as you change it.
+                  </div>
+                </div>
+              )}
               <div className='flex items-center gap-2'>
                 {growthTrace && !zoneEditMode && (
                   <button
@@ -1568,8 +1968,16 @@ export default function CZGeneration() {
                 )}
                 <button
                   type='button'
+                  onClick={saveCZHtmlMap}
+                  disabled={loading || isFinalizing || savingHtmlMap}
+                  className='px-4 py-2 rounded-lg border border-[#70B4D4] bg-white text-[#1f2937] font-semibold disabled:opacity-40'
+                >
+                  {savingHtmlMap ? 'Saving HTML Map...' : 'Save HTML Map'}
+                </button>
+                <button
+                  type='button'
                   onClick={finalizeCZ}
-                  disabled={loading || isFinalizing}
+                  disabled={loading || isFinalizing || savingHtmlMap}
                   className='px-4 py-2 rounded-lg border border-[#70B4D4] bg-[#e0f2fe] text-[#1f2937] font-semibold disabled:opacity-40'
                 >
                   {isFinalizing ? 'Generating Patterns...' : 'Finalize & Generate'}
@@ -1578,156 +1986,223 @@ export default function CZGeneration() {
             </div>
           </div>
         ) : (
-          <div className='w-full flex flex-col gap-4'>
-            <div className={`${setupViewportHeightClass} w-full`}>
+          <div className='w-full flex flex-col gap-4 lg:flex-row lg:items-stretch'>
+            <div className={`${setupViewportHeightClass} w-full lg:min-w-0 lg:flex-1`}>
               <InteractiveMap
                 onLocationSelect={setLocation}
-                disabled={loading}
+                disabled={loading || resolvingSeed}
+                seedGeoJSON={setupSeedGeoJSON}
+                seedCbgId={setupSeedCbg}
+                seedGuardRadiusKm={seedGuardDistanceKm}
+                showSeedGuardCircle={clusterAlgorithm === 'greedy_weight_seed_guard'}
               />
             </div>
-            <div className='w-full rounded-lg border border-[#70B4D4] bg-[#fffff2] p-4'>
-              <div className='flex flex-wrap gap-4 items-end'>
-                <div className='w-[22rem] max-w-full'>
-                  <FormField
-                    label='City, Address, or Location'
-                    name='location'
-                    type='text'
-                    placeholder='e.g. 55902'
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className='w-[16rem] max-w-full'>
-                  <FormField
-                    label='Minimum Population'
-                    name='min_pop'
-                    type='number'
-                    value={minPop}
-                    min={100}
-                    max={100_000}
-                    onChange={(e) => setMinPop(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className='w-[22rem] max-w-full'>
-                  <FormField
-                    label='Clustering Algorithm'
-                    name='algorithm'
-                    type='select'
-                    value={clusterAlgorithm}
-                    options={CLUSTER_ALGORITHM_OPTIONS}
-                    onChange={(e) => setClusterAlgorithm(e.target.value)}
-                    disabled={loading}
-                  />
+            <div className={`w-full rounded-lg border border-[#70B4D4] bg-[#fffff2] p-4 lg:w-[30rem] xl:w-[32rem] lg:flex-none ${setupSidebarHeightClass}`}>
+              <div className='flex flex-col gap-4'>
+                <div className='flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col xl:flex-row xl:items-end'>
+                  <div className='flex-1 min-w-0'>
+                    <FormField
+                      label='City, Address, or Location'
+                      name='location'
+                      type='text'
+                      placeholder='e.g. 55902'
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      disabled={loading || resolvingSeed}
+                    />
+                  </div>
+                  <div className='w-full sm:w-[12rem] lg:w-full xl:w-[12rem]'>
+                    <button
+                      type='button'
+                      onClick={resolveSeedPreview}
+                      disabled={loading || resolvingSeed || !location.trim() || isTestLocationInput}
+                      className='w-full px-4 py-2 rounded-lg border border-[#70B4D4] bg-white text-[#1f2937] font-semibold disabled:opacity-40'
+                    >
+                      {resolvingSeed ? 'Resolving Seed...' : 'Resolve Seed'}
+                    </button>
+                  </div>
                 </div>
 
-                <div className='w-[11rem] max-w-full'>
-                  <FormField
-                    label='Start Date'
-                    name='start_date'
-                    type='date'
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    disabled={loading}
-                  />
+                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                  <div className='w-full'>
+                    <FormField
+                      label='Minimum Population'
+                      name='min_pop'
+                      type='number'
+                      value={minPop}
+                      min={100}
+                      max={100_000}
+                      onChange={(e) => setMinPop(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className='w-full sm:col-span-2'>
+                    <FormField
+                      label='Clustering Algorithm'
+                      name='algorithm'
+                      type='select'
+                      value={clusterAlgorithm}
+                      options={CLUSTER_ALGORITHM_OPTIONS}
+                      onChange={(e) => setClusterAlgorithm(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className='w-full'>
+                    <FormField
+                      label='Start Date'
+                      name='start_date'
+                      type='date'
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className='w-full'>
+                    <FormField
+                      label='End Date'
+                      name='end_date'
+                      type='date'
+                      value={endDate}
+                      min={startDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className='w-full sm:col-span-2'>
+                    <FormField
+                      label='Description'
+                      name='description'
+                      type='textarea'
+                      placeholder='a short description for this convenience zone...'
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      disabled={loading}
+                      required={false}
+                    />
+                  </div>
                 </div>
-                <div className='w-[11rem] max-w-full'>
-                  <FormField
-                    label='End Date'
-                    name='end_date'
-                    type='date'
-                    value={endDate}
-                    min={startDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className='w-[26rem] max-w-full'>
-                  <FormField
-                    label='Description'
-                    name='description'
-                    type='textarea'
-                    placeholder='a short description for this convenience zone...'
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    disabled={loading}
-                    required={false}
-                  />
-                </div>
-              </div>
 
-              {clusterAlgorithm === 'czi_optimal_cap' && (
-                <div className='mt-3 text-xs text-gray-600 rounded-lg border border-[#70B4D4] p-3 bg-[#fffff2]'>
-                  CZI Optimal treats `Minimum Population` as a population cap and searches for a
-                  high-CZI connected zone within a floor-to-cap band.
-                </div>
-              )}
+                {(setupSeedCbg || seedResolveError || isTestLocationInput) && (
+                  <div className='flex flex-col gap-2 text-sm'>
+                    {setupSeedCbg && (
+                      <div className='rounded-lg border border-[#70B4D4] bg-[#eff6ff] px-3 py-2 text-[#1e3a8a]'>
+                        <span className='font-semibold'>Resolved Seed:</span> {setupSeedCbg}
+                        {setupResolvedCityName ? ` for ${setupResolvedCityName}` : ''}
+                        {clusterAlgorithm === 'greedy_weight_seed_guard'
+                          ? ` | Blue ring radius: ${seedGuardDistanceKm} km`
+                          : ''}
+                      </div>
+                    )}
+                    {!setupSeedCbg && isTestLocationInput && (
+                      <div className='rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900'>
+                        Seed preview is unavailable in TEST mode.
+                      </div>
+                    )}
+                    {seedResolveError && (
+                      <div className='rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-red-700'>
+                        {seedResolveError}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {clusterAlgorithm === 'czi_balanced' && (
-                <div className='mt-3 rounded-lg border border-[#70B4D4] p-3 bg-[#fffff2] max-w-[30rem]'>
-                  <button
-                    type='button'
-                    className='text-sm font-semibold text-left w-full'
-                    onClick={() => setShowAdvancedClustering((v) => !v)}
-                    disabled={loading}
-                  >
-                    Advanced Clustering {showAdvancedClustering ? 'v' : '>'}
-                  </button>
-                  {showAdvancedClustering && (
-                    <div className='mt-3 flex flex-col gap-3'>
-                      <label className='flex items-center gap-2 text-sm'>
-                        <input
-                          type='checkbox'
-                          checked={useDistancePenalty}
-                          onChange={(e) => setUseDistancePenalty(e.target.checked)}
-                          disabled={loading}
-                        />
-                        Use distance penalty
-                      </label>
-                      <FormField
-                        label='Distance Penalty Weight'
-                        name='distance_penalty_weight'
-                        type='number'
-                        value={distancePenaltyWeight}
-                        min={0}
-                        max={1}
-                        onChange={(e) => setDistancePenaltyWeight(e.target.value)}
-                        disabled={loading || !useDistancePenalty}
-                      />
-                      <FormField
-                        label='Distance Scale (km)'
-                        name='distance_scale_km'
-                        type='number'
-                        value={distanceScaleKm}
-                        min={0.1}
-                        max={500}
-                        onChange={(e) => setDistanceScaleKm(e.target.value)}
-                        disabled={loading || !useDistancePenalty}
-                      />
-                      <div className='text-xs text-gray-600'>
-                        {useDistancePenalty ? (
+                {clusterAlgorithm === 'czi_optimal_cap' && (
+                  <div className='text-xs text-gray-600'>
+                    CZI Optimal treats `Minimum Population` as a population cap and searches within a floor-to-cap band.
+                  </div>
+                )}
+
+                {clusterAlgorithm === 'greedy_weight_seed_guard' && (
+                  <div className='text-xs text-gray-600'>
+                    Resolve the seed, adjust the blue radius, then preview the cluster.
+                  </div>
+                )}
+
+                {(clusterAlgorithm === 'czi_balanced' || clusterAlgorithm === 'greedy_weight_seed_guard') && (
+                  <div className='rounded-lg border border-[#70B4D4] p-3 bg-[#fffff2] w-full'>
+                    <button
+                      type='button'
+                      className='text-sm font-semibold text-left w-full'
+                      onClick={() => setShowAdvancedClustering((v) => !v)}
+                      disabled={loading}
+                    >
+                      Advanced Clustering {showAdvancedClustering ? 'v' : '>'}
+                    </button>
+                    {showAdvancedClustering && (
+                      <div className='mt-3 flex flex-col gap-3'>
+                        {clusterAlgorithm === 'czi_balanced' ? (
                           <>
-                            Higher `Distance Penalty Weight` favors closer CBGs more strongly.
-                            {' '}Distance Scale controls how quickly distance penalty grows (larger = softer penalty).
+                            <label className='flex items-center gap-2 text-sm'>
+                              <input
+                                type='checkbox'
+                                checked={useDistancePenalty}
+                                onChange={(e) => setUseDistancePenalty(e.target.checked)}
+                                disabled={loading}
+                              />
+                              Use distance penalty
+                            </label>
+                            <FormField
+                              label='Distance Penalty Weight'
+                              name='distance_penalty_weight'
+                              type='number'
+                              value={distancePenaltyWeight}
+                              min={0}
+                              max={1}
+                              onChange={(e) => setDistancePenaltyWeight(e.target.value)}
+                              disabled={loading || !useDistancePenalty}
+                            />
+                            <FormField
+                              label='Distance Scale (km)'
+                              name='distance_scale_km'
+                              type='number'
+                              value={distanceScaleKm}
+                              min={0.1}
+                              max={500}
+                              onChange={(e) => setDistanceScaleKm(e.target.value)}
+                              disabled={loading || !useDistancePenalty}
+                            />
+                            <div className='text-xs text-gray-600'>
+                              {useDistancePenalty ? (
+                                <>
+                                  Higher `Distance Penalty Weight` favors closer CBGs more strongly.
+                                  {' '}Distance Scale controls how quickly distance penalty grows.
+                                </>
+                              ) : (
+                                'Balanced CZI will rank using CZI-after only.'
+                              )}
+                            </div>
                           </>
                         ) : (
-                          'Balanced CZI will rank using CZI-after only (no distance penalty).'
+                          <>
+                            <FormField
+                              label='Seed Guard Distance (km)'
+                              name='seed_guard_distance_km'
+                              type='number'
+                              value={seedGuardDistanceKm}
+                              min={0}
+                              max={500}
+                              onChange={(e) => setSeedGuardDistanceKm(e.target.value)}
+                              disabled={loading}
+                            />
+                            <div className='text-xs text-gray-600'>
+                              Distant CBGs can still be added, but they will stop influencing later picks.
+                            </div>
+                          </>
                         )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
 
-              <div className='mt-4 flex justify-end'>
-                <button
-                  type='submit'
-                  disabled={loading}
-                  className='px-4 py-2 rounded-lg border border-[#70B4D4] bg-[#e0f2fe] text-[#1f2937] font-semibold disabled:opacity-40'
-                >
-                  {loading ? 'Clustering...' : 'Preview CBGs'}
-                </button>
+                <div className='pt-1'>
+                  <button
+                    type='submit'
+                    disabled={loading || resolvingSeed || (seedGuardNeedsResolvedSeed && !setupSeedCbg)}
+                    className='w-full px-4 py-2 rounded-lg border border-[#70B4D4] bg-[#e0f2fe] text-[#1f2937] font-semibold disabled:opacity-40'
+                  >
+                    {loading ? 'Clustering...' : 'Preview CBGs'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
