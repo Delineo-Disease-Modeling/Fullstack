@@ -32,17 +32,13 @@ export async function GET(request: NextRequest) {
   const { user_id } = parsed.data;
 
   const zones = await prisma.convenienceZone.findMany({
-    include: {
-      papdata: { select: { id: true } }
-    },
     where: { user_id }
   });
 
   return Response.json({
-    data: zones.map((zone: any) => ({
+    data: zones.map((zone) => ({
       ...zone,
-      papdata: undefined,
-      ready: !!zone.papdata
+      ready: !!zone.papdata_id
     }))
   });
 }

@@ -26,20 +26,23 @@ export async function POST(request: NextRequest) {
 
     await mkdir(DB_FOLDER, { recursive: true });
 
-    const papdata_obj = await prisma.paPData.create({ data: { czone_id } });
-    const patterns_obj = await prisma.movementPattern.create({
-      data: { czone_id }
+    const papdata_id = crypto.randomUUID();
+    const patterns_id = crypto.randomUUID();
+
+    await prisma.convenienceZone.update({
+      where: { id: czone_id },
+      data: { papdata_id, patterns_id }
     });
 
     await Promise.all([
-      saveFileStream(patterns, `${DB_FOLDER + patterns_obj.id}.gz`, true),
-      saveFileStream(papdata, `${DB_FOLDER + papdata_obj.id}.gz`, true)
+      saveFileStream(patterns, `${DB_FOLDER + patterns_id}.gz`, true),
+      saveFileStream(papdata, `${DB_FOLDER + papdata_id}.gz`, true)
     ]);
 
     return Response.json({
       data: {
-        papdata: { id: papdata_obj.id },
-        patterns: { id: patterns_obj.id }
+        papdata: { id: papdata_id },
+        patterns: { id: patterns_id }
       }
     });
   } catch (e) {

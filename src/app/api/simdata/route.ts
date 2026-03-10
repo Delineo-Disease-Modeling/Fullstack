@@ -1,12 +1,9 @@
-import { constants } from 'node:fs';
-import { access, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { saveFileStream } from '@/lib/filestream';
-import { processSimData } from '@/lib/postgres-store';
 import { prisma } from '@/lib/prisma';
-import { generateMapData } from '@/lib/sim-map';
-import { generateGlobalStats } from '@/lib/sim-stats';
+import { processSimulation } from '@/lib/sim-processor';
 
 export const maxDuration = 300;
 
@@ -39,37 +36,32 @@ export async function POST(request: NextRequest) {
       data: { czone_id, length }
     });
 
+    const fileId = simdata_obj.file_id;
     const simIsGz = simdata.name.endsWith('.gz');
     const patIsGz = patterns.name.endsWith('.gz');
+    const simPath = DB_FOLDER + fileId + '.sim' + (simIsGz ? '.gz' : '');
+    const patPath = DB_FOLDER + fileId + '.pat' + (patIsGz ? '.gz' : '');
 
     await Promise.all([
-      saveFileStream(
-        simdata,
-        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : '')
-      ),
-      saveFileStream(
-        patterns,
-        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : '')
-      )
+      saveFileStream(simdata, simPath),
+      saveFileStream(patterns, patPath)
     ]);
 
-    const papdata_obj = await prisma.paPData.findUnique({
-      where: { czone_id: Number(czone_id) }
+    const czone = await prisma.convenienceZone.findUnique({
+      where: { id: Number(czone_id) }
     });
 
-    if (papdata_obj) {
-      let papPath = DB_FOLDER + papdata_obj.id;
-      try {
-        await access(`${papPath}.gz`, constants.F_OK);
-        papPath += '.gz';
-      } catch {
-        // plain file
-      }
+    if (czone?.papdata_id) {
+      const papPath = `${DB_FOLDER}${czone.papdata_id}.gz`;
 
-      generateGlobalStats(
-        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
-        papPath
-      )
+      // Single-pass processor: generates map cache, global stats
+      processSimulation({
+        simDataId: simdata_obj.id,
+        simdataPath: simPath,
+        patternsPath: patPath,
+        papDataPath: papPath,
+        mapCachePath: `${DB_FOLDER}${fileId}.map.json`
+      })
         .then((stats) =>
           prisma.simData.update({
             where: { id: simdata_obj.id },
@@ -77,31 +69,20 @@ export async function POST(request: NextRequest) {
           })
         )
         .catch((e) => {
-          console.error('Stats generation failed:', e);
-          prisma.simData.update({
-            where: { id: simdata_obj.id },
-            data: {
-              global_stats: {
-                error: e instanceof Error ? e.message : String(e)
+          console.error('Simulation processing failed:', e);
+          prisma.simData
+            .update({
+              where: { id: simdata_obj.id },
+              data: {
+                global_stats: {
+                  error: e instanceof Error ? e.message : String(e)
+                }
               }
-            }
-          }).catch((dbErr) =>
-            console.error('Failed to persist stats error state:', dbErr)
-          );
+            })
+            .catch((dbErr) =>
+              console.error('Failed to persist error state:', dbErr)
+            );
         });
-
-      processSimData(
-        simdata_obj.id,
-        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
-        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : '')
-      ).catch((e) => console.error('Postgres ingestion failed:', e));
-
-      generateMapData(
-        DB_FOLDER + simdata_obj.simdata + (simIsGz ? '.gz' : ''),
-        DB_FOLDER + simdata_obj.patterns + (patIsGz ? '.gz' : ''),
-        papPath,
-        `${DB_FOLDER + simdata_obj.simdata}.map.json`
-      ).catch((e) => console.error('Map cache generation failed:', e));
     }
 
     return Response.json({ data: { id: simdata_obj.id } });

@@ -18,16 +18,18 @@ export async function GET(
     return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
   }
 
-  const papdata_obj = await prisma.paPData.findUnique({ where: { czone_id } });
+  const czone = await prisma.convenienceZone.findUnique({
+    where: { id: czone_id }
+  });
 
-  if (!papdata_obj) {
+  if (!czone?.papdata_id) {
     return Response.json(
       { message: 'Could not find papdata' },
       { status: 404 }
     );
   }
 
-  const papPath = `${DB_FOLDER + papdata_obj.id}.gz`;
+  const papPath = `${DB_FOLDER + czone.papdata_id}.gz`;
 
   try {
     await access(papPath, constants.F_OK);

@@ -24,20 +24,19 @@ export async function GET(
     return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
   }
 
-  const [papdata_obj, patterns_obj] = await Promise.all([
-    prisma.paPData.findUnique({ where: { czone_id } }),
-    prisma.movementPattern.findUnique({ where: { czone_id } })
-  ]);
+  const czone = await prisma.convenienceZone.findUnique({
+    where: { id: czone_id }
+  });
 
-  if (!papdata_obj || !patterns_obj) {
+  if (!czone?.papdata_id || !czone?.patterns_id) {
     return Response.json(
       { message: 'Could not find patterns or papdata' },
       { status: 404 }
     );
   }
 
-  const papPath = `${DB_FOLDER + papdata_obj.id}.gz`;
-  const patPath = `${DB_FOLDER + patterns_obj.id}.gz`;
+  const papPath = `${DB_FOLDER + czone.papdata_id}.gz`;
+  const patPath = `${DB_FOLDER + czone.patterns_id}.gz`;
 
   try {
     await Promise.all([

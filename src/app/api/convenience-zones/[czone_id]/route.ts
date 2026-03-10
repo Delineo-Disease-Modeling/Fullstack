@@ -25,10 +25,9 @@ export async function PATCH(
     const zone = await prisma.convenienceZone.update({
       where: { id },
       data,
-      include: { papdata: { select: { id: true } } },
     });
     return Response.json({
-      data: { ...zone, papdata: undefined, ready: !!zone.papdata },
+      data: { ...zone, ready: !!zone.papdata_id },
     });
   } catch (error) {
     return Response.json({ message: String(error) }, { status: 400 });

@@ -75,50 +75,20 @@ model ConvenienceZone {
   created_at        DateTime @default(now())
   user_id           String
   user              User @relation(references: [id], fields: [user_id], onDelete: Cascade)
-  papdata           PaPData?
-  patterns          MovementPattern?
+  papdata_id        String?         // UUID for papdata file ({id}.gz)
+  patterns_id       String?         // UUID for movement patterns file ({id}.gz)
   simdata           SimData[]
-}
-
-model MovementPattern {
-  id                String   @id @default(uuid())
-  created_at        DateTime @default(now())
-  czone_id          Int @unique
-  czone             ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)          
-}
-
-model PaPData {
-  id            String @id @default(uuid())
-  czone_id      Int @unique
-  czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
 }
 
 model SimData {
   id            Int @id @default(autoincrement())
   name          String @default("Untitled Run")
   created_at    DateTime @default(now())
-  patterns      String @unique @default(uuid())
-  simdata       String @unique @default(uuid())
+  file_id       String @unique @default(uuid()) // Files: {file_id}.sim.gz + {file_id}.pat.gz
   czone_id      Int
   length        Int
   global_stats  Json?
   czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
-  stats         LocationStats[]
-}
-
-model LocationStats {
-  id            String   @id @default(cuid())
-  simDataId     Int      // Foreign key to SimData
-  time          Int
-  locationId    String   @map("location_id")
-  locationType  String   @map("location_type") 
-  population    Int
-  infected      Int
-  infectedList  Bytes    @map("infected_list") // Stored as BLOB (Bytes)
-
-  simData       SimData  @relation(fields: [simDataId], references: [id], onDelete: Cascade)
-  
-  @@index([simDataId, locationId, time])
 }
 
 model POI {

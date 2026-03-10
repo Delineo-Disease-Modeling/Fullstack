@@ -1,8 +1,10 @@
-import { constants } from 'node:fs';
+import { constants, createReadStream } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
-import { createGunzip } from 'node:zlib';
+import { createGunzip, gunzipSync } from 'node:zlib';
 import type { NextRequest } from 'next/server';
-import { getStats } from '@/lib/postgres-store';
+import chain from 'stream-chain';
+import parser from 'stream-json';
+import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { prisma } from '@/lib/prisma';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
@@ -27,24 +29,142 @@ const infection_states = {
 type DataPoint = { time: number; [key: string]: number };
 type ChartData = { [type: string]: DataPoint[] };
 
-async function getPapData(czone_id: number) {
-  const papdata_obj = await prisma.paPData.findUnique({ where: { czone_id } });
-  if (!papdata_obj) throw new Error('Could not find papdata');
-
-  const papPath = `${DB_FOLDER + papdata_obj.id}.gz`;
+async function loadPapData(papDataId: string) {
+  const papPath = `${DB_FOLDER}${papDataId}.gz`;
   await access(papPath, constants.F_OK);
   const raw = await readFile(papPath);
 
   const buffer = await new Promise<Buffer>((resolve, reject) => {
     const unzip = createGunzip();
     const chunks: Buffer[] = [];
-    unzip.on('data', (c) => chunks.push(c));
+    unzip.on('data', (c: Buffer) => chunks.push(c));
     unzip.on('end', () => resolve(Buffer.concat(chunks)));
     unzip.on('error', reject);
     unzip.end(raw);
   });
 
   return JSON.parse(buffer.toString());
+}
+
+/**
+ * Compute location-specific chart data on-demand by streaming sim+patterns
+ * files and filtering for the requested location.
+ */
+async function computeLocationStats(
+  fileId: string,
+  locId: string,
+  locType: 'homes' | 'places',
+  papdata: any
+): Promise<ChartData> {
+  const simPath = `${DB_FOLDER}${fileId}.sim.gz`;
+  const patPath = `${DB_FOLDER}${fileId}.pat.gz`;
+
+  await Promise.all([
+    access(simPath, constants.F_OK),
+    access(patPath, constants.F_OK)
+  ]);
+
+  const simIter = (
+    chain([
+      createReadStream(simPath),
+      createGunzip(),
+      parser(),
+      StreamObject.streamObject()
+    ]) as any
+  )[Symbol.asyncIterator]();
+
+  const patIter = (
+    chain([
+      createReadStream(patPath),
+      createGunzip(),
+      parser(),
+      StreamObject.streamObject()
+    ]) as any
+  )[Symbol.asyncIterator]();
+
+  const chartData: ChartData = { iot: [], ages: [], sexes: [], states: [] };
+
+  let spl = await simIter.next();
+  let ppl = await patIter.next();
+
+  while (!spl.done && !ppl.done) {
+    const skey: string = spl.value.key;
+    const pkey: string = ppl.value.key;
+
+    if (skey !== pkey) {
+      if (+skey < +pkey) {
+        spl = await simIter.next();
+        continue;
+      }
+      ppl = await patIter.next();
+      continue;
+    }
+
+    const svalue = spl.value.value;
+    const pvalue = ppl.value.value;
+    const time = +skey / 60;
+
+    // Get the people at this location for this timestep
+    const locGroup = locType === 'homes' ? pvalue.homes : pvalue.places;
+    const pop: string[] | undefined = locGroup?.[locId];
+
+    if (pop && pop.length > 0) {
+      const popSet = new Set(pop);
+
+      const iot_data: DataPoint = { time, 'All People': pop.length };
+      const ages_data: DataPoint = { time };
+      const sexes_data: DataPoint = { time, Male: 0, Female: 0 };
+      const states_data: DataPoint = { time };
+
+      for (const range of age_ranges) ages_data[range.join('-')] = 0;
+      for (const state of Object.keys(infection_states))
+        states_data[state] = 0;
+
+      for (const [disease, people] of Object.entries(svalue) as [
+        string,
+        Record<string, number>
+      ][]) {
+        const localInfected = Object.entries(people).filter(([pid]) =>
+          popSet.has(pid)
+        );
+        iot_data[disease] = localInfected.length;
+
+        for (const [pid, stateBitmask] of localInfected) {
+          for (const [state, value] of Object.entries(infection_states)) {
+            if (state === 'Susceptible') continue;
+            if (stateBitmask & (value as number)) states_data[state]++;
+          }
+          const p = papdata.people[pid];
+          if (p) {
+            sexes_data[p.sex === 0 ? 'Male' : 'Female'] += 1;
+            for (const range of age_ranges) {
+              if (p.age >= range[0] && p.age <= range[1])
+                ages_data[range.join('-')] += 1;
+            }
+          }
+        }
+      }
+
+      // Susceptible = people at this location who are not infected
+      const totalInfected = Object.values(svalue).reduce(
+        (sum: number, people: any) =>
+          sum +
+          Object.keys(people).filter((pid) => popSet.has(pid)).length,
+        0
+      );
+      states_data.Susceptible = Math.max(0, pop.length - totalInfected);
+
+      chartData.iot.push(iot_data);
+      chartData.ages.push(ages_data);
+      chartData.sexes.push(sexes_data);
+      chartData.states.push(states_data);
+    }
+
+    spl = await simIter.next();
+    ppl = await patIter.next();
+  }
+
+  return chartData;
 }
 
 export async function GET(
@@ -61,7 +181,10 @@ export async function GET(
     return Response.json({ message: 'Invalid id' }, { status: 400 });
   }
 
-  const simdata = await prisma.simData.findUnique({ where: { id } });
+  const simdata = await prisma.simData.findUnique({
+    where: { id },
+    include: { czone: true }
+  });
   if (!simdata) {
     return Response.json(
       { message: 'Could not find associated simdata' },
@@ -82,73 +205,38 @@ export async function GET(
       return Response.json({ data: stats });
     }
     return Response.json(
-      { message: 'Global stats are still being processed. This may take a few minutes for large simulations.' },
+      {
+        message:
+          'Global stats are still being processed. This may take a few minutes for large simulations.'
+      },
       { status: 202 }
     );
   }
 
-  // Location-specific stats
-  if (loc_id) {
-    try {
-      const rows = await getStats(simdata.id, loc_id);
-      const chartData: ChartData = { iot: [], ages: [], sexes: [], states: [] };
-      const papdata = await getPapData(simdata.czone_id);
-
-      for (const row of rows) {
-        const iot_data: DataPoint = { time: row.time };
-        const ages_data: DataPoint = { time: row.time };
-        const sexes_data: DataPoint = { time: row.time };
-        const states_data: DataPoint = { time: row.time };
-
-        sexes_data.Male = 0;
-        sexes_data.Female = 0;
-        for (const range of age_ranges) ages_data[range.join('-')] = 0;
-        for (const state of Object.keys(infection_states))
-          states_data[state] = 0;
-
-        iot_data['All People'] = row.population;
-        const infectedMap = row.infected_list;
-
-        for (const [disease, people] of Object.entries(infectedMap) as [
-          string,
-          any
-        ][]) {
-          iot_data[disease] = Object.keys(people).length;
-          for (const [state, value] of Object.entries(infection_states)) {
-            states_data[state] += Object.values(people).filter(
-              (s: any) => s & (value as number)
-            ).length;
-          }
-          Object.keys(people).forEach((pid) => {
-            const p = papdata.people[pid];
-            if (p) {
-              sexes_data[p.sex === 0 ? 'Male' : 'Female'] += 1;
-              for (const range of age_ranges) {
-                if (p.age >= range[0] && p.age <= range[1])
-                  ages_data[range.join('-')] += 1;
-              }
-            }
-          });
-        }
-
-        chartData.iot.push(iot_data);
-        chartData.ages.push(ages_data);
-        chartData.sexes.push(sexes_data);
-        chartData.states.push(states_data);
-      }
-
-      return Response.json({ data: chartData });
-    } catch (e) {
-      console.error('Stats retrieval error:', e);
+  // Location-specific stats: compute on-demand from files
+  try {
+    const papDataId = simdata.czone.papdata_id;
+    if (!papDataId) {
       return Response.json(
-        { message: 'Failed to retrieve simulation statistics.' },
-        { status: 500 }
+        { message: 'PapData not available for this zone' },
+        { status: 404 }
       );
     }
-  }
 
-  return Response.json(
-    { message: 'Invalid request parameters' },
-    { status: 400 }
-  );
+    const papdata = await loadPapData(papDataId);
+    const chartData = await computeLocationStats(
+      simdata.file_id,
+      loc_id,
+      loc_type,
+      papdata
+    );
+
+    return Response.json({ data: chartData });
+  } catch (e) {
+    console.error('Stats computation error:', e);
+    return Response.json(
+      { message: 'Failed to compute simulation statistics.' },
+      { status: 500 }
+    );
+  }
 }
