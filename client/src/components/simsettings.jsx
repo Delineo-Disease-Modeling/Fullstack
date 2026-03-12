@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import CzDict from './czdict';
 import useSimSettings from '../stores/simsettings';
 import InterventionTimeline from './intervention-timeline';
 import { SimParameter, SimBoolean, SimFile, SimRunSelector } from './settings-components';
+import { SIM_URL } from '../env';
+import { getInclusiveEndDateIso, toSimulationDateParam } from '../lib/simulation-dates';
 
 import './simsettings.css';
 
@@ -19,22 +22,26 @@ const FIPS_TO_STATE = {
   '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV', '55': 'WI', '56': 'WY'
 };
 
-// States with available monthly pattern files (pattern files in data/{STATE}/ folder)
-const AVAILABLE_STATES = ['OK'];  // Add more as pattern files become available
-
 function getStateFromCBG(cbgList) {
   if (!cbgList || cbgList.length === 0) return null;
   const fips = cbgList[0]?.substring(0, 2);
   return FIPS_TO_STATE[fips] || null;
 }
 
+function formatMonthList(months) {
+  return Array.isArray(months) && months.length > 0 ? months.join(', ') : '';
+}
+
 export default function SimSettings({ sendData }) {
   const settings = useSimSettings((state) => state.settings);
   const setSettings = useSimSettings((state) => state.setSettings);
+  const [patternAvailability, setPatternAvailability] = useState({ status: 'idle' });
   
   // Auto-detect state from zone's CBGs
   const detectedState = getStateFromCBG(settings.zone?.cbg_list);
-  const stateAvailable = AVAILABLE_STATES.includes(detectedState);
+  const endDateIso = getInclusiveEndDateIso(settings.zone?.start_date, settings.zone?.length);
+  const startDateParam = toSimulationDateParam(settings.zone?.start_date);
+  const endDateParam = toSimulationDateParam(endDateIso);
   
   // Format dates for display
   const formatDateDisplay = (isoString) => {
@@ -45,11 +52,103 @@ export default function SimSettings({ sendData }) {
 
   // Calculate end date from start_date + length (hours)
   const getEndDate = () => {
-    if (!settings.zone?.start_date || !settings.zone?.length) return null;
-    const start = new Date(settings.zone.start_date);
-    const end = new Date(start.getTime() + settings.zone.length * 60 * 60 * 1000);
-    return end.toISOString();
+    return endDateIso;
   };
+
+  useEffect(() => {
+    if (!detectedState || !startDateParam || !endDateParam) {
+      setPatternAvailability({ status: 'idle' });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    async function loadPatternAvailability() {
+      setPatternAvailability({ status: 'loading' });
+
+      try {
+        const params = new URLSearchParams({
+          state: detectedState,
+          start_date: startDateParam,
+          end_date: endDateParam,
+        });
+        const response = await fetch(`${SIM_URL}simulation/pattern-availability?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Pattern availability request failed with status ${response.status}`);
+        }
+
+        const json = await response.json();
+        setPatternAvailability({ status: 'ready', data: json.data });
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          return;
+        }
+
+        console.error('Pattern availability check failed:', error);
+        setPatternAvailability({ status: 'error' });
+      }
+    }
+
+    loadPatternAvailability();
+
+    return () => controller.abort();
+  }, [detectedState, startDateParam, endDateParam]);
+
+  const patternStatus = (() => {
+    if (!detectedState) {
+      return null;
+    }
+
+    if (!startDateParam || !endDateParam) {
+      return {
+        tone: 'text-gray-500',
+        message: `State detected: ${detectedState}`,
+      };
+    }
+
+    if (patternAvailability.status === 'loading') {
+      return {
+        tone: 'text-gray-500',
+        message: `Checking pattern data for ${detectedState}...`,
+      };
+    }
+
+    if (patternAvailability.status === 'error') {
+      return {
+        tone: 'text-gray-500',
+        message: `State detected: ${detectedState} (pattern availability check unavailable)`,
+      };
+    }
+
+    if (patternAvailability.status !== 'ready') {
+      return null;
+    }
+
+    const coveredMonths = formatMonthList(
+      patternAvailability.data?.required_months?.length
+        ? patternAvailability.data.required_months
+        : patternAvailability.data?.available_months
+    );
+    if (patternAvailability.data?.has_coverage) {
+      return {
+        tone: 'text-green-600',
+        message: coveredMonths
+          ? `✓ Pattern data available for ${detectedState} (${coveredMonths})`
+          : `✓ Pattern data available for ${detectedState}`,
+      };
+    }
+
+    const missingMonths = formatMonthList(patternAvailability.data?.missing_months);
+    return {
+      tone: 'text-amber-600',
+      message: missingMonths
+        ? `⚠ Missing pattern data for ${detectedState}: ${missingMonths}`
+        : `⚠ No pattern data available for ${detectedState}`,
+    };
+  })();
 
   return (
     <div className='simset_settings'>
@@ -78,11 +177,9 @@ export default function SimSettings({ sendData }) {
         )}
         
         {/* Show detected state and availability warning */}
-        {detectedState && (
-          <div className={`text-xs ${stateAvailable ? 'text-green-600' : 'text-amber-600'} ml-1 mb-2`}>
-            {stateAvailable 
-              ? `✓ Pattern data available for ${detectedState}`
-              : `⚠ No pattern data for ${detectedState} yet - using fallback`}
+        {patternStatus && (
+          <div className={`text-xs ${patternStatus.tone} ml-1 mb-2`}>
+            {patternStatus.message}
           </div>
         )}
 

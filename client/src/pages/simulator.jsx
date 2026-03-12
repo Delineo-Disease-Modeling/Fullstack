@@ -3,6 +3,7 @@ import { DB_URL, SIM_URL } from '../env';
 import axios from 'axios';
 import useSimSettings from '../stores/simsettings';
 import useSimData from '../stores/simdata';
+import { getInclusiveEndDateIso, toSimulationDateParam } from '../lib/simulation-dates';
 
 import SimSettings from '../components/simsettings.jsx';
 import ModelMap from '../components/modelmap.jsx';
@@ -184,17 +185,12 @@ export default function Simulator() {
     
     // Get dates from zone (set during CZ generation)
     // Convert ISO dates to YYYY-MM-DD format for the simulation API
-    const formatDate = (isoString) => {
-      if (!isoString) return null;
-      return new Date(isoString).toISOString().split('T')[0];
-    };
+    const formatDate = (isoString) => toSimulationDateParam(isoString);
     
     const zoneStart = settings.zone?.start_date;
     const zoneLengthHours = Number(settings.zone?.length ?? settings.hours ?? 0);
-    const startDate = formatDate(settings.zone?.start_date);
-    const endDate = zoneStart && zoneLengthHours > 0
-      ? formatDate(new Date(new Date(zoneStart).getTime() + zoneLengthHours * 60 * 60 * 1000).toISOString())
-      : null;
+    const startDate = formatDate(zoneStart);
+    const endDate = formatDate(getInclusiveEndDateIso(zoneStart, zoneLengthHours));
 
     const missing = [];
     if (!startDate) missing.push('start_date');
