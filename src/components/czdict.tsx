@@ -32,7 +32,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    let timerId: ReturnType<typeof window.setTimeout> | null = null;
+    let timerId: number | null = null;
 
     const refreshZones = async () => {
       try {
