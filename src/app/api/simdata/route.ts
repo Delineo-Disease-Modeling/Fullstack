@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { saveFileStream } from '@/lib/filestream';
 import { prisma } from '@/lib/prisma';
-import { processSimulation } from '@/lib/sim-processor';
+import { processingProgress, processSimulation } from '@/lib/sim-processor';
 
 export const maxDuration = 300;
 
@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
         simdataPath: simPath,
         patternsPath: patPath,
         papDataPath: papPath,
-        mapCachePath: `${DB_FOLDER}${fileId}.map.json`
+        mapCachePath: `${DB_FOLDER}${fileId}.map.json`,
+        totalLength: length
       })
         .then((stats) =>
           prisma.simData.update({
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
         )
         .catch((e) => {
           console.error('Simulation processing failed:', e);
+          processingProgress.delete(simdata_obj.id);
           prisma.simData
             .update({
               where: { id: simdata_obj.id },

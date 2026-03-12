@@ -57,7 +57,17 @@ export default function SimulatorRun() {
       setError(null);
 
       try {
-        const response = await fetch(`/api/simdata/${run_id}`, { signal });
+        // Poll until the map cache is ready (API returns 202 with progress while processing)
+        let response: Response;
+        while (true) {
+          response = await fetch(`/api/simdata/${run_id}`, { signal });
+          if (response.status !== 202) break;
+          const status = await response.json();
+          if (typeof status.progress === 'number') {
+            setProgress(status.progress);
+          }
+          await new Promise((r) => setTimeout(r, 2000));
+        }
         if (!response.ok) throw new Error('Run not found');
 
         const reader = response.body?.getReader();

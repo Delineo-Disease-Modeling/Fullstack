@@ -5,6 +5,7 @@ import { createGunzip } from 'node:zlib';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { processingProgress } from '@/lib/sim-processor';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
@@ -183,11 +184,13 @@ export async function GET(
     // Cache miss: map cache not yet generated
   }
 
-  // Cache miss: return 202 to indicate processing is still in progress.
-  // The single-pass processor generates the cache on upload; if it's not
-  // ready yet the client should retry after a short delay.
+  // Cache miss: return 202 with processing progress so the client can
+  // show a progress bar while polling.
+  const progress = processingProgress.get(id) ?? 0;
   return Response.json(
     {
+      processing: true,
+      progress,
       message:
         'Simulation data is still being processed. Please retry shortly.'
     },

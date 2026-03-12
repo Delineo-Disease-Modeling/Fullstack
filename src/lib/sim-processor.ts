@@ -35,7 +35,11 @@ interface ProcessOpts {
   patternsPath: string;
   papDataPath: string;
   mapCachePath: string;
+  totalLength: number;
 }
+
+/** In-memory progress tracker for active processing jobs (simDataId -> 0-100). */
+export const processingProgress = new Map<number, number>();
 
 /**
  * Single-pass processor that streams simdata + patterns files once and produces:
@@ -45,7 +49,8 @@ interface ProcessOpts {
  * Returns the global stats object to be stored in SimData.global_stats.
  */
 export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
-  const { simdataPath, patternsPath, papDataPath, mapCachePath } = opts;
+  const { simDataId, simdataPath, patternsPath, papDataPath, mapCachePath, totalLength } = opts;
+  processingProgress.set(simDataId, 0);
 
   // Load papdata once
   const papRaw = await readFile(papDataPath);
@@ -225,9 +230,15 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     globalStats.sexes.push(sexes_data);
     globalStats.states.push(states_data);
 
+    if (totalLength > 0) {
+      processingProgress.set(simDataId, Math.min(99, Math.round((+skey / totalLength) * 100)));
+    }
+
     spl = await simIter.next();
     ppl = await patIter.next();
   }
+
+  processingProgress.delete(simDataId);
 
   // Finalize map cache
   cacheParts.push(`},"hotspots":${JSON.stringify(hotspots)}`);
