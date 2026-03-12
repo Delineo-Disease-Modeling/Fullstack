@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import EditDeleteActions from '@/components/edit-delete-actions';
 import InstructionBanner from '@/components/instruction-banner';
 import OutputGraphs from '@/components/outputgraphs';
+import PersonPathPanel from '@/components/person-path-panel';
 import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
@@ -262,6 +263,7 @@ export default function SimulatorRun() {
             selectedZone={selectedZone}
             onMarkerClick={handleMarkerClick}
           />
+          <PersonPathPanel simId={sim_id ?? Number(run_id)} />
         </div>
 
         <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />

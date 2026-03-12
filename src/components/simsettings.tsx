@@ -84,8 +84,14 @@ export default function SimSettings({
           className="w-32 disabled:bg-gray-400!"
           disabled={loading}
           onClick={() => {
-            if (!zone?.name) {
-              alert('Please pick a valid convenience zone first!');
+            if (!zone) {
+              alert('Please pick a convenience zone first.');
+              return;
+            }
+            if (!zone.ready) {
+              alert(
+                'This convenience zone is still generating. Try again in a moment.'
+              );
               return;
             }
             if (sim_id) {

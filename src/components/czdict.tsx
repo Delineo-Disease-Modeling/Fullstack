@@ -23,6 +23,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const zoneRef = useRef(zone);
   zoneRef.current = zone;
 
@@ -31,28 +32,63 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetch('/api/convenience-zones')
-      .then((res) => res.json())
-      .then((json) => {
+    let timerId: ReturnType<typeof window.setTimeout> | null = null;
+
+    const refreshZones = async () => {
+      try {
+        const res = await fetch('/api/convenience-zones');
+        const json = await res.json().catch(() => ({}));
+        const locs = Array.isArray(json.data) ? json.data : [];
+
         if (!active) return;
-        const locs = json.data ?? [];
+
+        if (!res.ok) {
+          setLocations([]);
+          setLoadError(`Failed to load zones (${res.status}).`);
+          setLoading(false);
+          timerId = window.setTimeout(refreshZones, 5000);
+          return;
+        }
+
         setLocations(locs);
+        setLoadError('');
         setLoading(false);
 
         const currentZone = zoneRef.current;
         if (currentZone) {
-          const freshZone = locs.find((z: ConvenienceZone) => z.id === currentZone.id);
+          const freshZone = locs.find(
+            (candidate: ConvenienceZone) => candidate.id === currentZone.id
+          );
           if (freshZone && JSON.stringify(freshZone) !== JSON.stringify(currentZone)) {
             setZone(freshZone);
+          } else if (!freshZone && locs.length > 0) {
+            setZone(locs[0]);
           }
         } else if (locs.length > 0) {
           setZone(locs[0]);
         }
-      })
-      .catch((e) => { console.error(e); if (active) setLoading(false); });
+
+        const hasPendingGeneration = locs.some(
+          (candidate: ConvenienceZone) => !candidate.ready
+        );
+        timerId = window.setTimeout(refreshZones, hasPendingGeneration ? 4000 : 30000);
+      } catch (e) {
+        if (!active) return;
+        console.error(e);
+        setLocations([]);
+        setLoadError('Unable to reach the API. Check that the backend is running.');
+        setLoading(false);
+        timerId = window.setTimeout(refreshZones, 5000);
+      }
+    };
+
+    refreshZones();
 
     return () => {
       active = false;
+      if (timerId) {
+        clearTimeout(timerId);
+      }
     };
   }, [setZone]);
 
@@ -101,7 +137,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
             <p className="text-center my-auto">Loading...</p>
           ) : locations.length === 0 && (
             <p className="text-center my-auto">
-              No zones found, create one to get started!
+              {loadError || 'No zones found, create one to get started!'}
             </p>
           )}
           {locations
@@ -112,21 +148,27 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
                 key={loc.id}
                 className={`flex w-full text-left px-1 justify-between items-center py-1 relative select-none rounded-md hover:cursor-pointer hover:outline-solid hover:outline-1 ${zone?.id === loc.id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
                 style={
-                  !loc.ready
-                    ? {
-                        background: '#11111140',
-                        color: 'white',
-                        cursor: 'not-allowed'
-                      }
-                    : zone?.id === loc.id
+                  zone?.id === loc.id
+                    ? (
+                        loc.ready
+                          ? {
+                              background: 'var(--color-primary-blue)',
+                              color: 'white'
+                            }
+                          : {
+                              background: '#11111175',
+                              color: 'white'
+                            }
+                      )
+                    : !loc.ready
                       ? {
-                          background: 'var(--color-primary-blue)',
+                          background: '#11111140',
                           color: 'white'
                         }
                       : undefined
                 }
                 onClick={() => {
-                  if (loc.ready) setZone(loc);
+                  setZone(loc);
                   setSettings({ sim_id: null });
                 }}
               >
