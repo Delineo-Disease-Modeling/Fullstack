@@ -1,6 +1,30 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ czone_id: string }> }
+) {
+  const { czone_id } = await params;
+  const id = Number(czone_id);
+
+  if (Number.isNaN(id) || id < 0) {
+    return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
+  }
+
+  try {
+    const zone = await prisma.convenienceZone.findUnique({ where: { id } });
+    if (!zone) {
+      return Response.json({ message: 'Not found' }, { status: 404 });
+    }
+    return Response.json({
+      data: { ...zone, ready: !!zone.papdata_id },
+    });
+  } catch (error) {
+    return Response.json({ message: String(error) }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ czone_id: string }> }

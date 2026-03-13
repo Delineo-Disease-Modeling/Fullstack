@@ -114,6 +114,8 @@ export default function CZGeneration() {
     czi?: number;
   } | null>(null);
   const [cziLoading, setCziLoading] = useState(false);
+  const [genProgress, setGenProgress] = useState(0);
+  const [genMessage, setGenMessage] = useState('');
 
   const hasGenerated = phase === 'edit';
   const isFinalizing = phase === 'finalizing';
@@ -171,6 +173,8 @@ export default function CZGeneration() {
     }
 
     setPhase('finalizing');
+    setGenProgress(0);
+    setGenMessage('Starting...');
     setError('');
     try {
       const lengthHours = length * 24;
@@ -192,12 +196,42 @@ export default function CZGeneration() {
 
       const data = await resp.json();
 
-      if (resp.ok && data?.id) {
-        console.log('CZ finalized with ID:', data.id);
-        router.push('/simulator');
-      } else {
+      if (!resp.ok || !data?.id) {
         throw new Error('Failed to finalize CZ');
       }
+
+      console.log('CZ finalized with ID:', data.id);
+
+      // Stream progress via SSE from algorithms server
+      await new Promise<void>((resolve, reject) => {
+        const es = new EventSource(
+          `${ALG_URL}generation-progress/${data.id}`
+        );
+        es.onmessage = (event) => {
+          try {
+            const evt = JSON.parse(event.data);
+            setGenProgress(evt.progress ?? 0);
+            setGenMessage(evt.message ?? '');
+            if (evt.done) {
+              es.close();
+              resolve();
+            } else if (evt.error) {
+              es.close();
+              reject(new Error(evt.message || 'Generation failed'));
+            }
+          } catch {
+            // ignore malformed events
+          }
+        };
+        es.onerror = () => {
+          // Connection lost — generation continues on server.
+          // Fall back to polling the ready flag.
+          es.close();
+          resolve();
+        };
+      });
+
+      router.push('/simulator');
     } catch (err) {
       console.error('Error finalizing CZ:', err);
       setError(
@@ -494,6 +528,19 @@ export default function CZGeneration() {
         {error && (
           <div className="text-red-500 font-bold mb-4 text-center mx-4">
             {error}
+          </div>
+        )}
+        {isFinalizing && (
+          <div className="w-80 max-w-[85vw] flex flex-col gap-1">
+            <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-(--color-primary-blue) rounded-full transition-all duration-500"
+                style={{ width: `${genProgress}%` }}
+              />
+            </div>
+            <p className="text-sm text-center text-gray-400">
+              {genMessage || 'Generating...'}
+            </p>
           </div>
         )}
         <Button
