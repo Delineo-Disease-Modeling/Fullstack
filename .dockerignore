@@ -1,0 +1,9 @@
+.git/
+.next/
+node_modules/
+db/
+.env
+.env.*
+!.env.example
+src/generated/
+*.log
