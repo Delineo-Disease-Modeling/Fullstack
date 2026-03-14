@@ -95,13 +95,13 @@ export default function CZGeneration() {
 
   const [location, setLocation] = useState('');
   const [minPop, setMinPop] = useState(5000);
-  const [startDate, setStartDate] = useState('2019-01-01');
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [length, setLength] = useState(15);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [phase, setPhase] = useState<'input' | 'edit' | 'finalizing'>('input');
+  const [phase, setPhase] = useState<'input' | 'edit' | 'finalizing' | 'done'>('input');
   const [cbgGeoJSON, setCbgGeoJSON] = useState<GeoJSONData | null>(null);
   const [selectedCBGs, setSelectedCBGs] = useState<string[]>([]);
   const [seedCBG, setSeedCBG] = useState('');
@@ -116,8 +116,10 @@ export default function CZGeneration() {
   const [cziLoading, setCziLoading] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [genMessage, setGenMessage] = useState('');
+  const [clusterProgress, setClusterProgress] = useState(0);
+  const [clusterMessage, setClusterMessage] = useState('');
 
-  const hasGenerated = phase === 'edit';
+  const hasGenerated = phase === 'edit' || phase === 'done';
   const isFinalizing = phase === 'finalizing';
 
   const ALG_URL = process.env.NEXT_PUBLIC_ALG_URL;
@@ -231,7 +233,7 @@ export default function CZGeneration() {
         };
       });
 
-      router.push('/simulator');
+      setPhase('done');
     } catch (err) {
       console.error('Error finalizing CZ:', err);
       setError(
@@ -327,14 +329,52 @@ export default function CZGeneration() {
     }
   };
 
-  const lookupLocation = async (location: string) => {
-    const resp = await fetch('/api/lookup-location', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ location })
-    });
-    if (!resp.ok) return null;
-    return await resp.json();
+  const lookupLocation = async (
+    query: string
+  ): Promise<{ cbg: string; city: string; state: string } | null> => {
+    // Geocode via Nominatim (coordinates or address → lat/lng + city)
+    const coordMatch = query.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    const nominatimUrl = coordMatch
+      ? `https://nominatim.openstreetmap.org/reverse?lat=${coordMatch[1]}&lon=${coordMatch[2]}&format=json&addressdetails=1`
+      : `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=1&countrycodes=us`;
+
+    const geoResp = await fetch(nominatimUrl, { headers: { 'User-Agent': 'DelineoApp/1.0' } });
+    if (!geoResp.ok) {
+      return null;
+    }
+
+    const geoData = coordMatch ? [await geoResp.json()] : await geoResp.json();
+    const result = geoData?.[0];
+    if (!result?.address) {
+      return null;
+    }
+
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    if (!lat || !lng) {
+      return null;
+    }
+
+    const city = result.address.city || result.address.town || result.address.village || '';
+
+    // FCC Census Block API -> CBG + 2-letter state code
+    const censusYear = parseInt(startDate.split('-')[0], 10) >= 2020 ? 2020 : 2010;
+    const fccResp = await fetch(
+      `https://geo.fcc.gov/api/census/block/find?latitude=${lat}&longitude=${lng}&censusYear=${censusYear}&format=json`
+    );
+
+    if (!fccResp.ok) {
+      return null;
+    }
+
+    const fccData = await fccResp.json();
+    const fips = fccData?.Block?.FIPS;
+    if (!fips) {
+      return null;
+    }
+
+    const state = fccData?.State?.code || result.address.state || '';
+    return { cbg: fips.slice(0, 12), city, state };
   };
 
   const generateCZ = (formdata: FormData) => {
@@ -343,38 +383,68 @@ export default function CZGeneration() {
 
       const locationData = await lookupLocation(rawLocation);
       const core_cbg = locationData?.cbg;
-      const resolvedCity = locationData?.city || rawLocation;
 
       if (!core_cbg) {
         setError(
           'Could not find location or CBG. Please try a different location or enter a 5-digit ZIP code.'
         );
+
         return;
       }
 
-      setCityName(resolvedCity);
+      const city = locationData?.city || '';
+      const state = locationData?.state || '';
+      const resolvedName = city && state
+        ? `${city}, ${state}`
+        : city || state || rawLocation;
+
+      setCityName(resolvedName);
+      setClusterProgress(0);
+      setClusterMessage('Starting...');
 
       const resp = await fetch(`${ALG_URL}cluster-cbgs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cbg: core_cbg,
-          min_pop: +(formdata.get('min_pop') ?? 0)
+          min_pop: +(formdata.get('min_pop') ?? 0),
+          start_date: startDate
         })
       });
 
-      const data = await resp.json();
+      const initData = await resp.json();
 
-      if (!resp.ok || !data?.cluster) {
-        throw new Error('Failed to cluster CBGs');
+      if (!resp.ok || !initData?.clustering_id) {
+        throw new Error(initData?.message || 'Failed to start clustering');
       }
 
-      setSelectedCBGs(data.cluster || []);
-      setSeedCBG(data.seed_cbg || core_cbg);
-      setTotalPopulation(data.size || 0);
-      setMapCenter(data.center || null);
+      // Stream progress via SSE
+      const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        const es = new EventSource(`${ALG_URL}clustering-progress/${initData.clustering_id}`);
+        es.onmessage = (event) => {
+          const evt = JSON.parse(event.data);
+          setClusterProgress(evt.progress ?? 0);
+          setClusterMessage(evt.message ?? '');
+          if (evt.done && evt.result) {
+            es.close();
+            resolve(evt.result as Record<string, unknown>);
+          } else if (evt.error) {
+            es.close();
+            reject(new Error(evt.message || 'Clustering failed'));
+          }
+        };
+        es.onerror = () => {
+          es.close();
+          reject(new Error('Lost connection to clustering server'));
+        };
+      });
 
-      if (data.geojson) setCbgGeoJSON(data.geojson);
+      setSelectedCBGs((data.cluster as string[]) || []);
+      setSeedCBG((data.seed_cbg as string) || core_cbg);
+      setTotalPopulation((data.size as number) || 0);
+      setMapCenter((data.center as [number, number]) || null);
+
+      if (data.geojson) setCbgGeoJSON(data.geojson as GeoJSONData);
       setPhase('edit');
     };
 
@@ -385,20 +455,25 @@ export default function CZGeneration() {
       .catch((err) => {
         console.error(err);
         setError(
-          (err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || 'Failed to cluster CBGs. Please try again.'
+          (err instanceof Error ? err.message : null) ||
+            'Failed to cluster CBGs. Please try again.'
         );
       })
       .finally(() => setLoading(false));
   };
 
-  if (isPending) {
-    return <div className="text-white text-center mt-20">Loading...</div>;
-  }
+  useEffect(() => {
+    if (!user && !isPending) {
+      router.replace('/simulator');
+    }
+  }, [user, isPending, router]);
 
   if (!user) {
-    router.replace('/simulator');
     return null;
+  }
+
+  if (isPending) {
+    return <div className="text-white text-center mt-20">Loading...</div>;
   }
 
   return (
@@ -497,8 +572,8 @@ export default function CZGeneration() {
                 {cbgGeoJSON ? (
                   <CBGMap
                     cbgData={cbgGeoJSON}
-                    onCBGClick={handleCBGClick}
-                    onMapBackgroundClick={handleMapBackgroundClick}
+                    onCBGClick={phase === 'done' ? () => {} : handleCBGClick}
+                    onMapBackgroundClick={phase === 'done' ? () => {} : handleMapBackgroundClick}
                     selectedCBGs={selectedCBGs}
                   />
                 ) : (
@@ -511,9 +586,11 @@ export default function CZGeneration() {
                     </div>
                   </div>
                 )}
-                <div className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs">
-                  Click CBGs (or empty map area) to add/remove from zone
-                </div>
+                {phase === 'edit' && (
+                  <div className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs">
+                    Click CBGs (or empty map area) to add/remove from zone
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -526,8 +603,21 @@ export default function CZGeneration() {
           )}
         </div>
         {error && (
-          <div className="text-red-500 font-bold mb-4 text-center mx-4">
+          <div className="text-red-500 text-center mx-4 max-w-100">
             {error}
+          </div>
+        )}
+        {loading && (
+          <div className="w-80 max-w-[85vw] flex flex-col gap-1">
+            <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-(--color-primary-blue) rounded-full transition-all duration-500"
+                style={{ width: `${clusterProgress}%` }}
+              />
+            </div>
+            <p className="text-sm text-center text-gray-400">
+              {clusterMessage || 'Starting...'}
+            </p>
           </div>
         )}
         {isFinalizing && (
@@ -543,19 +633,33 @@ export default function CZGeneration() {
             </p>
           </div>
         )}
-        <Button
-          type={phase === 'input' ? 'submit' : 'button'}
-          onClick={() => phase === 'edit' && finalizeCZ()}
-          disabled={loading || isFinalizing}
-        >
-          {loading
-            ? 'Clustering...'
-            : isFinalizing
-              ? 'Generating Patterns...'
-              : phase === 'input'
-                ? 'Preview CBGs'
-                : 'Finalize & Generate'}
-        </Button>
+        {phase === 'done' ? (
+          <div className="flex flex-col items-center gap-2">
+            <p>
+              Convenience zone created successfully!
+            </p>
+            <Button
+              type="button"
+              onClick={() => router.push('/simulator')}
+            >
+              Return
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type={phase === 'input' ? 'submit' : 'button'}
+            onClick={() => phase === 'edit' && finalizeCZ()}
+            disabled={loading || isFinalizing}
+          >
+            {loading
+              ? 'Clustering...'
+              : isFinalizing
+                ? 'Generating Patterns...'
+                : phase === 'input'
+                  ? 'Preview CBGs'
+                  : 'Finalize & Generate'}
+          </Button>
+        )}
       </form>
     </div>
   );

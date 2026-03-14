@@ -196,7 +196,7 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
       {error ? <div className="mt-2 text-xs text-red-600">{error}</div> : null}
 
       {pathData ? (
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 max-h-96 space-y-3 overflow-y-scroll rounded-md border-2 border-(--color-primary-blue) p-3 pr-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:mr-1 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
           <div className="text-xs text-gray-700">
             <span className="font-semibold">Person #{pathData.person_id}</span>
             {pathData.person ? (
