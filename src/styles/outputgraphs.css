@@ -13,3 +13,25 @@ div.outputgraph_chart {
   border: 2px solid var(--color-primary-blue);
   border-radius: 0.375rem;
 }
+
+@media (max-width: 768px) {
+  div.outputgraphs_container {
+    height: 450px;
+    padding-bottom: 40px;
+  }
+
+  div.outputgraph_chart {
+    padding: 16px 8px 16px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  div.outputgraphs_container {
+    height: 380px;
+    padding-bottom: 30px;
+  }
+
+  div.outputgraph_chart {
+    padding: 12px 4px 12px 0;
+  }
+}

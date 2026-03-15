@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   CartesianGrid,
   Legend,
@@ -40,6 +40,25 @@ export default function OutputGraphs({
   const [chartData, setChartData] = useState<any>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
+
+  const handleLegendClick = useCallback((entry: any) => {
+    const key = entry.dataKey ?? entry.value;
+    setHiddenLines((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  // Reset hidden lines when chart type or data changes
+  useEffect(() => {
+    setHiddenLines(new Set());
+  }, [chartType, chartData]);
 
   useEffect(() => {
     setChartData(null);
@@ -124,6 +143,7 @@ export default function OutputGraphs({
                 type="number"
                 dataKey="time"
                 tickCount={20}
+                domain={['dataMin', 'dataMax']}
               />
               <YAxis
                 label={{ value: 'Total', angle: -90, position: 'insideLeft' }}
@@ -131,6 +151,12 @@ export default function OutputGraphs({
               <Tooltip content={CustomTooltip as any} />
               <Legend
                 wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }}
+                onClick={handleLegendClick}
+                formatter={(value: string) => (
+                  <span style={{ color: hiddenLines.has(value) ? '#ccc' : undefined, cursor: 'pointer' }}>
+                    {value}
+                  </span>
+                )}
               />
               {Object.keys(chartData[chartType][0])
                 .filter((key) => key !== 'time')
@@ -141,6 +167,7 @@ export default function OutputGraphs({
                     dataKey={key}
                     stroke={COLORS[index % COLORS.length]}
                     dot={false}
+                    hide={hiddenLines.has(key)}
                   />
                 ))}
             </LineChart>
