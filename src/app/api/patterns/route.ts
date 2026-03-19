@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { saveFileStream } from '@/lib/filestream';
 import { prisma } from '@/lib/prisma';
+import { broadcast } from '@/lib/sse-broadcast';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
@@ -33,6 +34,8 @@ export async function POST(request: NextRequest) {
       where: { id: czone_id },
       data: { papdata_id, patterns_id }
     });
+
+    broadcast({ type: 'zone-ready', zone_id: czone_id });
 
     await Promise.all([
       saveFileStream(patterns, `${DB_FOLDER + patterns_id}.gz`, true),

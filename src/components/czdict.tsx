@@ -31,10 +31,10 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    let timerId: number | null = null;
+    let es: EventSource | null = null;
+    let fallbackTimer: number | null = null;
 
-    const refreshZones = async () => {
+    const fetchZones = async () => {
       try {
         const res = await fetch('/api/convenience-zones');
         const json = await res.json().catch(() => ({}));
@@ -46,7 +46,6 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
           setLocations([]);
           setLoadError(`Failed to load zones (${res.status}).`);
           setLoading(false);
-          timerId = window.setTimeout(refreshZones, 5000);
           return;
         }
 
@@ -67,28 +66,49 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
         } else if (locs.length > 0) {
           setZone(locs[0]);
         }
-
-        const hasPendingGeneration = locs.some(
-          (candidate: ConvenienceZone) => !candidate.ready
-        );
-        timerId = window.setTimeout(refreshZones, hasPendingGeneration ? 4000 : 30000);
       } catch (e) {
         if (!active) return;
         console.error(e);
         setLocations([]);
         setLoadError('Unable to reach the API. Check that the backend is running.');
         setLoading(false);
-        timerId = window.setTimeout(refreshZones, 5000);
       }
     };
 
-    refreshZones();
+    const connectSSE = () => {
+      es = new EventSource('/api/convenience-zones/events');
+
+      es.onmessage = () => {
+        fetchZones();
+      };
+
+      es.onerror = () => {
+        if (!fallbackTimer) {
+          fallbackTimer = window.setInterval(fetchZones, 10_000);
+        }
+      };
+
+      es.onopen = () => {
+        if (fallbackTimer) {
+          clearInterval(fallbackTimer);
+          fallbackTimer = null;
+        }
+        fetchZones();
+      };
+    };
+
+    setLoading(true);
+    fetchZones().then(() => {
+      if (active) connectSSE();
+    });
+
+    const heartbeat = window.setInterval(fetchZones, 60_000);
 
     return () => {
       active = false;
-      if (timerId) {
-        clearTimeout(timerId);
-      }
+      if (es) es.close();
+      if (fallbackTimer) clearInterval(fallbackTimer);
+      clearInterval(heartbeat);
     };
   }, [setZone]);
 

@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { broadcast } from '@/lib/sse-broadcast';
 
 export async function GET(
   _request: NextRequest,
@@ -50,6 +51,7 @@ export async function PATCH(
       where: { id },
       data,
     });
+    broadcast({ type: 'zone-updated', zone_id: zone.id });
     return Response.json({
       data: { ...zone, ready: !!zone.papdata_id },
     });
@@ -71,6 +73,7 @@ export async function DELETE(
 
   try {
     const zone = await prisma.convenienceZone.delete({ where: { id } });
+    broadcast({ type: 'zone-deleted', zone_id: zone.id });
     return Response.json({ data: zone });
   } catch (error) {
     return Response.json({ message: String(error) }, { status: 400 });

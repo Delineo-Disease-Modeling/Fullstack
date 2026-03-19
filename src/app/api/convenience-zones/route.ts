@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { broadcast } from '@/lib/sse-broadcast';
 
 const getSchema = z.object({
   user_id: z.string().optional()
@@ -87,6 +88,8 @@ export async function POST(request: NextRequest) {
         user_id
       }
     });
+
+    broadcast({ type: 'zone-created', zone_id: zone.id });
 
     return Response.json({ data: zone });
   } catch {
