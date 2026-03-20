@@ -59,6 +59,7 @@ export async function GET(
           controller.enqueue(chunk);
         }
 
+        controller.enqueue(encoder.encode('\n'));
         controller.close();
       } catch (e) {
         console.error('Patterns stream error:', e);
