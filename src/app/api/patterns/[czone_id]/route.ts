@@ -2,24 +2,17 @@ import { constants, createReadStream } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
-import chain from 'stream-chain';
-import parser from 'stream-json';
-import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { prisma } from '@/lib/prisma';
 import { getCachedPapdata } from '@/lib/papdata-cache';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ czone_id: string }> }
 ) {
   const { czone_id: czone_id_raw } = await params;
   const czone_id = Number(czone_id_raw);
-  const { searchParams } = new URL(request.url);
-  const length = searchParams.get('length')
-    ? Number(searchParams.get('length'))
-    : undefined;
 
   if (Number.isNaN(czone_id) || czone_id < 0) {
     return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
@@ -44,7 +37,6 @@ export async function GET(
     return Response.json({ message: 'Data files not found' }, { status: 404 });
   }
 
-  // Pre-load papdata from cache (avoids re-gunzipping from disk)
   let papdata: any;
   try {
     papdata = await getCachedPapdata(czone.papdata_id);
@@ -54,30 +46,17 @@ export async function GET(
 
   const encoder = new TextEncoder();
 
+  // Send papdata as first line, then stream raw decompressed patterns JSON
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Send papdata from cache as first chunk
         controller.enqueue(encoder.encode(JSON.stringify(papdata)));
         controller.enqueue(encoder.encode('\n'));
 
-        // Stream patterns from disk (large, benefits from streaming)
-        const patChain = chain([
-          createReadStream(patPath),
-          createGunzip(),
-          parser(),
-          StreamObject.streamObject()
-        ]);
-        for await (const { key, value } of patChain as AsyncIterable<{
-          key: string;
-          value: any;
-        }>) {
-          if (length && +key > length) continue;
-          controller.enqueue(
-            encoder.encode(
-              `${JSON.stringify({ patterns: { [key]: value } })}\n`
-            )
-          );
+        const gunzip = createGunzip();
+        const fileStream = createReadStream(patPath).pipe(gunzip);
+        for await (const chunk of fileStream) {
+          controller.enqueue(chunk);
         }
 
         controller.close();
