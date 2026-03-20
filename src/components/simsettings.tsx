@@ -19,13 +19,15 @@ interface SimSettingsProps {
   error: string | null;
   loading: boolean;
   progress: number;
+  progressMessage: string | null;
 }
 
 export default function SimSettings({
   sendData,
   error,
   loading,
-  progress
+  progress,
+  progressMessage
 }: SimSettingsProps) {
   const zone = useSimSettings((state) => state.zone);
   const hours = useSimSettings((state) => state.hours);
@@ -103,14 +105,16 @@ export default function SimSettings({
         >
           {loading ? 'Processing...' : 'Simulate'}
         </Button>
-        {loading && progress > 0 && (
-          <div className="w-64 rounded-full h-2.5 bg-(--color-bg-dark) mb-4">
-            <div
-              className="bg-(--color-primary-blue) h-2.5 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-            <p className="text-xs text-center mt-1">
-              Simulating... {progress}%
+        {loading && (
+          <div className="w-80 max-w-[85vw] flex flex-col gap-1">
+            <div className="w-full h-3 bg-(--color-bg-dark) rounded-full overflow-hidden">
+              <div
+                className="h-full bg-(--color-primary-blue) rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-sm text-center text-gray-400">
+              {progressMessage || 'Starting...'}{progress > 0 ? ` ${progress}%` : ''}
             </p>
           </div>
         )}

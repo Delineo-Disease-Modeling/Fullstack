@@ -18,6 +18,7 @@ export default function Simulator() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Deselect any previous run when entering this page
@@ -57,6 +58,7 @@ export default function Simulator() {
 
     // Start a new simulation with SSE
     setProgress(0);
+    setProgressMessage(null);
     try {
       const simUrl = process.env.NEXT_PUBLIC_SIM_URL;
       const response = await fetch(`${simUrl}simulation/`, {
@@ -87,20 +89,17 @@ export default function Simulator() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            try {
-              const msg = JSON.parse(line.slice(6));
+            const msg = JSON.parse(line.slice(6));
 
-              if (msg.type === 'progress') {
-                setProgress(msg.value);
-              } else if (msg.type === 'result') {
-                setSettings({ sim_id: msg.data.id });
-                console.log('Set sim_id to:', msg.data.id);
-                return true;
-              } else if (msg.type === 'error') {
-                throw new Error(msg.message);
-              }
-            } catch (e) {
-              console.error('Error parsing SSE message:', e);
+            if (msg.type === 'progress') {
+              setProgress(msg.value);
+              if (msg.message) setProgressMessage(msg.message);
+            } else if (msg.type === 'result') {
+              setSettings({ sim_id: msg.data.id });
+              console.log('Set sim_id to:', msg.data.id);
+              return true;
+            } else if (msg.type === 'error') {
+              throw new Error(msg.message);
             }
           }
         }
@@ -144,6 +143,7 @@ export default function Simulator() {
           error={error}
           loading={loading}
           progress={progress}
+          progressMessage={progressMessage}
         />
       </div>
     </div>

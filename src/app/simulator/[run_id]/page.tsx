@@ -41,6 +41,14 @@ export default function SimulatorRun() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    if (loading) {
+      document.title = 'Loading Simulation | Delineo';
+    } else if (selectedZone?.name) {
+      document.title = `${selectedZone.name} | Delineo`;
+    }
+  }, [loading, selectedZone?.name]);
+
+  useEffect(() => {
     if (!run_id) {
       router.replace('/simulator');
       return;

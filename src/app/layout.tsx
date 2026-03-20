@@ -13,7 +13,10 @@ export const viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Delineo',
+  title: {
+    default: 'Delineo',
+    template: '%s | Delineo'
+  },
   description: 'Community-level disease modeling'
 };
 

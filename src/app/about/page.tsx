@@ -1,5 +1,8 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import '@/styles/about.css';
+
+export const metadata: Metadata = { title: 'About' };
 
 export default function About() {
   return (
