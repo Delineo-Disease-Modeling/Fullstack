@@ -1,9 +1,10 @@
 import { createReadStream } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
-import { createGunzip, gunzipSync } from 'node:zlib';
+import { writeFile } from 'node:fs/promises';
+import { createGunzip } from 'node:zlib';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { getCachedPapdata } from './papdata-cache';
 
 const age_ranges: [number, number][] = [
   [0, 20],
@@ -33,7 +34,7 @@ interface ProcessOpts {
   simDataId: number;
   simdataPath: string;
   patternsPath: string;
-  papDataPath: string;
+  papdataId: string;
   mapCachePath: string;
   totalLength: number;
 }
@@ -49,14 +50,11 @@ export const processingProgress = new Map<number, number>();
  * Returns the global stats object to be stored in SimData.global_stats.
  */
 export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
-  const { simDataId, simdataPath, patternsPath, papDataPath, mapCachePath, totalLength } = opts;
+  const { simDataId, simdataPath, patternsPath, papdataId, mapCachePath, totalLength } = opts;
   processingProgress.set(simDataId, 0);
 
-  // Load papdata once
-  const papRaw = await readFile(papDataPath);
-  const papdata = JSON.parse(
-    (papDataPath.endsWith('.gz') ? gunzipSync(papRaw) : papRaw).toString()
-  );
+  // Load papdata from shared cache (avoids redundant gunzip)
+  const papdata = await getCachedPapdata(papdataId);
 
   const homeIds = Object.keys(papdata.homes).sort(
     (a, b) => Number(a) - Number(b)

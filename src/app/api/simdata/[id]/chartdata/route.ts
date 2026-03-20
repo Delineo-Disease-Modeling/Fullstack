@@ -1,11 +1,12 @@
 import { constants, createReadStream } from 'node:fs';
-import { access, readFile } from 'node:fs/promises';
-import { createGunzip, gunzipSync } from 'node:zlib';
+import { access } from 'node:fs/promises';
+import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { prisma } from '@/lib/prisma';
+import { getCachedPapdata } from '@/lib/papdata-cache';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
@@ -28,23 +29,6 @@ const infection_states = {
 
 type DataPoint = { time: number; [key: string]: number };
 type ChartData = { [type: string]: DataPoint[] };
-
-async function loadPapData(papDataId: string) {
-  const papPath = `${DB_FOLDER}${papDataId}.gz`;
-  await access(papPath, constants.F_OK);
-  const raw = await readFile(papPath);
-
-  const buffer = await new Promise<Buffer>((resolve, reject) => {
-    const unzip = createGunzip();
-    const chunks: Buffer[] = [];
-    unzip.on('data', (c: Buffer) => chunks.push(c));
-    unzip.on('end', () => resolve(Buffer.concat(chunks)));
-    unzip.on('error', reject);
-    unzip.end(raw);
-  });
-
-  return JSON.parse(buffer.toString());
-}
 
 /**
  * Compute location-specific chart data on-demand by streaming sim+patterns
@@ -223,7 +207,7 @@ export async function GET(
       );
     }
 
-    const papdata = await loadPapData(papDataId);
+    const papdata = await getCachedPapdata(papDataId);
     const chartData = await computeLocationStats(
       simdata.file_id,
       loc_id,

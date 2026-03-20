@@ -52,14 +52,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (czone?.papdata_id) {
-      const papPath = `${DB_FOLDER}${czone.papdata_id}.gz`;
-
       // Single-pass processor: generates map cache, global stats
       processSimulation({
         simDataId: simdata_obj.id,
         simdataPath: simPath,
         patternsPath: patPath,
-        papDataPath: papPath,
+        papdataId: czone.papdata_id,
         mapCachePath: `${DB_FOLDER}${fileId}.map.json`,
         totalLength: length
       })

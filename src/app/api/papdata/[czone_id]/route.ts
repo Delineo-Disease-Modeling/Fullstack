@@ -1,11 +1,6 @@
-import { constants, createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
-import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
-import chain from 'stream-chain';
 import { prisma } from '@/lib/prisma';
-
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
+import { getCachedPapdata } from '@/lib/papdata-cache';
 
 export async function GET(
   _request: NextRequest,
@@ -29,10 +24,9 @@ export async function GET(
     );
   }
 
-  const papPath = `${DB_FOLDER + czone.papdata_id}.gz`;
-
+  let json: any;
   try {
-    await access(papPath, constants.F_OK);
+    json = await getCachedPapdata(czone.papdata_id);
   } catch {
     return Response.json(
       { message: 'Papdata file not found' },
@@ -40,14 +34,6 @@ export async function GET(
     );
   }
 
-  const papdata_stream = chain([createReadStream(papPath), createGunzip()]);
-
-  let data = '';
-  for await (const chunk of papdata_stream) {
-    data += chunk;
-  }
-
-  const json = JSON.parse(data);
   const filtered: any = { homes: {}, places: {} };
 
   for (const [id] of Object.entries(json.homes)) {

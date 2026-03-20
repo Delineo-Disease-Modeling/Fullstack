@@ -6,6 +6,7 @@ import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { prisma } from '@/lib/prisma';
+import { getCachedPapdata } from '@/lib/papdata-cache';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
@@ -35,16 +36,20 @@ export async function GET(
     );
   }
 
-  const papPath = `${DB_FOLDER + czone.papdata_id}.gz`;
   const patPath = `${DB_FOLDER + czone.patterns_id}.gz`;
 
   try {
-    await Promise.all([
-      access(papPath, constants.F_OK),
-      access(patPath, constants.F_OK)
-    ]);
+    await access(patPath, constants.F_OK);
   } catch {
     return Response.json({ message: 'Data files not found' }, { status: 404 });
+  }
+
+  // Pre-load papdata from cache (avoids re-gunzipping from disk)
+  let papdata: any;
+  try {
+    papdata = await getCachedPapdata(czone.papdata_id);
+  } catch {
+    return Response.json({ message: 'Papdata file not found' }, { status: 404 });
   }
 
   const encoder = new TextEncoder();
@@ -52,14 +57,11 @@ export async function GET(
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Stream papdata
-        const papChain = chain([createReadStream(papPath), createGunzip()]);
-        for await (const chunk of papChain) {
-          controller.enqueue(encoder.encode(chunk));
-        }
+        // Send papdata from cache as first chunk
+        controller.enqueue(encoder.encode(JSON.stringify(papdata)));
         controller.enqueue(encoder.encode('\n'));
 
-        // Stream patterns
+        // Stream patterns from disk (large, benefits from streaming)
         const patChain = chain([
           createReadStream(patPath),
           createGunzip(),
