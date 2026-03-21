@@ -10,25 +10,61 @@ import { getCachedPapdata } from '@/lib/papdata-cache';
 
 const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
-const age_ranges = [
+const age_ranges: [number, number][] = [
   [0, 20],
   [21, 40],
   [41, 60],
   [61, 80],
   [81, 99]
 ];
-const infection_states = {
-  Susceptible: 0,
-  Infected: 1,
-  Infectious: 2,
-  Symptomatic: 4,
-  Hospitalized: 8,
-  Recovered: 16,
-  Removed: 32
-};
+const age_range_labels = age_ranges.map(([lo, hi]) => `${lo}-${hi}`);
+
+const bitmask_states: [string, number][] = [
+  ['Infected', 1],
+  ['Infectious', 2],
+  ['Symptomatic', 4],
+  ['Hospitalized', 8],
+  ['Recovered', 16],
+  ['Removed', 32]
+];
+const all_state_names = ['Susceptible', ...bitmask_states.map(([n]) => n)];
 
 type DataPoint = { time: number; [key: string]: number };
 type ChartData = { [type: string]: DataPoint[] };
+
+// LRU cache for computed location stats
+const LOC_CACHE_MAX = 30;
+interface LocCacheEntry {
+  data: ChartData;
+  lastAccess: number;
+}
+const locationCache = new Map<string, LocCacheEntry>();
+
+function getCachedLocationStats(key: string): ChartData | undefined {
+  const entry = locationCache.get(key);
+  if (entry) {
+    entry.lastAccess = Date.now();
+    return entry.data;
+  }
+  return undefined;
+}
+
+function setCachedLocationStats(key: string, data: ChartData): void {
+  if (locationCache.size >= LOC_CACHE_MAX) {
+    let oldestKey = '';
+    let oldestTime = Infinity;
+    for (const [k, entry] of locationCache) {
+      if (entry.lastAccess < oldestTime) {
+        oldestTime = entry.lastAccess;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) {
+      locationCache.delete(oldestKey);
+    }
+  }
+  locationCache.set(key, { data, lastAccess: Date.now() });
+}
 
 /**
  * Compute location-specific chart data on-demand by streaming sim+patterns
@@ -40,6 +76,12 @@ async function computeLocationStats(
   locType: 'homes' | 'places',
   papdata: any
 ): Promise<ChartData> {
+  const cacheKey = `${fileId}:${locType}:${locId}`;
+  const cached = getCachedLocationStats(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const simPath = `${DB_FOLDER}${fileId}.sim.gz`;
   const patPath = `${DB_FOLDER}${fileId}.pat.gz`;
 
@@ -47,6 +89,20 @@ async function computeLocationStats(
     access(simPath, constants.F_OK),
     access(patPath, constants.F_OK)
   ]);
+
+  // Pre-build age index for people in papdata (avoids repeated range scans)
+  const ageIndex = new Map<string, number>();
+  for (const [id, person] of Object.entries(papdata.people ?? {}) as [
+    string,
+    any
+  ][]) {
+    for (let i = 0; i < age_ranges.length; i++) {
+      if (person.age >= age_ranges[i][0] && person.age <= age_ranges[i][1]) {
+        ageIndex.set(id, i);
+        break;
+      }
+    }
+  }
 
   const simIter = (
     chain([
@@ -93,49 +149,47 @@ async function computeLocationStats(
     const pop: string[] | undefined = locGroup?.[locId];
 
     if (pop && pop.length > 0) {
-      const popSet = new Set(pop);
-
       const iot_data: DataPoint = { time, 'All People': pop.length };
       const ages_data: DataPoint = { time };
       const sexes_data: DataPoint = { time, Male: 0, Female: 0 };
       const states_data: DataPoint = { time };
 
-      for (const range of age_ranges) ages_data[range.join('-')] = 0;
-      for (const state of Object.keys(infection_states))
-        states_data[state] = 0;
+      for (const label of age_range_labels) ages_data[label] = 0;
+      for (const name of all_state_names) states_data[name] = 0;
+
+      // Iterate over pop instead of all infected
+      let totalInfected = 0;
 
       for (const [disease, people] of Object.entries(svalue) as [
         string,
         Record<string, number>
       ][]) {
-        const localInfected = Object.entries(people).filter(([pid]) =>
-          popSet.has(pid)
-        );
-        iot_data[disease] = localInfected.length;
+        let diseaseCount = 0;
 
-        for (const [pid, stateBitmask] of localInfected) {
-          for (const [state, value] of Object.entries(infection_states)) {
-            if (state === 'Susceptible') continue;
-            if (stateBitmask & (value as number)) states_data[state]++;
+        for (const pid of pop) {
+          const stateBitmask = people[pid];
+          if (stateBitmask === undefined) {
+            continue;
+          }
+
+          diseaseCount++;
+          for (const [stateName, bit] of bitmask_states) {
+            if (stateBitmask & bit) states_data[stateName]++;
           }
           const p = papdata.people[pid];
           if (p) {
-            sexes_data[p.sex === 0 ? 'Male' : 'Female'] += 1;
-            for (const range of age_ranges) {
-              if (p.age >= range[0] && p.age <= range[1])
-                ages_data[range.join('-')] += 1;
+            sexes_data[p.sex === 0 ? 'Male' : 'Female']++;
+            const ageIdx = ageIndex.get(pid);
+            if (ageIdx !== undefined) {
+              ages_data[age_range_labels[ageIdx]]++;
             }
           }
         }
+
+        iot_data[disease] = diseaseCount;
+        totalInfected += diseaseCount;
       }
 
-      // Susceptible = people at this location who are not infected
-      const totalInfected = Object.values(svalue).reduce(
-        (sum: number, people: any) =>
-          sum +
-          Object.keys(people).filter((pid) => popSet.has(pid)).length,
-        0
-      );
       states_data.Susceptible = Math.max(0, pop.length - totalInfected);
 
       chartData.iot.push(iot_data);
@@ -148,6 +202,7 @@ async function computeLocationStats(
     ppl = await patIter.next();
   }
 
+  setCachedLocationStats(cacheKey, chartData);
   return chartData;
 }
 
