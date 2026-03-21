@@ -384,17 +384,22 @@ function ClusteredMap({
   };
 
   const clusterColor = [
-    'interpolate',
-    ['linear'],
-    ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
-    0,
+    'case',
+    ['==', ['get', 'population'], 0],
     '#4CAF50',
-    0.15,
-    '#FFEB3B',
-    0.35,
-    '#FF9800',
-    0.5,
-    '#F44336'
+    [
+      'interpolate',
+      ['linear'],
+      ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
+      0,
+      '#4CAF50',
+      0.15,
+      '#FFEB3B',
+      0.35,
+      '#FF9800',
+      0.5,
+      '#F44336'
+    ]
   ];
 
   return (
