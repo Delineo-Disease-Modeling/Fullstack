@@ -234,6 +234,21 @@ function getResponseErrorMessage(
   return fallback;
 }
 
+function getPayloadErrorMessage(
+  payload: Record<string, unknown> | null,
+  fallback: string
+) {
+  if (typeof payload?.message === 'string' && payload.message.trim()) {
+    return payload.message;
+  }
+
+  if (typeof payload?.error === 'string' && payload.error.trim()) {
+    return payload.error;
+  }
+
+  return fallback;
+}
+
 export default function CZGeneration() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -854,6 +869,96 @@ export default function CZGeneration() {
     return resp.json();
   };
 
+  const waitForClusteringResult = useCallback(
+    (clusteringId: number): Promise<Record<string, unknown>> =>
+      new Promise((resolve, reject) => {
+        let settled = false;
+        const eventSource = new EventSource(
+          algUrl(`clustering-progress/${clusteringId}`)
+        );
+        const timeout = window.setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          eventSource.close();
+          reject(
+            new Error('Timed out waiting for the clustering preview to finish.')
+          );
+        }, 5 * 60 * 1000);
+
+        const finish = (callback: () => void) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(timeout);
+          eventSource.close();
+          callback();
+        };
+
+        eventSource.onmessage = (event) => {
+          let payload: Record<string, unknown> | null = null;
+          try {
+            const parsed = JSON.parse(event.data);
+            payload = isRecord(parsed) ? parsed : null;
+          } catch {
+            finish(() =>
+              reject(
+                new Error(
+                  'Received an invalid clustering progress payload from the Algorithms service.'
+                )
+              )
+            );
+            return;
+          }
+
+          if (payload?.error) {
+            finish(() =>
+              reject(
+                new Error(
+                  getPayloadErrorMessage(
+                    payload,
+                    'Failed to cluster CBGs. Please try again.'
+                  )
+                )
+              )
+            );
+            return;
+          }
+
+          if (!payload?.done) {
+            return;
+          }
+
+          const result = isRecord(payload.result) ? payload.result : null;
+          if (!result) {
+            finish(() =>
+              reject(
+                new Error(
+                  'Clustering finished without returning the preview result payload.'
+                )
+              )
+            );
+            return;
+          }
+
+          finish(() => resolve(result));
+        };
+
+        eventSource.onerror = () => {
+          finish(() =>
+            reject(
+              new Error(
+                'Lost connection to the Algorithms service while previewing CBGs.'
+              )
+            )
+          );
+        };
+      }),
+    [algUrl]
+  );
+
   const resolveSeedPreview = async () => {
     const rawLocationInput = String(location ?? '').trim();
     if (!rawLocationInput) {
@@ -1066,13 +1171,35 @@ export default function CZGeneration() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(clusterReq)
       });
-      const data = (await readJsonObject(resp)) as Record<string, any> | null;
-      if (!resp.ok || !Array.isArray(data?.cluster)) {
+      const kickoffData = (await readJsonObject(resp)) as
+        | Record<string, unknown>
+        | null;
+      if (!resp.ok) {
         throw new Error(
           getResponseErrorMessage(
             resp,
-            data,
+            kickoffData,
             'Failed to cluster CBGs. Please try again.'
+          )
+        );
+      }
+
+      let data = kickoffData as Record<string, any> | null;
+      if (!Array.isArray(data?.cluster)) {
+        const clusteringId = Number(data?.clustering_id);
+        if (Number.isInteger(clusteringId) && clusteringId > 0) {
+          data = (await waitForClusteringResult(clusteringId)) as Record<
+            string,
+            any
+          >;
+        }
+      }
+
+      if (!Array.isArray(data?.cluster)) {
+        throw new Error(
+          getPayloadErrorMessage(
+            kickoffData,
+            'The Algorithms service returned an unexpected clustering response.'
           )
         );
       }
