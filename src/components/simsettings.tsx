@@ -45,6 +45,22 @@ function formatMonthList(months?: string[]): string {
   return months?.length ? months.join(', ') : '';
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+async function readJsonObject(
+  response: Response
+): Promise<Record<string, unknown> | null> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return null;
+  }
+
+  const payload = await response.json().catch(() => null);
+  return isRecord(payload) ? payload : null;
+}
+
 export default function SimSettings({
   sendData,
   error,
@@ -110,15 +126,28 @@ export default function SimSettings({
           `${algUrl}pattern-availability?${availabilityParams.toString()}`,
           { signal: controller.signal }
         );
+        const json = await readJsonObject(response);
 
         if (!response.ok) {
+          const message =
+            typeof json?.message === 'string'
+              ? json.message
+              : `Pattern availability request failed with status ${response.status}`;
           throw new Error(
-            `Pattern availability request failed with status ${response.status}`
+            message
           );
         }
 
-        const json = await response.json();
-        setPatternAvailability({ status: 'ready', data: json.data });
+        if (!isRecord(json?.data)) {
+          throw new Error(
+            'Algorithms service returned invalid pattern availability data'
+          );
+        }
+
+        setPatternAvailability({
+          status: 'ready',
+          data: json.data as PatternAvailabilityData
+        });
       } catch (error) {
         if ((error as Error).name === 'AbortError') {
           return;

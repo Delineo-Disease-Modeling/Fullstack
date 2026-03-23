@@ -192,6 +192,22 @@ function getLengthHours(startDate: string, endDate: string) {
   return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+async function readJsonObject(
+  response: Response
+): Promise<Record<string, unknown> | null> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return null;
+  }
+
+  const payload = await response.json().catch(() => null);
+  return isRecord(payload) ? payload : null;
+}
+
 export default function CZGeneration() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -991,14 +1007,19 @@ export default function CZGeneration() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(clusterReq)
       });
-      const data = await resp.json();
-      if (!resp.ok || !data?.cluster) {
+      const data = (await readJsonObject(resp)) as Record<string, any> | null;
+      if (!resp.ok || !Array.isArray(data?.cluster)) {
         throw new Error(
-          data?.message || 'Failed to cluster CBGs. Please try again.'
+          (typeof data?.message === 'string' && data.message) ||
+            (resp.status === 404
+              ? 'The clustering endpoint was not found on the deployed Algorithms service.'
+              : 'Failed to cluster CBGs. Please try again.')
         );
       }
 
-      const cluster = Array.isArray(data.cluster) ? data.cluster : [];
+      const cluster = data.cluster.filter(
+        (cbg: unknown): cbg is string => typeof cbg === 'string'
+      );
       setSelectedCBGs(cluster);
       setSeedCBG(data.seed_cbg || coreCbg || '');
       setMapCenter(data.center || null);
