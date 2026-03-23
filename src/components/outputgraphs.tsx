@@ -55,11 +55,6 @@ export default function OutputGraphs({
     });
   }, []);
 
-  // Reset hidden lines when chart type or data changes
-  useEffect(() => {
-    setHiddenLines(new Set());
-  }, [chartType, chartData]);
-
   useEffect(() => {
     setChartData(null);
     setChartError(null);
@@ -89,6 +84,7 @@ export default function OutputGraphs({
         .then((json) => {
           if (json) {
             setProcessing(false);
+            setHiddenLines(new Set());
             setChartData(json.data);
           }
         })
@@ -112,7 +108,10 @@ export default function OutputGraphs({
           id="chart-type-select"
           className="px-1 outline-2 outline-solid bg-(--color-bg-ivory) outline-(--color-primary-blue)"
           value={chartType}
-          onChange={(e) => setChartType(e.target.value)}
+          onChange={(e) => {
+            setChartType(e.target.value);
+            setHiddenLines(new Set());
+          }}
         >
           <option value="iot">Infectiousness Over Time</option>
           <option value="ages">Age Of Infected</option>

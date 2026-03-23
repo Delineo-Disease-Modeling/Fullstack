@@ -80,7 +80,7 @@ export default function InterventionTimeline() {
         <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-2 bg-(--color-text-main) rounded-md outline-0" />
         {values.map((value, i) => (
           <input
-            key={i}
+            key={value}
             className={`iv_timeline absolute top-1/2 -translate-y-1/2 left-0 w-full ${curtime === value ? 'current ' : ''}`}
             type="range"
             min={0}

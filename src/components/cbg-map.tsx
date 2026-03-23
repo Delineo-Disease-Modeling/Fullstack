@@ -1,129 +1,242 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layer, Map, Popup, Source } from 'react-map-gl/maplibre';
+import { Layer, Map as MapLibreMap, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import {
+  createCircleGeoJson,
+  getBoundsForGeoJson,
+  getFeatureCbgId,
+  getFeatureCenterFromGeoJson,
+  type GeoJSONFeature,
+  type GeoJSONData,
+  type LatLng
+} from '@/lib/cz-geo';
 
-interface LatLng {
-  lat: number;
-  lng: number;
+const TRACE_LOW_COLOR = '#fde68a';
+const TRACE_HIGH_COLOR = '#dc2626';
+
+type TraceCandidate = {
+  cbg?: string;
+  score?: number;
+  selected?: boolean;
+  rank?: number;
+  [key: string]: unknown;
+};
+
+type TraceLayerData = {
+  clusterSet: Set<string>;
+  candidateByCbg: Map<string, TraceCandidate>;
+  selectedCbg?: string;
+  minScore: number;
+  maxScore: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
-interface GeoJSONData {
-  type: string;
-  features: Array<{
-    type: string;
-    properties: Record<string, unknown>;
-    geometry: object;
-  }>;
+function hexToRgb(hex: string) {
+  const cleaned = hex.replace('#', '');
+  const expanded =
+    cleaned.length === 3
+      ? cleaned
+          .split('')
+          .map((char) => char + char)
+          .join('')
+      : cleaned;
+  const intVal = parseInt(expanded, 16);
+  return {
+    r: (intVal >> 16) & 255,
+    g: (intVal >> 8) & 255,
+    b: intVal & 255
+  };
+}
+
+function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
+  const toHex = (component: number) =>
+    component.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function interpolateHexColor(startHex: string, endHex: string, t: number) {
+  const start = hexToRgb(startHex);
+  const end = hexToRgb(endHex);
+  const ratio = clamp(Number.isFinite(t) ? t : 0, 0, 1);
+
+  return rgbToHex({
+    r: Math.round(start.r + (end.r - start.r) * ratio),
+    g: Math.round(start.g + (end.g - start.g) * ratio),
+    b: Math.round(start.b + (end.b - start.b) * ratio)
+  });
 }
 
 export default function CBGMap({
   cbgData,
+  center = null,
   onCBGClick,
   onMapBackgroundClick,
-  selectedCBGs
+  onTraceCbgInspect = null,
+  selectedCBGs,
+  seedCbgId = '',
+  seedGuardRadiusKm = 0,
+  showSeedGuardCircle = false,
+  traceLayer = null,
+  editingEnabled = true,
+  focusedCbgId = '',
+  focusNonce = 0
 }: {
   cbgData: GeoJSONData;
+  center?: [number, number] | null;
   onCBGClick: (cbgId: string, properties: Record<string, unknown>) => void;
   onMapBackgroundClick: (latlng: LatLng) => void;
+  onTraceCbgInspect?: ((cbgId: string, properties: Record<string, unknown>) => void) | null;
   selectedCBGs: string[];
+  seedCbgId?: string;
+  seedGuardRadiusKm?: number;
+  showSeedGuardCircle?: boolean;
+  traceLayer?: TraceLayerData | null;
+  editingEnabled?: boolean;
+  focusedCbgId?: string;
+  focusNonce?: number;
 }) {
   const mapRef = useRef<MapRef>(null);
   const hasFittedRef = useRef(false);
   const [hoverCbgId, setHoverCbgId] = useState<string | null>(null);
-  const [popupInfo, setPopupInfo] = useState<{
-    lng: number;
-    lat: number;
-    cbgId: string;
-    population: string;
-    inZone: boolean;
-  } | null>(null);
 
-  // Tag each feature with its CBG ID for filter expressions
+  const seedCircleCenter = useMemo(
+    () =>
+      showSeedGuardCircle
+        ? getFeatureCenterFromGeoJson(cbgData, seedCbgId)
+        : null,
+    [cbgData, seedCbgId, showSeedGuardCircle]
+  );
+
+  const seedCircleGeoJSON = useMemo(
+    () =>
+      seedCircleCenter
+        ? createCircleGeoJson(seedCircleCenter, Number(seedGuardRadiusKm))
+        : null,
+    [seedCircleCenter, seedGuardRadiusKm]
+  );
+
+  const bounds = useMemo(() => getBoundsForGeoJson(cbgData), [cbgData]);
+
+  const getCandidateHeatColor = useCallback(
+    (score: number) => {
+      if (!traceLayer) {
+        return TRACE_LOW_COLOR;
+      }
+      const hasRange =
+        Number.isFinite(traceLayer.minScore) &&
+        Number.isFinite(traceLayer.maxScore) &&
+        traceLayer.maxScore > traceLayer.minScore;
+      const normalized = hasRange
+        ? (Number(score) - traceLayer.minScore) /
+          (traceLayer.maxScore - traceLayer.minScore)
+        : 1;
+      return interpolateHexColor(TRACE_LOW_COLOR, TRACE_HIGH_COLOR, normalized);
+    },
+    [traceLayer]
+  );
+
   const taggedData = useMemo(() => {
     if (!cbgData?.features) {
       return cbgData;
     }
+
     return {
       ...cbgData,
       features: cbgData.features.map((f) => ({
         ...f,
         properties: {
           ...f.properties,
-          _cbg_id:
-            (f.properties?.GEOID as string) ||
-            (f.properties?.CensusBlockGroup as string) ||
-            ''
+          _cbg_id: getFeatureCbgId(f),
+          ...(() => {
+            const cbgId = getFeatureCbgId(f);
+            const isFocused = cbgId === focusedCbgId;
+            const candidate = cbgId ? traceLayer?.candidateByCbg.get(cbgId) : null;
+
+            if (traceLayer) {
+              if (traceLayer.clusterSet.has(cbgId)) {
+                return {
+                  _fill_color: '#1d4ed8',
+                  _fill_opacity: 0.74,
+                  _line_color: isFocused ? '#0f172a' : '#1e3a8a',
+                  _line_width: isFocused ? 4 : 2.25
+                };
+              }
+
+              if (traceLayer.selectedCbg === cbgId) {
+                return {
+                  _fill_color: '#f97316',
+                  _fill_opacity: 0.85,
+                  _line_color: isFocused ? '#0f172a' : '#9a3412',
+                  _line_width: isFocused ? 4.75 : 3
+                };
+              }
+
+              if (candidate) {
+                return {
+                  _fill_color: getCandidateHeatColor(Number(candidate.score ?? 0)),
+                  _fill_opacity: 0.75,
+                  _line_color: isFocused ? '#0f172a' : '#7c2d12',
+                  _line_width: isFocused ? 4 : 2
+                };
+              }
+
+              return {
+                _fill_color: '#d1d5db',
+                _fill_opacity: 0.12,
+                _line_color: isFocused ? '#0f172a' : '#9ca3af',
+                _line_width: isFocused ? 4 : 1.25
+              };
+            }
+
+            const isSelected = selectedCBGs.includes(cbgId);
+            return {
+              _fill_color: isSelected ? '#70B4D4' : '#BDBDBD',
+              _fill_opacity: isSelected ? 0.6 : 0.2,
+              _line_color: isFocused
+                ? '#0f172a'
+                : isSelected
+                  ? '#1f2937'
+                  : '#6b7280',
+              _line_width: isFocused ? 4 : isSelected ? 2 : 1.25
+            };
+          })()
         }
       }))
     };
-  }, [cbgData]);
+  }, [cbgData, focusedCbgId, getCandidateHeatColor, selectedCBGs, traceLayer]);
 
-  // Reset fit flag when CBG data changes so we re-center for new data
-  useEffect(() => {
-    hasFittedRef.current = false;
-  }, [cbgData]);
+  const focusedFeature = useMemo<GeoJSONFeature | null>(
+    () =>
+      taggedData?.features?.find(
+        (item) => getFeatureCbgId(item) === focusedCbgId
+      ) ?? null,
+    [focusedCbgId, taggedData]
+  );
+  const focusTarget = `${focusedCbgId}:${focusNonce}`;
 
-  // Fit map bounds to CBG features
   const fitBoundsToData = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (!map || !cbgData?.features?.length || hasFittedRef.current) {
+    if (!map || !bounds || hasFittedRef.current) {
       return;
     }
 
-    let minLng = Infinity, maxLng = -Infinity;
-    let minLat = Infinity, maxLat = -Infinity;
+    map.fitBounds(bounds, { padding: 20, maxZoom: 14, duration: 0 });
+    hasFittedRef.current = true;
+  }, [bounds]);
 
-    for (const feature of cbgData.features) {
-      const coords = (feature.geometry as { coordinates: number[][][][] })?.coordinates;
-      if (!coords) {
-        continue;
-      }
-      // Handle both Polygon and MultiPolygon
-      const rings = Array.isArray(coords[0]?.[0]?.[0]) ? coords.flat() : coords;
-      for (const ring of rings) {
-        for (const point of ring as unknown as number[][]) {
-          minLng = Math.min(minLng, point[0]);
-          maxLng = Math.max(maxLng, point[0]);
-          minLat = Math.min(minLat, point[1]);
-          maxLat = Math.max(maxLat, point[1]);
-        }
-      }
-    }
-
-    if (minLng !== Infinity) {
-      map.fitBounds(
-        [[minLng, minLat], [maxLng, maxLat]],
-        { padding: 20, maxZoom: 14, duration: 0 }
-      );
-      hasFittedRef.current = true;
-    }
-  }, [cbgData]);
-
-  // Fit bounds when data arrives (if map is already loaded)
   useEffect(() => {
     fitBoundsToData();
   }, [fitBoundsToData]);
 
-  // Also fit bounds when map finishes loading (if data arrived first)
   const handleMapLoad = useCallback(() => {
     fitBoundsToData();
   }, [fitBoundsToData]);
-
-  // Build a set for selected CBGs (used in filter expressions)
-  const selectedSet = useMemo(() => new Set(selectedCBGs), [selectedCBGs]);
-
-  // MapLibre GL expressions for selected/unselected styling
-  const selectedFilter = useMemo(
-    () => ['in', ['get', '_cbg_id'], ['literal', selectedCBGs]] as unknown as maplibregl.ExpressionSpecification,
-    [selectedCBGs]
-  );
-  const unselectedFilter = useMemo(
-    () => ['!', ['in', ['get', '_cbg_id'], ['literal', selectedCBGs]]] as unknown as maplibregl.ExpressionSpecification,
-    [selectedCBGs]
-  );
 
   const handleClick = useCallback(
     (e: { lngLat: { lat: number; lng: number }; features?: { properties?: Record<string, unknown> }[] }) => {
@@ -131,58 +244,35 @@ export default function CBGMap({
       if (feature?.properties) {
         const cbgId = (feature.properties._cbg_id as string) || '';
         if (cbgId) {
+          if (traceLayer && onTraceCbgInspect) {
+            onTraceCbgInspect(cbgId, feature.properties);
+            return;
+          }
+          if (!editingEnabled) {
+            return;
+          }
           onCBGClick(cbgId, feature.properties);
           return;
         }
       }
-      // Background click
-      onMapBackgroundClick({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-    },
-    [onCBGClick, onMapBackgroundClick]
-  );
-
-  const handleMouseMove = useCallback(
-    (e: { features?: { properties?: Record<string, unknown> }[] }) => {
-      const feature = e.features?.[0];
-      const cbgId = (feature?.properties?._cbg_id as string) || null;
-      setHoverCbgId(cbgId);
-
-      if (feature?.properties && cbgId) {
-        // We don't have lngLat from mousemove features directly,
-        // so we use popup on hover via state
-        setPopupInfo(null); // Clear popup on hover to avoid stale state
+      if (editingEnabled) {
+        onMapBackgroundClick({ lat: e.lngLat.lat, lng: e.lngLat.lng });
       }
     },
-    []
+    [editingEnabled, onCBGClick, onMapBackgroundClick, onTraceCbgInspect, traceLayer]
   );
 
   const handleMouseLeave = useCallback(() => {
     setHoverCbgId(null);
-    setPopupInfo(null);
   }, []);
 
-  // Show tooltip on hover using a different approach — track mouse position
   const handleMapMouseMove = useCallback(
-    (e: { lngLat: { lat: number; lng: number }; features?: { properties?: Record<string, unknown> }[] }) => {
+    (e: { features?: { properties?: Record<string, unknown> }[] }) => {
       const feature = e.features?.[0];
       const cbgId = (feature?.properties?._cbg_id as string) || null;
       setHoverCbgId(cbgId);
-
-      if (cbgId && feature?.properties) {
-        const pop = feature.properties.population ?? 'N/A';
-        const inZone = selectedSet.has(cbgId);
-        setPopupInfo({
-          lng: e.lngLat.lng,
-          lat: e.lngLat.lat,
-          cbgId,
-          population: String(pop),
-          inZone
-        });
-      } else {
-        setPopupInfo(null);
-      }
     },
-    [selectedSet]
+    []
   );
 
   // Hover highlight filter
@@ -193,65 +283,88 @@ export default function CBGMap({
     [hoverCbgId]
   );
 
+  useEffect(() => {
+    const [normalized] = focusTarget.split(':');
+    if (!normalized) {
+      return;
+    }
+
+    const map = mapRef.current?.getMap();
+    const feature = focusedFeature;
+    if (!map || !feature) {
+      return;
+    }
+
+    const featureBounds = getBoundsForGeoJson({
+      type: 'FeatureCollection',
+      features: [feature]
+    });
+    if (!featureBounds) {
+      return;
+    }
+
+    map.fitBounds(featureBounds, {
+      padding: 72,
+      maxZoom: 11.25,
+      duration: 0
+    });
+  }, [focusTarget, focusedFeature]);
+
   return (
-    <Map
+    <MapLibreMap
       ref={mapRef}
       initialViewState={{
-        latitude: 39.3291,
-        longitude: -76.6220,
+        latitude: center?.[0] ?? 39.3291,
+        longitude: center?.[1] ?? -76.6220,
         zoom: 12
       }}
       style={{ width: '100%', height: '100%' }}
       mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-      interactiveLayerIds={['cbg-fill-selected', 'cbg-fill-unselected']}
+      interactiveLayerIds={['cbg-fill']}
       onLoad={handleMapLoad}
       onClick={handleClick}
       onMouseMove={handleMapMouseMove}
       onMouseLeave={handleMouseLeave}
       cursor={hoverCbgId ? 'pointer' : ''}
     >
+      {seedCircleGeoJSON && (
+        <Source id="seed-guard-circle" type="geojson" data={seedCircleGeoJSON as any}>
+          <Layer
+            id="seed-guard-circle-fill"
+            type="fill"
+            paint={{
+              'fill-color': '#60a5fa',
+              'fill-opacity': 0.06
+            }}
+          />
+          <Layer
+            id="seed-guard-circle-line"
+            type="line"
+            paint={{
+              'line-color': '#2563eb',
+              'line-width': 2,
+              'line-dasharray': [3, 2]
+            }}
+          />
+        </Source>
+      )}
       <Source id="cbg-data" type="geojson" data={taggedData as GeoJSON.FeatureCollection}>
-        {/* Unselected fill */}
         <Layer
-          id="cbg-fill-unselected"
+          id="cbg-fill"
           type="fill"
-          filter={unselectedFilter}
           paint={{
-            'fill-color': '#BDBDBD',
-            'fill-opacity': 0.2
+            'fill-color': ['get', '_fill_color'],
+            'fill-opacity': ['get', '_fill_opacity']
           }}
         />
-        {/* Selected fill */}
         <Layer
-          id="cbg-fill-selected"
-          type="fill"
-          filter={selectedFilter}
-          paint={{
-            'fill-color': '#70B4D4',
-            'fill-opacity': 0.6
-          }}
-        />
-        {/* Unselected outline */}
-        <Layer
-          id="cbg-outline-unselected"
+          id="cbg-outline"
           type="line"
-          filter={unselectedFilter}
           paint={{
-            'line-color': '#6b7280',
-            'line-width': 1.25
+            'line-color': ['get', '_line_color'],
+            'line-width': ['get', '_line_width']
           }}
         />
-        {/* Selected outline */}
-        <Layer
-          id="cbg-outline-selected"
-          type="line"
-          filter={selectedFilter}
-          paint={{
-            'line-color': '#1f2937',
-            'line-width': 2
-          }}
-        />
-        {/* Hover highlight */}
         <Layer
           id="cbg-hover"
           type="fill"
@@ -271,21 +384,6 @@ export default function CBGMap({
           }}
         />
       </Source>
-      {popupInfo && (
-        <Popup
-          longitude={popupInfo.lng}
-          latitude={popupInfo.lat}
-          anchor="bottom"
-          closeButton={false}
-          closeOnClick={false}
-        >
-          <div className="text-xs font-[Poppins]">
-            <strong>CBG:</strong> {popupInfo.cbgId}<br />
-            <strong>Population:</strong> {popupInfo.population}<br />
-            <strong>Status:</strong> {popupInfo.inZone ? 'In Zone' : 'Click to Add'}
-          </div>
-        </Popup>
-      )}
-    </Map>
+    </MapLibreMap>
   );
 }

@@ -30,6 +30,7 @@ export type SimSettings = {
   hours: number;
   randseed: boolean;
   usecache: boolean;
+  initial_infected_count: number;
   interventions: Interventions[];
 };
 
@@ -60,6 +61,7 @@ const default_settings: SimSettings = {
   hours: 84,
   randseed: true,
   usecache: true,
+  initial_infected_count: 1,
   interventions: [{ ...default_interventions }]
 };
 

@@ -1,11 +1,9 @@
-import { constants, createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
+import { resolveDbDataPath } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { getCachedPapdata } from '@/lib/papdata-cache';
-
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
 export async function GET(
   _request: NextRequest,
@@ -29,46 +27,44 @@ export async function GET(
     );
   }
 
-  const patPath = `${DB_FOLDER + czone.patterns_id}.gz`;
-
   try {
-    await access(patPath, constants.F_OK);
+    const [{ path: patPath, gzipped: patGzipped }, papdata] =
+      await Promise.all([
+        resolveDbDataPath(czone.patterns_id),
+        getCachedPapdata(czone.papdata_id)
+      ]);
+
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(papdata)));
+          controller.enqueue(encoder.encode('\n'));
+
+          const fileStream = patGzipped
+            ? createReadStream(patPath).pipe(createGunzip())
+            : createReadStream(patPath);
+
+          for await (const chunk of fileStream) {
+            controller.enqueue(
+              typeof chunk === 'string' ? encoder.encode(chunk) : chunk
+            );
+          }
+
+          controller.enqueue(encoder.encode('\n'));
+          controller.close();
+        } catch (e) {
+          console.error('Patterns stream error:', e);
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   } catch {
     return Response.json({ message: 'Data files not found' }, { status: 404 });
   }
-
-  let papdata: any;
-  try {
-    papdata = await getCachedPapdata(czone.papdata_id);
-  } catch {
-    return Response.json({ message: 'Papdata file not found' }, { status: 404 });
-  }
-
-  const encoder = new TextEncoder();
-
-  // Send papdata as first line, then stream raw decompressed patterns JSON
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        controller.enqueue(encoder.encode(JSON.stringify(papdata)));
-        controller.enqueue(encoder.encode('\n'));
-
-        const gunzip = createGunzip();
-        const fileStream = createReadStream(patPath).pipe(gunzip);
-        for await (const chunk of fileStream) {
-          controller.enqueue(chunk);
-        }
-
-        controller.enqueue(encoder.encode('\n'));
-        controller.close();
-      } catch (e) {
-        console.error('Patterns stream error:', e);
-        controller.close();
-      }
-    }
-  });
-
-  return new Response(stream, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-  });
 }

@@ -1,14 +1,12 @@
-import { constants, createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { resolveDbDataPath } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { getCachedPapdata } from '@/lib/papdata-cache';
-
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
 const age_ranges: [number, number][] = [
   [0, 20],
@@ -32,7 +30,6 @@ const all_state_names = ['Susceptible', ...bitmask_states.map(([n]) => n)];
 type DataPoint = { time: number; [key: string]: number };
 type ChartData = { [type: string]: DataPoint[] };
 
-// LRU cache for computed location stats
 const LOC_CACHE_MAX = 30;
 interface LocCacheEntry {
   data: ChartData;
@@ -66,10 +63,6 @@ function setCachedLocationStats(key: string, data: ChartData): void {
   locationCache.set(key, { data, lastAccess: Date.now() });
 }
 
-/**
- * Compute location-specific chart data on-demand by streaming sim+patterns
- * files and filtering for the requested location.
- */
 async function computeLocationStats(
   fileId: string,
   locId: string,
@@ -82,15 +75,12 @@ async function computeLocationStats(
     return cached;
   }
 
-  const simPath = `${DB_FOLDER}${fileId}.sim.gz`;
-  const patPath = `${DB_FOLDER}${fileId}.pat.gz`;
+  const [{ path: simPath, gzipped: simGzipped }, { path: patPath, gzipped: patGzipped }] =
+    await Promise.all([
+      resolveDbDataPath(fileId, '.sim'),
+      resolveDbDataPath(fileId, '.pat')
+    ]);
 
-  await Promise.all([
-    access(simPath, constants.F_OK),
-    access(patPath, constants.F_OK)
-  ]);
-
-  // Pre-build age index for people in papdata (avoids repeated range scans)
   const ageIndex = new Map<string, number>();
   for (const [id, person] of Object.entries(papdata.people ?? {}) as [
     string,
@@ -107,7 +97,7 @@ async function computeLocationStats(
   const simIter = (
     chain([
       createReadStream(simPath),
-      createGunzip(),
+      ...(simGzipped ? [createGunzip()] : []),
       parser(),
       StreamObject.streamObject()
     ]) as any
@@ -116,7 +106,7 @@ async function computeLocationStats(
   const patIter = (
     chain([
       createReadStream(patPath),
-      createGunzip(),
+      ...(patGzipped ? [createGunzip()] : []),
       parser(),
       StreamObject.streamObject()
     ]) as any
@@ -144,7 +134,6 @@ async function computeLocationStats(
     const pvalue = ppl.value.value;
     const time = +skey / 60;
 
-    // Get the people at this location for this timestep
     const locGroup = locType === 'homes' ? pvalue.homes : pvalue.places;
     const pop: string[] | undefined = locGroup?.[locId];
 
@@ -157,7 +146,6 @@ async function computeLocationStats(
       for (const label of age_range_labels) ages_data[label] = 0;
       for (const name of all_state_names) states_data[name] = 0;
 
-      // Iterate over pop instead of all infected
       let totalInfected = 0;
 
       for (const [disease, people] of Object.entries(svalue) as [
@@ -231,7 +219,6 @@ export async function GET(
     );
   }
 
-  // Global stats (no loc_id)
   if (!loc_id || !loc_type) {
     if (simdata.global_stats) {
       const stats = simdata.global_stats as any;
@@ -252,7 +239,6 @@ export async function GET(
     );
   }
 
-  // Location-specific stats: compute on-demand from files
   try {
     const papDataId = simdata.czone.papdata_id;
     if (!papDataId) {

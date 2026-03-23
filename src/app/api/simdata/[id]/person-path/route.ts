@@ -1,13 +1,11 @@
-import { constants, createReadStream } from 'node:fs';
-import { access, readFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { readDbJson, resolveDbDataPath } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
-
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
 const DAY_MINUTES = 24 * 60;
 
 type KnownLocation = {
@@ -104,33 +102,11 @@ function toIsoTime(startDateMs: number, minute: number) {
 }
 
 async function loadPapData(papDataId: string) {
-  const papPath = `${DB_FOLDER}${papDataId}.gz`;
-  await access(papPath, constants.F_OK);
-  const raw = await readFile(papPath);
-
-  const buffer = await new Promise<Buffer>((resolve, reject) => {
-    const unzip = createGunzip();
-    const chunks: Buffer[] = [];
-    unzip.on('data', (chunk: Buffer) => chunks.push(chunk));
-    unzip.on('end', () => resolve(Buffer.concat(chunks)));
-    unzip.on('error', reject);
-    unzip.end(raw);
-  });
-
-  return JSON.parse(buffer.toString());
+  return readDbJson(papDataId);
 }
 
 async function resolvePatternsPath(fileId: string) {
-  const candidates = [`${DB_FOLDER}${fileId}.pat.gz`, `${DB_FOLDER}${fileId}.pat`];
-
-  for (const path of candidates) {
-    try {
-      await access(path, constants.F_OK);
-      return path;
-    } catch {}
-  }
-
-  throw new Error('Patterns file not found for this simulation run.');
+  return resolveDbDataPath(fileId, '.pat');
 }
 
 async function buildPersonPath(
@@ -139,12 +115,12 @@ async function buildPersonPath(
   startDate: Date,
   papdata: any
 ) {
-  const patternsPath = await resolvePatternsPath(fileId);
+  const { path: patternsPath, gzipped } = await resolvePatternsPath(fileId);
   const startDateMs = startDate.getTime();
   const personKey = String(personId);
 
   const patChain: any[] = [createReadStream(patternsPath)];
-  if (patternsPath.endsWith('.gz')) {
+  if (gzipped) {
     patChain.push(createGunzip());
   }
   patChain.push(parser(), StreamObject.streamObject());

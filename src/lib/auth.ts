@@ -2,8 +2,25 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { prisma } from './prisma';
 
+const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:3000';
+const isSecureOrigin = baseURL.startsWith('https://');
+
+const trustedOrigins = Array.from(
+  new Set([
+    baseURL,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://coviddev.isi.jhu.edu',
+    'http://coviddev.isi.jhu.edu',
+    'https://covidweb.isi.jhu.edu',
+    'http://covidweb.isi.jhu.edu'
+  ])
+);
+
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+  baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
 
   database: prismaAdapter(prisma, {
@@ -30,19 +47,12 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24
   },
 
-  trustedOrigins: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://coviddev.isi.jhu.edu',
-    'http://coviddev.isi.jhu.edu',
-    'https://covidweb.isi.jhu.edu',
-    'http://covidweb.isi.jhu.edu'
-  ],
+  trustedOrigins,
 
   advanced: {
     defaultCookieAttributes: {
-      sameSite: 'none',
-      secure: true
+      sameSite: isSecureOrigin ? 'none' : 'lax',
+      secure: isSecureOrigin
     }
   }
 });

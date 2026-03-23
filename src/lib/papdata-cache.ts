@@ -1,8 +1,7 @@
-import { constants } from 'node:fs';
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
+import { resolveDbDataPath } from './db-files';
 
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
 const MAX_CACHE_SIZE = 5;
 
 interface CacheEntry {
@@ -26,10 +25,9 @@ export async function getCachedPapdata(papdataId: string): Promise<any> {
     return cached.data;
   }
 
-  const papPath = `${DB_FOLDER}${papdataId}.gz`;
-  await access(papPath, constants.F_OK);
-  const raw = await readFile(papPath);
-  const data = JSON.parse(gunzipSync(raw).toString());
+  const { path, gzipped } = await resolveDbDataPath(papdataId);
+  const raw = await readFile(path);
+  const data = JSON.parse((gzipped ? gunzipSync(raw) : raw).toString());
 
   // Evict least-recently-used entry if at capacity
   if (cache.size >= MAX_CACHE_SIZE) {

@@ -4,9 +4,45 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import InstructionBanner from '@/components/instruction-banner';
 import SimSettings from '@/components/simsettings';
+import {
+  getInclusiveEndDateIso,
+  getStateFromCBG,
+  getZoneLocationName,
+  toSimulationDateParam
+} from '@/lib/simulation-zone';
 import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
+
+function extractMessage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const message = record.message;
+  if (typeof message === 'string' && message.trim()) {
+    return message;
+  }
+
+  const error = record.error;
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  return null;
+}
+
+async function readResponseMessage(response: Response) {
+  try {
+    const payload = await response.json();
+    return (
+      extractMessage(payload) || `Simulation failed with status ${response.status}`
+    );
+  } catch {
+    return response.statusText || `Simulation failed with status ${response.status}`;
+  }
+}
 
 export default function Simulator() {
   const router = useRouter();
@@ -21,21 +57,12 @@ export default function Simulator() {
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Deselect any previous run when entering this page
     setSettings({ sim_id: null });
   }, [setSettings]);
 
   const makePostRequest = async (): Promise<boolean> => {
     const settings = useSimSettings.getState();
-    const reqbody = {
-      ...settings,
-      czone_id: settings.zone?.id,
-      length: settings.hours * 60
-    };
 
-    console.log(reqbody);
-
-    // If we have a selected run, load it directly
     if (settings.sim_id !== null) {
       try {
         const res = await fetch(`/api/simdata/${settings.sim_id}`);
@@ -56,11 +83,44 @@ export default function Simulator() {
       }
     }
 
-    // Start a new simulation with SSE
+    const zone = settings.zone;
+    if (!zone) {
+      setError('Please pick a convenience zone first.');
+      return false;
+    }
+
+    const startDate = toSimulationDateParam(zone.start_date);
+    const endDate = toSimulationDateParam(
+      getInclusiveEndDateIso(zone.start_date, settings.hours)
+    );
+    const state = getStateFromCBG(zone.cbg_list);
+
+    if (!startDate || !endDate || !state) {
+      setError('Selected convenience zone is missing required simulation data.');
+      return false;
+    }
+
+    const reqbody = {
+      ...settings,
+      czone_id: zone.id,
+      length: settings.hours * 60,
+      start_date: startDate,
+      end_date: endDate,
+      state,
+      location: getZoneLocationName(zone),
+      initial_infected_count: settings.initial_infected_count,
+      interventions: settings.interventions,
+      randseed: settings.randseed
+    };
+
     setProgress(0);
-    setProgressMessage(null);
+    setProgressMessage('Starting simulation...');
     try {
       const simUrl = process.env.NEXT_PUBLIC_SIM_URL;
+      if (!simUrl) {
+        throw new Error('NEXT_PUBLIC_SIM_URL is not configured.');
+      }
+
       const response = await fetch(`${simUrl}simulation/`, {
         method: 'POST',
         headers: {
@@ -70,42 +130,78 @@ export default function Simulator() {
       });
 
       if (!response.ok) {
-        throw new Error(`Simulation failed with status ${response.status}`);
+        throw new Error(await readResponseMessage(response));
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
-      const decoder = new TextDecoder();
-      let buffer = '';
+      const contentType = response.headers.get('content-type') || '';
 
-      while (true) {
-        const { done, value } = await reader.read();
+      if (contentType.includes('text/event-stream')) {
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
 
-        if (done) break;
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() ?? '';
+        while (true) {
+          const { done, value } = await reader.read();
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) {
+              continue;
+            }
+
             const msg = JSON.parse(line.slice(6));
 
             if (msg.type === 'progress') {
-              setProgress(msg.value);
-              if (msg.message) setProgressMessage(msg.message);
+              const value = Number(msg.value);
+              setProgress(Number.isFinite(value) ? value : 0);
+              if (msg.message) {
+                setProgressMessage(msg.message);
+              }
             } else if (msg.type === 'result') {
-              setSettings({ sim_id: msg.data.id });
-              console.log('Set sim_id to:', msg.data.id);
+              const simId = Number(msg.data?.id);
+              if (!Number.isFinite(simId) || simId <= 0) {
+                throw new Error('Simulation finished but no saved run ID was returned.');
+              }
+
+              setProgress(100);
+              setProgressMessage('Simulation complete.');
+              setSettings({ sim_id: simId });
               return true;
             } else if (msg.type === 'error') {
               throw new Error(msg.message);
             }
           }
         }
+
+        return false;
       }
 
-      return false;
+      const json = await response.json().catch(() => null);
+      const responseData =
+        json && typeof json === 'object' && 'data' in json
+          ? (json.data as { id?: unknown })
+          : undefined;
+
+      const simId = Number(responseData?.id);
+      if (!Number.isFinite(simId) || simId <= 0) {
+        throw new Error('Simulation finished but no saved run ID was returned.');
+      }
+
+      setProgress(100);
+      setProgressMessage('Simulation complete.');
+      setSettings({ sim_id: simId });
+      return true;
     } catch (e) {
       console.error(e);
       setError(`Failed to start simulation: ${(e as Error).message}`);

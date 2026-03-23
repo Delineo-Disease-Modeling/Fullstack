@@ -1,13 +1,12 @@
 import { mkdir } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { DB_FOLDER } from '@/lib/db-files';
 import { saveFileStream } from '@/lib/filestream';
 import { prisma } from '@/lib/prisma';
 import { processingProgress, processSimulation } from '@/lib/sim-processor';
 
 export const maxDuration = 300;
-
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
 const postSchema = z.object({
   czone_id: z.coerce.number().nonnegative(),

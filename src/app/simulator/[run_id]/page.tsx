@@ -183,15 +183,15 @@ export default function SimulatorRun() {
       <div className="sim_container">
         <div className="flex flex-col items-center gap-4 my-auto">
           <div className="text-lg">Loading simulation data...</div>
-          {progress > 0 && (
-            <div className="w-72 rounded-full h-2 bg-(--color-bg-dark)">
-              <div
-                className="bg-(--color-primary-blue) h-2 rounded-full transition-all duration-100"
-                style={{ width: `${progress}%` }}
-              />
-              <p className="text-sm text-center mt-2">{progress}%</p>
-            </div>
-          )}
+          <div className="w-72 rounded-full h-2 bg-(--color-bg-dark)">
+            <div
+              className="bg-(--color-primary-blue) h-2 rounded-full transition-all duration-100"
+              style={{ width: `${Math.max(progress, 2)}%` }}
+            />
+            <p className="text-sm text-center mt-2">
+              {progress > 0 ? `${progress}%` : 'Starting...'}
+            </p>
+          </div>
         </div>
       </div>
     );

@@ -235,9 +235,9 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs">
-                      {visibleStops.map((stop, index) => (
+                      {visibleStops.map((stop) => (
                         <div
-                          key={`${day.day_index}-${index}-${stop.start_minute}`}
+                          key={`${day.day_index}-${stop.location_type}-${stop.location_id}-${stop.start_minute}-${stop.end_time_iso}`}
                           className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2 rounded px-2 py-1 odd:bg-[#f7fbfe]"
                         >
                           <span>{formatDateTime(stop.start_time_iso)}</span>

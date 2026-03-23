@@ -1,60 +1,14 @@
-import { constants } from 'node:fs';
-import { access, readFile, stat, unlink } from 'node:fs/promises';
+import { readFile, stat, unlink } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
-import { createGunzip } from 'node:zlib';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
+import { DB_FOLDER } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { processingProgress } from '@/lib/sim-processor';
-
-const DB_FOLDER = process.env.DB_FOLDER || './db/';
 
 const updateSchema = z.object({
   name: z.string().min(2).optional()
 });
-
-/** Load and process papdata for a convenience zone. */
-async function loadPapData(papDataId: string) {
-  const papPath = `${DB_FOLDER}${papDataId}.gz`;
-  try {
-    await access(papPath, constants.F_OK);
-  } catch {
-    return null;
-  }
-
-  const raw = await readFile(papPath);
-  const buffer = await new Promise<Buffer>((resolve, reject) => {
-    const unzip = createGunzip();
-    const chunks: Buffer[] = [];
-    unzip.on('data', (c: Buffer) => chunks.push(c));
-    unzip.on('end', () => resolve(Buffer.concat(chunks)));
-    unzip.on('error', reject);
-    unzip.end(raw);
-  });
-
-  const json = JSON.parse(buffer.toString());
-  const homeIds = Object.keys(json.homes).sort(
-    (a, b) => Number(a) - Number(b)
-  );
-  const placeIds = Object.keys(json.places).sort(
-    (a, b) => Number(a) - Number(b)
-  );
-
-  return {
-    homeIds,
-    placeIds,
-    arrays: {
-      homes: homeIds.map((id) => ({ id })),
-      places: placeIds.map((id) => ({
-        id,
-        latitude: json.places[id].latitude,
-        longitude: json.places[id].longitude,
-        label: json.places[id].label,
-        top_category: json.places[id].top_category
-      }))
-    }
-  };
-}
 
 /** Optionally gzip-compress a response body if the client accepts it. */
 function maybeCompress(
@@ -298,7 +252,9 @@ export async function DELETE(
     // Clean up all files associated with this run
     const base = DB_FOLDER + deleted.file_id;
     await Promise.allSettled([
+      unlink(`${base}.sim`),
       unlink(`${base}.sim.gz`),
+      unlink(`${base}.pat`),
       unlink(`${base}.pat.gz`),
       unlink(`${base}.map.json`)
     ]);
