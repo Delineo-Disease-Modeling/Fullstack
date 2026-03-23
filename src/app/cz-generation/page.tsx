@@ -300,6 +300,7 @@ export default function CZGeneration() {
   const [focusedTraceCbg, setFocusedTraceCbg] = useState('');
   const [focusedTraceNonce, setFocusedTraceNonce] = useState(0);
   const [candidatePois, setCandidatePois] = useState<PoiAnalysis[]>([]);
+  const [candidatePoiDebug, setCandidatePoiDebug] = useState<Record<string, unknown> | null>(null);
   const [candidatePoiLoading, setCandidatePoiLoading] = useState(false);
   const [candidatePoiError, setCandidatePoiError] = useState('');
   const [manualFrontierCandidates, setManualFrontierCandidates] = useState<
@@ -618,6 +619,7 @@ export default function CZGeneration() {
 
   useEffect(() => {
     if (!showCandidatePanels || !selectedTraceCandidateCbg) {
+      setCandidatePoiDebug(null);
       return;
     }
 
@@ -628,12 +630,14 @@ export default function CZGeneration() {
       : selectedCBGs;
     if (!poiCluster.length) {
       setCandidatePois([]);
+      setCandidatePoiDebug(null);
       setCandidatePoiError('');
       return;
     }
 
     let cancelled = false;
     setCandidatePoiLoading(true);
+    setCandidatePoiDebug(null);
     setCandidatePoiError('');
 
     fetch(algUrl('candidate-pois'), {
@@ -649,14 +653,23 @@ export default function CZGeneration() {
       })
     })
       .then(async (resp) => {
-        const data = await resp.json();
+        const data = await readJsonObject(resp);
         if (cancelled) {
           return;
         }
+        setCandidatePoiDebug(
+          isRecord(data?.debug) ? (data.debug as Record<string, unknown>) : null
+        );
         if (!resp.ok) {
-          throw new Error(data?.message || 'Failed to load POI analysis.');
+          throw new Error(
+            getResponseErrorMessage(
+              resp,
+              data,
+              'Failed to load POI analysis.'
+            )
+          );
         }
-        setCandidatePois(data?.pois || []);
+        setCandidatePois(Array.isArray(data?.pois) ? (data.pois as PoiAnalysis[]) : []);
       })
       .catch((err) => {
         if (cancelled) {
@@ -1612,12 +1625,36 @@ export default function CZGeneration() {
                         Loading POI analysis...
                       </div>
                     ) : candidatePoiError ? (
-                      <div className="text-sm text-red-700">
-                        {candidatePoiError}
+                      <div className="space-y-3">
+                        <div className="text-sm text-red-700">
+                          {candidatePoiError}
+                        </div>
+                        {candidatePoiDebug && (
+                          <div className="rounded border border-[#d1d5db] bg-white/80 p-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-700">
+                              Debug Snapshot
+                            </div>
+                            <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] leading-4 text-gray-600">
+                              {JSON.stringify(candidatePoiDebug, null, 2)}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     ) : candidatePois.length === 0 ? (
-                      <div className="text-sm text-gray-500">
-                        No cluster-to-POI flow found for this CBG.
+                      <div className="space-y-3">
+                        <div className="text-sm text-gray-500">
+                          No cluster-to-POI flow found for this CBG.
+                        </div>
+                        {candidatePoiDebug && (
+                          <div className="rounded border border-[#d1d5db] bg-white/80 p-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-700">
+                              Debug Snapshot
+                            </div>
+                            <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] leading-4 text-gray-600">
+                              {JSON.stringify(candidatePoiDebug, null, 2)}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2">
