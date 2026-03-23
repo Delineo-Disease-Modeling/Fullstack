@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
-import { DB_FOLDER, resolveDbDataPath } from '@/lib/db-files';
+import { DB_FOLDER } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { processingProgress, processSimulation } from '@/lib/sim-processor';
 
@@ -92,13 +92,11 @@ export async function POST(request: Request) {
       writeFile(patPath, JSON.stringify(movement))
     ]);
 
-    const { path: papPath } = await resolveDbDataPath(papdataId);
-
     processSimulation({
       simDataId: simData.id,
       simdataPath: simPath,
       patternsPath: patPath,
-      papDataPath: papPath,
+      papdataId,
       mapCachePath: `${DB_FOLDER}${fileId}.map.json`,
       totalLength: simData.length
     })
