@@ -9,6 +9,7 @@ import {
   getBoundsForGeoJson,
   getFeatureCbgId,
   getFeatureCenterFromGeoJson,
+  normalizeCbgId,
   type GeoJSONFeature,
   type GeoJSONData,
   type LatLng
@@ -103,6 +104,7 @@ export default function CBGMap({
 }) {
   const mapRef = useRef<MapRef>(null);
   const hasFittedRef = useRef(false);
+  const lastFocusedTargetRef = useRef('');
   const [hoverCbgId, setHoverCbgId] = useState<string | null>(null);
 
   const seedCircleCenter = useMemo(
@@ -121,7 +123,37 @@ export default function CBGMap({
     [seedCircleCenter, seedGuardRadiusKm]
   );
 
-  const bounds = useMemo(() => getBoundsForGeoJson(cbgData), [cbgData]);
+  const initialFitGeoJson = useMemo<GeoJSONData | null>(() => {
+    if (!cbgData?.features?.length) {
+      return null;
+    }
+
+    const selectedSet = new Set(
+      selectedCBGs.map((cbgId) => normalizeCbgId(cbgId)).filter(Boolean)
+    );
+
+    if (!selectedSet.size) {
+      return cbgData;
+    }
+
+    const selectedFeatures = cbgData.features.filter((feature) =>
+      selectedSet.has(getFeatureCbgId(feature))
+    );
+
+    if (!selectedFeatures.length) {
+      return cbgData;
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: selectedFeatures
+    };
+  }, [cbgData, selectedCBGs]);
+
+  const bounds = useMemo(
+    () => getBoundsForGeoJson(initialFitGeoJson),
+    [initialFitGeoJson]
+  );
 
   const getCandidateHeatColor = useCallback(
     (score: number) => {
@@ -222,13 +254,13 @@ export default function CBGMap({
 
   const fitBoundsToData = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (!map || !bounds || hasFittedRef.current) {
+    if (!map || !bounds || hasFittedRef.current || selectedCBGs.length === 0) {
       return;
     }
 
-    map.fitBounds(bounds, { padding: 20, maxZoom: 14, duration: 0 });
+    map.fitBounds(bounds, { padding: 16, maxZoom: 15, duration: 0 });
     hasFittedRef.current = true;
-  }, [bounds]);
+  }, [bounds, selectedCBGs.length]);
 
   useEffect(() => {
     fitBoundsToData();
@@ -286,6 +318,11 @@ export default function CBGMap({
   useEffect(() => {
     const [normalized] = focusTarget.split(':');
     if (!normalized) {
+      lastFocusedTargetRef.current = '';
+      return;
+    }
+
+    if (lastFocusedTargetRef.current === focusTarget) {
       return;
     }
 
@@ -308,6 +345,7 @@ export default function CBGMap({
       maxZoom: 11.25,
       duration: 0
     });
+    lastFocusedTargetRef.current = focusTarget;
   }, [focusTarget, focusedFeature]);
 
   return (
@@ -328,7 +366,11 @@ export default function CBGMap({
       cursor={hoverCbgId ? 'pointer' : ''}
     >
       {seedCircleGeoJSON && (
-        <Source id="seed-guard-circle" type="geojson" data={seedCircleGeoJSON as any}>
+        <Source
+          id="seed-guard-circle"
+          type="geojson"
+          data={seedCircleGeoJSON as GeoJSON.FeatureCollection}
+        >
           <Layer
             id="seed-guard-circle-fill"
             type="fill"
