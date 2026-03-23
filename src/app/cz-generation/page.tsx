@@ -1162,7 +1162,8 @@ export default function CZGeneration() {
       min_pop: Number(minPop),
       algorithm: clusterAlgorithm,
       start_date: startDate,
-      use_test_data: isTestMode
+      use_test_data: isTestMode,
+      include_trace: true
     };
 
     if (clusterAlgorithm === 'greedy_weight_seed_guard') {
