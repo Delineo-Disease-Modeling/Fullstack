@@ -61,6 +61,24 @@ async function readJsonObject(
   return isRecord(payload) ? payload : null;
 }
 
+function getResponseErrorMessage(
+  response: Response,
+  payload: Record<string, unknown> | null,
+  fallback: string
+) {
+  if (typeof payload?.message === 'string' && payload.message.trim()) {
+    return payload.message;
+  }
+
+  if (typeof payload?.error === 'string' && payload.error.trim()) {
+    return payload.error;
+  }
+
+  return response.status === 404
+    ? 'Pattern availability endpoint was not found on the deployed Algorithms service.'
+    : fallback;
+}
+
 export default function SimSettings({
   sendData,
   error,
@@ -129,10 +147,11 @@ export default function SimSettings({
         const json = await readJsonObject(response);
 
         if (!response.ok) {
-          const message =
-            typeof json?.message === 'string'
-              ? json.message
-              : `Pattern availability request failed with status ${response.status}`;
+          const message = getResponseErrorMessage(
+            response,
+            json,
+            `Pattern availability request failed with status ${response.status}`
+          );
           throw new Error(
             message
           );

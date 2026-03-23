@@ -208,6 +208,26 @@ async function readJsonObject(
   return isRecord(payload) ? payload : null;
 }
 
+function getResponseErrorMessage(
+  response: Response,
+  payload: Record<string, unknown> | null,
+  fallback: string
+) {
+  if (typeof payload?.message === 'string' && payload.message.trim()) {
+    return payload.message;
+  }
+
+  if (typeof payload?.error === 'string' && payload.error.trim()) {
+    return payload.error;
+  }
+
+  if (response.status === 404) {
+    return 'The clustering endpoint was not found on the deployed Algorithms service.';
+  }
+
+  return fallback;
+}
+
 export default function CZGeneration() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -1010,10 +1030,11 @@ export default function CZGeneration() {
       const data = (await readJsonObject(resp)) as Record<string, any> | null;
       if (!resp.ok || !Array.isArray(data?.cluster)) {
         throw new Error(
-          (typeof data?.message === 'string' && data.message) ||
-            (resp.status === 404
-              ? 'The clustering endpoint was not found on the deployed Algorithms service.'
-              : 'Failed to cluster CBGs. Please try again.')
+          getResponseErrorMessage(
+            resp,
+            data,
+            'Failed to cluster CBGs. Please try again.'
+          )
         );
       }
 
