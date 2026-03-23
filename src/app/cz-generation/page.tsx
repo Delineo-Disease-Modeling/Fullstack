@@ -78,6 +78,12 @@ type ZoneMetrics = {
   cbg_count?: number;
 };
 
+type ResolvedSeedLookup = {
+  query: string;
+  cbg: string;
+  cityName: string;
+};
+
 function isClusterAlgorithm(value: unknown): value is ClusterAlgorithm {
   return CLUSTER_ALGORITHM_OPTIONS.some((option) => option.value === value);
 }
@@ -252,6 +258,8 @@ export default function CZGeneration() {
     null
   );
   const [setupResolvedCityName, setSetupResolvedCityName] = useState('');
+  const [resolvedSeedLookup, setResolvedSeedLookup] =
+    useState<ResolvedSeedLookup | null>(null);
   const [resolvingSeed, setResolvingSeed] = useState(false);
   const [seedResolveError, setSeedResolveError] = useState('');
   const [startDate, setStartDate] = useState('2019-01-01');
@@ -468,6 +476,7 @@ export default function CZGeneration() {
     setSetupSeedCbg('');
     setSetupSeedGeoJSON(null);
     setSetupResolvedCityName('');
+    setResolvedSeedLookup(null);
     setSeedResolveError('');
   }, []);
 
@@ -827,8 +836,19 @@ export default function CZGeneration() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ location })
     });
-    if (!resp.ok) {
+    if (resp.status === 404) {
       return null;
+    }
+
+    if (!resp.ok) {
+      const payload = await readJsonObject(resp);
+      throw new Error(
+        getResponseErrorMessage(
+          resp,
+          payload,
+          `Location lookup failed with status ${resp.status}`
+        )
+      );
     }
 
     return resp.json();
@@ -870,15 +890,21 @@ export default function CZGeneration() {
 
       setSetupSeedCbg(coreCbg);
       setSetupSeedGeoJSON(seedGeoJson);
-      setSetupResolvedCityName(
+      const cityName =
         locationData?.city && locationData?.state
           ? `${locationData.city}, ${locationData.state}`
-          : locationData?.city || locationData?.state || rawLocationInput
-      );
+          : locationData?.city || locationData?.state || rawLocationInput;
+      setSetupResolvedCityName(cityName);
+      setResolvedSeedLookup({
+        query: rawLocationInput,
+        cbg: coreCbg,
+        cityName
+      });
     } catch (err) {
       setSetupSeedCbg('');
       setSetupSeedGeoJSON(null);
       setSetupResolvedCityName('');
+      setResolvedSeedLookup(null);
       setSeedResolveError(
         err instanceof Error ? err.message : 'Failed to resolve the seed CBG.'
       );
@@ -974,9 +1000,13 @@ export default function CZGeneration() {
     const isTestMode = rawLocationInput.toUpperCase() === 'TEST';
     setUseTestData(isTestMode);
 
-    let coreCbg = setupSeedCbg || null;
+    const cachedSeedLookup =
+      resolvedSeedLookup?.query === rawLocationInput ? resolvedSeedLookup : null;
+    let coreCbg = setupSeedCbg || cachedSeedLookup?.cbg || null;
     let resolvedCityName =
-      setupResolvedCityName || (isTestMode ? 'TEST' : rawLocationInput);
+      setupResolvedCityName ||
+      cachedSeedLookup?.cityName ||
+      (isTestMode ? 'TEST' : rawLocationInput);
 
     if (seedGuardNeedsResolvedSeed && !coreCbg) {
       setError(
@@ -986,12 +1016,21 @@ export default function CZGeneration() {
     }
 
     if (!isTestMode && !coreCbg) {
-      const resolved = await lookupLocation(rawLocationInput);
-      coreCbg = resolved?.cbg || null;
-      resolvedCityName =
-        resolved?.city && resolved?.state
-          ? `${resolved.city}, ${resolved.state}`
-          : resolved?.city || resolved?.state || rawLocationInput;
+      try {
+        const resolved = await lookupLocation(rawLocationInput);
+        coreCbg = resolved?.cbg || null;
+        resolvedCityName =
+          resolved?.city && resolved?.state
+            ? `${resolved.city}, ${resolved.state}`
+            : resolved?.city || resolved?.state || rawLocationInput;
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to resolve location.'
+        );
+        return;
+      }
     }
 
     if (!isTestMode && !coreCbg) {
