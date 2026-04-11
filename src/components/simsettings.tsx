@@ -212,38 +212,22 @@ export default function SimSettings({
       return null;
     }
 
-    const coveredMonths = formatMonthList(
-      patternAvailability.data.required_months?.length
-        ? patternAvailability.data.required_months
-        : patternAvailability.data.available_months
-    );
+    const availableMonths = formatMonthList(patternAvailability.data.available_months);
 
-    if (patternAvailability.data.has_coverage) {
+    if (patternAvailability.data.has_any_data) {
       return {
         tone: 'text-green-600',
-        message: coveredMonths
-          ? `Pattern data available for ${detectedState} (${coveredMonths})`
+        message: availableMonths
+          ? `Pattern data available for ${detectedState} (${availableMonths})`
           : `Pattern data available for ${detectedState}`
       };
     }
 
-    const missingMonths = formatMonthList(patternAvailability.data.missing_months);
     return {
       tone: 'text-amber-600',
-      message: missingMonths
-        ? `Missing pattern data for ${detectedState}: ${missingMonths}`
-        : `No pattern data available for ${detectedState}`
+      message: `No pattern data found for ${detectedState} — simulation may fail`
     };
   })();
-
-  const patternBlocksSimulation =
-    !!zone &&
-    sim_id === null &&
-    !!detectedState &&
-    !!startDateParam &&
-    !!endDateParam &&
-    patternAvailability.status === 'ready' &&
-    !patternAvailability.data.has_coverage;
 
   return (
     <div className="flex flex-col items-center gap-16">
@@ -311,40 +295,20 @@ export default function SimSettings({
       <div className="flex flex-col items-center gap-8 w-full">
         <Button
           className="w-32 disabled:bg-gray-400!"
-          disabled={loading || patternBlocksSimulation}
+          disabled={loading || (!!zone && zone.ready === false)}
           onClick={() => {
             if (!zone) {
               alert('Please pick a convenience zone first.');
-              return;
-            }
-            if (!zone.ready) {
-              alert(
-                'This convenience zone is still generating. Try again in a moment.'
-              );
               return;
             }
             if (sim_id) {
               router.push(`/simulator/${sim_id}`);
               return;
             }
-            if (detectedState && startDateParam && endDateParam) {
-              if (
-                patternAvailability.status === 'ready' &&
-                !patternAvailability.data.has_coverage
-              ) {
-                const missingMonths =
-                  patternAvailability.data.missing_months?.join(', ') ||
-                  'the selected date range';
-                alert(
-                  `Simulation blocked: missing pattern data for ${missingMonths}.`
-                );
-                return;
-              }
-            }
             sendData();
           }}
         >
-          {loading ? 'Processing...' : 'Simulate'}
+          {loading ? 'Processing...' : (zone?.ready === false ? 'Generating...' : 'Simulate')}
         </Button>
         {loading && (
           <div className="w-80 max-w-[85vw] flex flex-col gap-1">

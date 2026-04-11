@@ -35,6 +35,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
     let fallbackTimer: number | null = null;
 
     const fetchZones = async () => {
+      if (!active) return;
       try {
         const res = await fetch('/api/convenience-zones');
         const json = await res.json().catch(() => ({}));
@@ -83,6 +84,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       };
 
       es.onerror = () => {
+        if (!active) return;
         if (!fallbackTimer) {
           fallbackTimer = window.setInterval(fetchZones, 10_000);
         }
