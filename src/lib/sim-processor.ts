@@ -63,13 +63,20 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     (a, b) => Number(a) - Number(b)
   );
 
-  // Pre-process papdata into compact format for map cache
+  // Pre-process papdata into compact format for map cache.
+  // Coerce lat/lon to number (or null) here: upstream popgen can emit strings
+  // when pandas infers the CSV column as object dtype, and the frontend map
+  // uses Number.isFinite which is strict and would skip every POI.
+  const toCoord = (v: unknown): number | null => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
   const papDataArrays = {
     homes: homeIds.map((id) => ({ id })),
     places: placeIds.map((id) => ({
       id,
-      latitude: papdata.places[id].latitude,
-      longitude: papdata.places[id].longitude,
+      latitude: toCoord(papdata.places[id].latitude),
+      longitude: toCoord(papdata.places[id].longitude),
       label: papdata.places[id].label,
       top_category: papdata.places[id].top_category
     }))

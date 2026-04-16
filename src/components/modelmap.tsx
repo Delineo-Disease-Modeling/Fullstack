@@ -56,11 +56,19 @@ function updateIcons(
     maxLng = -Infinity;
   let validPlaceCount = 0;
 
+  // Older map.json caches can have lat/lon stored as strings (from papdata
+  // where pandas inferred the CSV column as object dtype). Coerce on read so
+  // Number.isFinite downstream doesn't reject every POI.
+  const num = (v: unknown): number | null => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
   if (pap_data.places) {
     for (const pdata of pap_data.places) {
-      const lat = pdata.latitude,
-        lng = pdata.longitude;
-      if (lat && lng && !(lat === 0 && lng === 0)) {
+      const lat = num(pdata.latitude);
+      const lng = num(pdata.longitude);
+      if (lat !== null && lng !== null && !(lat === 0 && lng === 0)) {
         minLat = Math.min(minLat, lat);
         maxLat = Math.max(maxLat, lat);
         minLng = Math.min(minLng, lng);
@@ -79,8 +87,8 @@ function updateIcons(
   const processLocs = (type: string, dataArray: any[], statArray: number[]) => {
     if (!dataArray || !statArray) return;
     dataArray.forEach((data, index) => {
-      let lat = data.latitude,
-        lng = data.longitude;
+      let lat: number | null = num(data.latitude);
+      let lng: number | null = num(data.longitude);
       if (type === 'homes') {
         data.label = `Home #${data.id}`;
         if (!(data.id in household_locs)) {
@@ -91,7 +99,7 @@ function updateIcons(
         }
         lat = household_locs[data.id][0];
         lng = household_locs[data.id][1];
-      } else if (!lat || !lng || (lat === 0 && lng === 0)) {
+      } else if (lat === null || lng === null || (lat === 0 && lng === 0)) {
         if (!(data.id in place_locs)) {
           place_locs[data.id] = [
             homeCenterLat + (Math.random() - 0.5) * homeSpreadLat,
