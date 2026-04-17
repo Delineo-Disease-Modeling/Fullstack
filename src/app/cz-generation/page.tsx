@@ -1901,28 +1901,6 @@ export default function CZGeneration() {
                 )}
 
               <div className="flex items-center gap-2">
-                {isFinalizing && (
-                  <div className="w-full rounded-lg border border-[#70B4D4] bg-white px-4 py-3">
-                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#d1d5db]">
-                      <div
-                        className="h-full rounded-full bg-[#70B4D4] transition-all duration-300"
-                        style={{
-                          width: `${Math.max(
-                            2,
-                            Math.min(100, finalizeProgress)
-                          )}%`
-                        }}
-                      />
-                    </div>
-                    <div className="mt-2 text-xs text-gray-600">
-                      {finalizeStatusMessage || 'Generating convenience zone...'}{' '}
-                      {finalizeProgress}%
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
                 {growthTrace && !zoneEditMode && (
                   <button
                     type="button"
