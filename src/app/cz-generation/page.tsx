@@ -12,6 +12,7 @@ import {
   type LatLng
 } from '@/lib/cz-geo';
 import type { ConvenienceZone } from '@/stores/simsettings';
+import { getStateFromCBG } from '@/lib/simulation-zone';
 import '@/styles/cz-generation.css';
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
@@ -177,17 +178,55 @@ function clampIndex(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function toInputDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+function monthFromDate(dateStr: string): string {
+  return String(dateStr || '').slice(0, 7);
 }
 
-function getDefaultEndDate(startDate: string) {
-  const start = new Date(`${startDate}T00:00:00`);
-  if (Number.isNaN(start.getTime())) {
-    return '2019-01-15';
+function startDateFromMonth(month: string): string {
+  return `${month}-01`;
+}
+
+function endDateFromMonth(month: string): string {
+  const [yStr, mStr] = month.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) {
+    return `${month}-28`;
   }
-  start.setDate(start.getDate() + 14);
-  return toInputDate(start);
+  const nextMonth = m === 12 ? 1 : m + 1;
+  const nextYear = m === 12 ? y + 1 : y;
+  return `${nextYear.toString().padStart(4, '0')}-${nextMonth
+    .toString()
+    .padStart(2, '0')}-01`;
+}
+
+function monthFromEndDate(endDate: string): string {
+  const [yStr, mStr] = endDate.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) {
+    return monthFromDate(endDate);
+  }
+  const prevMonth = m === 1 ? 12 : m - 1;
+  const prevYear = m === 1 ? y - 1 : y;
+  return `${prevYear.toString().padStart(4, '0')}-${prevMonth
+    .toString()
+    .padStart(2, '0')}`;
+}
+
+function formatMonthLabel(month: string): string {
+  const [yStr, mStr] = month.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+    return month;
+  }
+  const date = new Date(Date.UTC(y, m - 1, 1));
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  });
 }
 
 function getLengthHours(startDate: string, endDate: string) {
@@ -352,7 +391,9 @@ export default function CZGeneration() {
   const [resolvingSeed, setResolvingSeed] = useState(false);
   const [seedResolveError, setSeedResolveError] = useState('');
   const [startDate, setStartDate] = useState('2019-01-01');
-  const [endDate, setEndDate] = useState('2019-01-15');
+  const [endDate, setEndDate] = useState('2019-02-01');
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [availableMonthsLoading, setAvailableMonthsLoading] = useState(false);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -574,6 +615,74 @@ export default function CZGeneration() {
       router.replace('/simulator');
     }
   }, [isPending, router, user]);
+
+  const seedStateCbg = setupSeedCbg || seedCBG || selectedCBGs[0] || '';
+  const detectedStateAbbr = getStateFromCBG(seedStateCbg ? [seedStateCbg] : null);
+
+  useEffect(() => {
+    if (!detectedStateAbbr) {
+      setAvailableMonths([]);
+      setAvailableMonthsLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setAvailableMonthsLoading(true);
+
+    const params = new URLSearchParams({
+      state: detectedStateAbbr,
+      start_date: '2018-01-01',
+      end_date: '2025-12-31'
+    });
+
+    fetch(algUrl(`pattern-availability?${params.toString()}`), {
+      signal: controller.signal
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          throw new Error(`Pattern availability failed: ${resp.status}`);
+        }
+        const json = await resp.json();
+        const months = Array.isArray(json?.data?.available_months)
+          ? (json.data.available_months as unknown[]).filter(
+              (m): m is string => typeof m === 'string'
+            )
+          : [];
+        setAvailableMonths(months);
+      })
+      .catch((err) => {
+        if ((err as Error).name === 'AbortError') {
+          return;
+        }
+        console.warn('Failed to load available months:', err);
+        setAvailableMonths([]);
+      })
+      .finally(() => {
+        setAvailableMonthsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [algUrl, detectedStateAbbr]);
+
+  const monthOptions = useMemo(
+    () => [...availableMonths].sort(),
+    [availableMonths]
+  );
+
+  useEffect(() => {
+    if (availableMonths.length === 0) return;
+    const currentStart = monthFromDate(startDate);
+    const currentEnd = monthFromEndDate(endDate);
+    if (!availableMonths.includes(currentStart)) {
+      const nextStart = availableMonths[0];
+      setStartDate(startDateFromMonth(nextStart));
+      if (!availableMonths.includes(currentEnd) || currentEnd < nextStart) {
+        setEndDate(endDateFromMonth(nextStart));
+      }
+    } else if (!availableMonths.includes(currentEnd)) {
+      setEndDate(endDateFromMonth(currentStart));
+    }
+  }, [availableMonths, startDate, endDate]);
 
   useEffect(() => {
     if (phase !== 'input') {
@@ -2027,34 +2136,77 @@ export default function CZGeneration() {
                       disabled={loading}
                     />
                   </div>
-                  <div className="w-full">
-                    <FormField
-                      label="Start Date"
-                      name="start_date"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => {
-                        const nextStart = e.target.value;
-                        setStartDate(nextStart);
-                        const currentLength = getLengthHours(nextStart, endDate);
-                        if (!currentLength || currentLength <= 0) {
-                          setEndDate(getDefaultEndDate(nextStart));
-                        }
-                      }}
-                      disabled={loading}
-                    />
-                  </div>
-                  <div className="w-full">
-                    <FormField
-                      label="End Date"
-                      name="end_date"
-                      type="date"
-                      value={endDate}
-                      min={startDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      disabled={loading}
-                    />
-                  </div>
+                  {(() => {
+                    const monthsReady = monthOptions.length > 0;
+                    const placeholderLabel = availableMonthsLoading
+                      ? 'Loading available months...'
+                      : detectedStateAbbr
+                        ? 'No months available for this state'
+                        : 'Resolve seed to see available months';
+                    const placeholderOption = [
+                      { value: '', label: placeholderLabel }
+                    ];
+                    const startValue = monthsReady
+                      ? monthFromDate(startDate)
+                      : '';
+                    const endValue = monthsReady
+                      ? monthFromEndDate(endDate)
+                      : '';
+                    const startOptions = monthsReady
+                      ? monthOptions.map((month) => ({
+                          value: month,
+                          label: formatMonthLabel(month)
+                        }))
+                      : placeholderOption;
+                    const endOptions = monthsReady
+                      ? monthOptions
+                          .filter(
+                            (month) => month >= monthFromDate(startDate)
+                          )
+                          .map((month) => ({
+                            value: month,
+                            label: formatMonthLabel(month)
+                          }))
+                      : placeholderOption;
+                    return (
+                      <>
+                        <div className="w-full">
+                          <FormField
+                            label="Start Month"
+                            name="start_month"
+                            type="select"
+                            value={startValue}
+                            options={startOptions}
+                            onChange={(e) => {
+                              const nextMonth = e.target.value;
+                              if (!nextMonth) return;
+                              const nextStart = startDateFromMonth(nextMonth);
+                              setStartDate(nextStart);
+                              if (monthFromEndDate(endDate) < nextMonth) {
+                                setEndDate(endDateFromMonth(nextMonth));
+                              }
+                            }}
+                            disabled={loading || !monthsReady}
+                          />
+                        </div>
+                        <div className="w-full">
+                          <FormField
+                            label="End Month"
+                            name="end_month"
+                            type="select"
+                            value={endValue}
+                            options={endOptions}
+                            onChange={(e) => {
+                              const nextMonth = e.target.value;
+                              if (!nextMonth) return;
+                              setEndDate(endDateFromMonth(nextMonth));
+                            }}
+                            disabled={loading || !monthsReady}
+                          />
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="w-full sm:col-span-2">
                     <FormField
                       label="Description"
