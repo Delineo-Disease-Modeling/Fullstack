@@ -11,6 +11,7 @@ import {
   type GeoJSONData,
   type LatLng
 } from '@/lib/cz-geo';
+import type { ConvenienceZone } from '@/stores/simsettings';
 import '@/styles/cz-generation.css';
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
@@ -247,6 +248,79 @@ function getPayloadErrorMessage(
   }
 
   return fallback;
+}
+
+async function fetchZoneById(zoneId: number): Promise<ConvenienceZone | null> {
+  try {
+    const res = await fetch('/api/convenience-zones');
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => ({}));
+    const zones = Array.isArray(json?.data) ? json.data : [];
+    const match = zones.find((z: ConvenienceZone) => z.id === zoneId);
+    return match && match.ready ? (match as ConvenienceZone) : null;
+  } catch {
+    return null;
+  }
+}
+
+function waitForZoneReady(
+  zoneId: number,
+  onProgress: (percent: number) => void
+): Promise<ConvenienceZone | null> {
+  return new Promise((resolve) => {
+    let done = false;
+    let currentProgress = 15;
+    let es: EventSource | null = null;
+
+    const finish = (zone: ConvenienceZone | null) => {
+      if (done) return;
+      done = true;
+      if (progressTimer) clearInterval(progressTimer);
+      if (pollTimer) clearInterval(pollTimer);
+      if (es) es.close();
+      resolve(zone);
+    };
+
+    const progressTimer = window.setInterval(() => {
+      if (done) return;
+      currentProgress = Math.min(
+        92,
+        currentProgress + (92 - currentProgress) * 0.05
+      );
+      onProgress(Math.round(currentProgress));
+    }, 1000);
+
+    const checkReady = async () => {
+      const zone = await fetchZoneById(zoneId);
+      if (zone) finish(zone);
+    };
+
+    const pollTimer = window.setInterval(checkReady, 5000);
+
+    try {
+      es = new EventSource('/api/convenience-zones/events');
+      es.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          if (
+            payload?.type === 'zone-ready' &&
+            Number(payload.zone_id) === zoneId
+          ) {
+            checkReady();
+          }
+        } catch {
+          // ignore non-JSON heartbeats
+        }
+      };
+      es.onerror = () => {
+        // polling remains as fallback
+      };
+    } catch {
+      // EventSource may be unavailable; polling will still run
+    }
+
+    checkReady();
+  });
 }
 
 export default function CZGeneration() {
@@ -1334,8 +1408,16 @@ export default function CZGeneration() {
         );
       }
 
+      const zoneId: number = data.id;
+      setFinalizeProgress(15);
+      setFinalizeStatusMessage('Zone saved. Generating movement patterns...');
+
+      await waitForZoneReady(zoneId, (pct) => {
+        setFinalizeProgress(pct);
+      });
+
       setFinalizeProgress(100);
-      setFinalizeStatusMessage('Generation started. Redirecting...');
+      setFinalizeStatusMessage('Generation complete. Opening simulator...');
 
       router.push('/simulator');
     } catch (err) {
@@ -1411,6 +1493,41 @@ export default function CZGeneration() {
 
   return (
     <div className="w-full flex justify-center px-2 py-2">
+      {isFinalizing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-live="polite"
+        >
+          <div className="w-[min(32rem,90vw)] rounded-2xl border border-[#70B4D4] bg-white px-6 py-6 shadow-2xl">
+            <div className="text-lg font-semibold text-[#1f2937]">
+              Generating convenience zone
+            </div>
+            <div className="mt-1 text-sm text-gray-600">
+              {finalizeStatusMessage || 'Preparing movement patterns...'}
+            </div>
+            <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-[#e5e7eb]">
+              <div
+                className="h-full rounded-full bg-[#70B4D4] transition-all duration-300"
+                style={{
+                  width: `${Math.max(
+                    2,
+                    Math.min(100, finalizeProgress)
+                  )}%`
+                }}
+              />
+            </div>
+            <div className="mt-2 text-right text-xs font-medium text-gray-600">
+              {finalizeProgress}%
+            </div>
+            <div className="mt-3 text-xs text-gray-500">
+              This can take a few minutes. You&apos;ll be taken to the simulator
+              automatically once generation is complete.
+            </div>
+          </div>
+        </div>
+      )}
       <form
         onSubmit={handleGenerateSubmit}
         className="w-full max-w-[2200px] flex flex-col gap-4 items-center"
