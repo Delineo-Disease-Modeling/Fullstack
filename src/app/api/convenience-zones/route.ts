@@ -4,10 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { broadcast } from '@/lib/sse-broadcast';
 
-const getSchema = z.object({
-  user_id: z.string().optional()
-});
-
 const postSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
@@ -21,16 +17,12 @@ const postSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const parsed = getSchema.safeParse({
-    user_id: searchParams.get('user_id') || undefined
-  });
+  const session = await auth.api.getSession({ headers: request.headers });
+  const user_id = session?.user?.id;
 
-  if (!parsed.success) {
-    return Response.json({ message: 'Invalid query' }, { status: 400 });
+  if (!user_id) {
+    return Response.json({ message: 'Authentication required' }, { status: 401 });
   }
-
-  const { user_id } = parsed.data;
 
   const zones = await prisma.convenienceZone.findMany({
     where: { user_id }

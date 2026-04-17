@@ -20,14 +20,14 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   const user = session?.user;
   const setSettings = useSimSettings((state) => state.setSettings);
 
-  const [tab, setTab] = useState(0);
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState('');
   const zoneRef = useRef(zone);
   zoneRef.current = zone;
-
-  const hasUserZones = user && locations.some((loc) => loc.user_id === user.id);
 
   useEffect(() => {
     let active = true;
@@ -45,7 +45,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
 
         if (!res.ok) {
           setLocations([]);
-          setLoadError(`Failed to load zones (${res.status}).`);
+          setLoadError(res.status === 401 ? '' : `Failed to load zones (${res.status}).`);
           setLoading(false);
           return;
         }
@@ -114,39 +114,12 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
     };
   }, [setZone]);
 
-  useEffect(() => {
-    if (!hasUserZones) {
-      setTab(0);
-    }
-  }, [hasUserZones]);
-
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory)">
-        {hasUserZones ? (
-          <div className="flex h-6">
-            <button
-              type="button"
-              className="bg-(--color-primary-blue) text-center text-white flex-1 h-full cursor-pointer"
-              style={tab === 0 ? { filter: 'brightness(0.8)' } : undefined}
-              onClick={() => setTab(0)}
-            >
-              All Zones
-            </button>
-            <button
-              type="button"
-              className="bg-(--color-primary-blue) text-center text-white flex-1 h-full cursor-pointer"
-              style={tab === 1 ? { filter: 'brightness(0.8)' } : undefined}
-              onClick={() => setTab(1)}
-            >
-              My Zones
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-6 text-white bg-(--color-primary-blue)">
-            Convenience Zones
-          </div>
-        )}
+        <div className="flex items-center justify-center h-6 text-white bg-(--color-primary-blue)">
+          Zones
+        </div>
 
         <div className="flex px-2 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
           <p className="flex-1">Name</p>
@@ -162,9 +135,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
               {loadError || 'No zones found, create one to get started!'}
             </p>
           )}
-          {locations
-            .filter((loc) => (tab === 0 ? true : loc.user_id === user?.id))
-            .map((loc) => (
+          {locations.map((loc) => (
               <button
                 type="button"
                 key={loc.id}
@@ -263,13 +234,100 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
       )}
 
       {user ? (
-        <Button
-          type="button"
-          className="w-42 p-2!"
-          onClick={() => router.push('/cz-generation')}
-        >
-          + Generate Zone
-        </Button>
+        (() => {
+          const myZones = locations.filter((loc) => loc.user_id === user.id);
+          return (
+            <div className="flex gap-2 items-start">
+              <Button
+                type="button"
+                className="w-42 p-2!"
+                onClick={() => router.push('/cz-generation')}
+              >
+                + Generate Zone
+              </Button>
+              {myZones.length > 0 && (
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="p-2!"
+                    onClick={() => setClearOpen((v) => !v)}
+                  >
+                    Clear My Zones
+                  </Button>
+                  {clearOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-20 w-64 bg-(--color-bg-ivory) outline-solid outline-2 outline-red-600 rounded-md p-3 flex flex-col gap-2 shadow-lg">
+                      <p className="text-sm font-semibold">Delete your {myZones.length} zone{myZones.length === 1 ? '' : 's'}?</p>
+                      <p className="text-xs text-gray-600">This action cannot be undone.</p>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          type="button"
+                          variant="neutral"
+                          className="text-sm py-1! px-3!"
+                          onClick={() => setClearOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="text-sm py-1! px-3!"
+                          disabled={clearing}
+                          onClick={async () => {
+                            setClearing(true);
+                            setClearError('');
+                            try {
+                              const statuses = await Promise.all(
+                                myZones.map(async (loc) => {
+                                  try {
+                                    const res = await fetch(`/api/convenience-zones/${loc.id}`, { method: 'DELETE' });
+                                    if (!res.ok) {
+                                      const text = await res.text().catch(() => '');
+                                      console.error(`DELETE zone ${loc.id} failed: ${res.status}`, text);
+                                    }
+                                    return res.status;
+                                  } catch (e) {
+                                    console.error(`DELETE zone ${loc.id} threw`, e);
+                                    return 0;
+                                  }
+                                })
+                              );
+                              const deletedIds = new Set(
+                                myZones.filter((_, i) => statuses[i] >= 200 && statuses[i] < 300).map((loc) => loc.id)
+                              );
+                              const failed = statuses.filter((s) => !(s >= 200 && s < 300));
+                              const survivors = locations.filter((loc) => !deletedIds.has(loc.id));
+                              setLocations(survivors);
+                              if (zone && deletedIds.has(zone.id)) {
+                                if (survivors.length > 0) {
+                                  setZone(survivors[0]);
+                                } else {
+                                  setSettings({ zone: null, sim_id: null });
+                                }
+                              }
+                              if (failed.length === 0) {
+                                setClearOpen(false);
+                              } else {
+                                setClearError(`Failed to delete ${failed.length} of ${myZones.length} (status ${failed[0] || 'network'}). Check console.`);
+                              }
+                            } finally {
+                              setClearing(false);
+                            }
+                          }}
+                        >
+                          {clearing ? 'Clearing...' : 'Clear All'}
+                        </Button>
+                      </div>
+                      {clearError && (
+                        <p className="text-xs text-red-600 mt-1">{clearError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()
       ) : (
         <InstructionBanner text="Login to generate a Convenience Zone" />
       )}

@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 import { broadcast } from '@/lib/sse-broadcast';
 import { invalidatePapdata } from '@/lib/papdata-cache';
 
@@ -38,6 +39,13 @@ export async function PATCH(
     return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
   }
 
+  const session = await auth.api.getSession({ headers: request.headers });
+  const user_id = session?.user?.id;
+
+  if (!user_id) {
+    return Response.json({ message: 'Authentication required' }, { status: 401 });
+  }
+
   const body = await request.json();
   const data: { name?: string; description?: string } = {};
   if (typeof body.name === 'string') data.name = body.name;
@@ -48,6 +56,14 @@ export async function PATCH(
   }
 
   try {
+    const existing = await prisma.convenienceZone.findUnique({ where: { id } });
+    if (!existing) {
+      return Response.json({ message: 'Not found' }, { status: 404 });
+    }
+    if (existing.user_id !== user_id) {
+      return Response.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
     const zone = await prisma.convenienceZone.update({
       where: { id },
       data,
@@ -62,7 +78,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ czone_id: string }> }
 ) {
   const { czone_id } = await params;
@@ -72,7 +88,22 @@ export async function DELETE(
     return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
   }
 
+  const session = await auth.api.getSession({ headers: request.headers });
+  const user_id = session?.user?.id;
+
+  if (!user_id) {
+    return Response.json({ message: 'Authentication required' }, { status: 401 });
+  }
+
   try {
+    const existing = await prisma.convenienceZone.findUnique({ where: { id } });
+    if (!existing) {
+      return Response.json({ message: 'Not found' }, { status: 404 });
+    }
+    if (existing.user_id !== user_id) {
+      return Response.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
     const zone = await prisma.convenienceZone.delete({ where: { id } });
     if (zone.papdata_id) {
       invalidatePapdata(zone.papdata_id);
