@@ -72,13 +72,21 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     return Number.isFinite(n) ? n : null;
   };
   const papDataArrays = {
-    homes: homeIds.map((id) => ({ id })),
+    homes: homeIds.map((id) => ({
+      id,
+      cbg: papdata.homes[id].cbg,
+      members: papdata.homes[id].members,
+      latitude: toCoord(papdata.homes[id].latitude),
+      longitude: toCoord(papdata.homes[id].longitude),
+    })),
     places: placeIds.map((id) => ({
       id,
+      placekey: papdata.places[id].placekey,
       latitude: toCoord(papdata.places[id].latitude),
       longitude: toCoord(papdata.places[id].longitude),
       label: papdata.places[id].label,
-      top_category: papdata.places[id].top_category
+      top_category: papdata.places[id].top_category,
+      footprint: papdata.places[id].footprint ?? null
     }))
   };
 

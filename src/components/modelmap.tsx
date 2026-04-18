@@ -10,6 +10,12 @@ import '@/styles/modelmap.css';
 import MapLegend from './maplegend';
 import Slider from '@/components/ui/slider';
 import Button from '@/components/ui/button';
+import {
+  getFeatureCbgId,
+  getGeometryPoints,
+  normalizeCbgId,
+  type GeoJSONData
+} from '@/lib/cz-geo';
 
 const icon_lookup: Record<string, string> = {
   'Depository Credit Intermediation': '🏦',
@@ -38,14 +44,592 @@ const icon_lookup: Record<string, string> = {
   'Home': '🏠'
 };
 
+const ALG_URL = process.env.NEXT_PUBLIC_ALG_URL || 'http://localhost:1880/';
+
 let household_locs: Record<string, [number, number]> = {};
 let place_locs: Record<string, [number, number]> = {};
+let place_dot_layouts: Record<string, [number, number][]> = {};
+let household_layout_key = '';
+
+const HOME_CIRCLE_RADIUS_FACTOR = 0.18;
+const HOME_CIRCLE_RADIUS_MIN = 0.008;
+const HOME_CIRCLE_RADIUS_MAX = 0.025;
+const HOME_CIRCLE_RADIUS_QUANTILE = 0.95;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function quantileSorted(values: number[], quantile: number) {
+  if (!values.length) return 0;
+  const index = clamp(
+    Math.round((values.length - 1) * quantile),
+    0,
+    values.length - 1
+  );
+  return values[index];
+}
+
+function getRingPoints(value: unknown) {
+  if (!Array.isArray(value)) return [] as Array<[number, number]>;
+
+  const points: Array<[number, number]> = [];
+  for (const item of value) {
+    if (
+      Array.isArray(item) &&
+      item.length >= 2 &&
+      typeof item[0] === 'number' &&
+      typeof item[1] === 'number'
+    ) {
+      points.push([item[0], item[1]]);
+    }
+  }
+  return points;
+}
+
+function getGeometryRings(geometry: any) {
+  const rings: Array<Array<[number, number]>> = [];
+  if (!geometry?.type || !Array.isArray(geometry.coordinates)) return rings;
+
+  if (geometry.type === 'Polygon') {
+    for (const ring of geometry.coordinates) {
+      const points = getRingPoints(ring);
+      if (points.length >= 3) rings.push(points);
+    }
+    return rings;
+  }
+
+  if (geometry.type === 'MultiPolygon') {
+    for (const polygon of geometry.coordinates) {
+      if (!Array.isArray(polygon)) continue;
+      for (const ring of polygon) {
+        const points = getRingPoints(ring);
+        if (points.length >= 3) rings.push(points);
+      }
+    }
+  }
+
+  return rings;
+}
+
+function getPolygonGroups(
+  geometry: { type?: string; coordinates?: unknown } | null | undefined
+) {
+  const groups: Array<Array<Array<[number, number]>>> = [];
+  if (!geometry?.type || !Array.isArray(geometry.coordinates)) return groups;
+
+  if (geometry.type === 'Polygon') {
+    const polygon: Array<Array<[number, number]>> = [];
+    for (const ring of geometry.coordinates) {
+      const points = getRingPoints(ring);
+      if (points.length >= 3) polygon.push(points);
+    }
+    if (polygon.length) groups.push(polygon);
+    return groups;
+  }
+
+  if (geometry.type === 'MultiPolygon') {
+    for (const polygonCoords of geometry.coordinates) {
+      if (!Array.isArray(polygonCoords)) continue;
+      const polygon: Array<Array<[number, number]>> = [];
+      for (const ring of polygonCoords) {
+        const points = getRingPoints(ring);
+        if (points.length >= 3) polygon.push(points);
+      }
+      if (polygon.length) groups.push(polygon);
+    }
+  }
+
+  return groups;
+}
+
+function pointInRing(
+  lng: number,
+  lat: number,
+  ring: Array<[number, number]>
+) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [lngI, latI] = ring[i];
+    const [lngJ, latJ] = ring[j];
+    const intersects =
+      latI > lat !== latJ > lat &&
+      lng <
+        ((lngJ - lngI) * (lat - latI)) / Math.max(latJ - latI, 1e-12) + lngI;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(
+  lng: number,
+  lat: number,
+  geometry: { type?: string; coordinates?: unknown } | null | undefined
+) {
+  const groups = getPolygonGroups(geometry);
+  for (const polygon of groups) {
+    const [outer, ...holes] = polygon;
+    if (!outer || !pointInRing(lng, lat, outer)) continue;
+    if (holes.some((hole) => pointInRing(lng, lat, hole))) continue;
+    return true;
+  }
+  return false;
+}
+
+function halton(index: number, base: number) {
+  let result = 0;
+  let fraction = 1 / base;
+  let i = index;
+  while (i > 0) {
+    result += fraction * (i % base);
+    i = Math.floor(i / base);
+    fraction /= base;
+  }
+  return result;
+}
+
+function samplePointsInFootprint(
+  geometry: { type?: string; coordinates?: unknown } | null | undefined,
+  count: number,
+  seed: number
+) {
+  if (!geometry || count <= 0) return [] as Array<[number, number]>;
+
+  const points = getGeometryPoints(geometry as any);
+  if (!points.length) return [] as Array<[number, number]>;
+
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  for (const [lng, lat] of points) {
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  }
+
+  if (
+    !Number.isFinite(minLng) ||
+    !Number.isFinite(maxLng) ||
+    !Number.isFinite(minLat) ||
+    !Number.isFinite(maxLat) ||
+    maxLng <= minLng ||
+    maxLat <= minLat
+  ) {
+    return [] as Array<[number, number]>;
+  }
+
+  const accepted: Array<[number, number]> = [];
+  const offsetA = 1 + Math.floor(hashUnit(seed, 17) * 997);
+  const offsetB = 1 + Math.floor(hashUnit(seed, 23) * 997);
+  const maxAttempts = Math.max(240, count * 80);
+
+  for (let attempt = 0; attempt < maxAttempts && accepted.length < count; attempt += 1) {
+    const lng = minLng + halton(attempt + offsetA, 2) * (maxLng - minLng);
+    const lat = minLat + halton(attempt + offsetB, 3) * (maxLat - minLat);
+    if (pointInGeometry(lng, lat, geometry)) {
+      accepted.push([lng, lat]);
+    }
+  }
+
+  return accepted;
+}
+
+function summarizeGeometry(
+  geometry: any,
+  longitudeScale: number
+): { area: number; centerLat: number; centerLng: number } | null {
+  const rings = getGeometryRings(geometry);
+  let areaSum = 0;
+  let weightedCenterX = 0;
+  let weightedCenterY = 0;
+
+  for (const ring of rings) {
+    let area2 = 0;
+    let centroidX = 0;
+    let centroidY = 0;
+
+    for (let index = 0; index < ring.length; index += 1) {
+      const [lngA, latA] = ring[index];
+      const [lngB, latB] = ring[(index + 1) % ring.length];
+      const xA = lngA * longitudeScale;
+      const xB = lngB * longitudeScale;
+      const cross = xA * latB - xB * latA;
+
+      area2 += cross;
+      centroidX += (xA + xB) * cross;
+      centroidY += (latA + latB) * cross;
+    }
+
+    if (Math.abs(area2) < 1e-12) continue;
+
+    areaSum += area2 / 2;
+    weightedCenterX += centroidX / 6;
+    weightedCenterY += centroidY / 6;
+  }
+
+  if (Math.abs(areaSum) > 1e-12) {
+    return {
+      area: Math.abs(areaSum),
+      centerLat: weightedCenterY / areaSum,
+      centerLng: weightedCenterX / areaSum / longitudeScale
+    };
+  }
+
+  const points = getGeometryPoints(geometry);
+  if (!points.length) return null;
+
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+
+  for (const [lng, lat] of points) {
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  }
+
+  if (
+    !Number.isFinite(minLng) ||
+    !Number.isFinite(maxLng) ||
+    !Number.isFinite(minLat) ||
+    !Number.isFinite(maxLat)
+  ) {
+    return null;
+  }
+
+  return {
+    area: 0,
+    centerLat: (minLat + maxLat) / 2,
+    centerLng: (minLng + maxLng) / 2
+  };
+}
+
+type HouseholdCircleLayout = {
+  anchorLat: number;
+  anchorLng: number;
+  centerLat: number;
+  centerLng: number;
+  radiusLat: number;
+  radiusLng: number;
+};
+
+type HouseholdLayoutBundle = {
+  fallback: HouseholdCircleLayout;
+  byCbg: Record<string, HouseholdCircleLayout>;
+};
+
+type HouseholdCircleDraft = {
+  cbgId: string;
+  anchorLat: number;
+  anchorLng: number;
+  x: number;
+  y: number;
+  radius: number;
+  homeCount: number;
+};
+
+function buildFallbackHouseholdLayout(
+  centerLat: number,
+  centerLng: number,
+  spreadLat: number,
+  spreadLng: number
+): HouseholdCircleLayout {
+  const displayCos = Math.max(Math.cos((centerLat * Math.PI) / 180), 0.35);
+  const radiusLat = clamp(
+    Math.max(spreadLat, spreadLng) * HOME_CIRCLE_RADIUS_FACTOR,
+    HOME_CIRCLE_RADIUS_MIN,
+    HOME_CIRCLE_RADIUS_MAX
+  );
+  return {
+    anchorLat: centerLat,
+    anchorLng: centerLng,
+    centerLat,
+    centerLng,
+    radiusLat,
+    radiusLng: radiusLat / displayCos
+  };
+}
+
+function relaxHouseholdCircles(circles: HouseholdCircleDraft[]) {
+  if (circles.length < 2) return;
+
+  const iterations = Math.max(12, Math.min(36, circles.length * 6));
+  const springStrength = 0.12;
+
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    let moved = false;
+
+    for (let leftIndex = 0; leftIndex < circles.length; leftIndex += 1) {
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < circles.length;
+        rightIndex += 1
+      ) {
+        const left = circles[leftIndex];
+        const right = circles[rightIndex];
+        const dx = right.x - left.x;
+        const dy = right.y - left.y;
+        const distance = Math.hypot(dx, dy);
+        const minDistance = left.radius + right.radius;
+
+        if (distance >= minDistance) continue;
+
+        moved = true;
+        const overlap = minDistance - Math.max(distance, 1e-9);
+        const seed = hashString(`${left.cbgId}:${right.cbgId}`);
+        const angle = hashUnit(seed, 1) * Math.PI * 2;
+        const nx = distance > 1e-9 ? dx / distance : Math.cos(angle);
+        const ny = distance > 1e-9 ? dy / distance : Math.sin(angle);
+        const leftMass = Math.max(left.homeCount, 1);
+        const rightMass = Math.max(right.homeCount, 1);
+        const totalMass = leftMass + rightMass;
+        const leftPush = rightMass / totalMass;
+        const rightPush = leftMass / totalMass;
+
+        left.x -= nx * overlap * leftPush;
+        left.y -= ny * overlap * leftPush;
+        right.x += nx * overlap * rightPush;
+        right.y += ny * overlap * rightPush;
+      }
+    }
+
+    for (const circle of circles) {
+      circle.x += (circle.anchorLng - circle.x) * springStrength;
+      circle.y += (circle.anchorLat - circle.y) * springStrength;
+    }
+
+    if (!moved) break;
+  }
+}
+
+function computeCbgHouseholdLayouts(
+  zoneGeoJSON: GeoJSONData | null,
+  homes: any[],
+  fallbackCenterLat: number,
+  fallbackCenterLng: number,
+  fallbackSpreadLat: number,
+  fallbackSpreadLng: number
+): HouseholdLayoutBundle {
+  const fallbackLayout = buildFallbackHouseholdLayout(
+    fallbackCenterLat,
+    fallbackCenterLng,
+    fallbackSpreadLat,
+    fallbackSpreadLng
+  );
+
+  if (!zoneGeoJSON?.features?.length) {
+    return {
+      fallback: fallbackLayout,
+      byCbg: {}
+    };
+  }
+
+  const boundaryPoints = zoneGeoJSON.features.flatMap((feature) =>
+    getGeometryPoints(feature.geometry)
+  );
+  if (!boundaryPoints.length) {
+    return {
+      fallback: fallbackLayout,
+      byCbg: {}
+    };
+  }
+
+  const referenceLat =
+    boundaryPoints.reduce((sum, [, lat]) => sum + lat, 0) / boundaryPoints.length;
+  const longitudeScale = Math.max(Math.cos((referenceLat * Math.PI) / 180), 0.35);
+
+  const homesByCbg = new Map<string, any[]>();
+  for (const home of homes ?? []) {
+    const cbgId = normalizeCbgId(home?.cbg);
+    if (!cbgId) continue;
+    const group = homesByCbg.get(cbgId) ?? [];
+    group.push(home);
+    homesByCbg.set(cbgId, group);
+  }
+
+  const circles: HouseholdCircleDraft[] = [];
+
+  for (const feature of zoneGeoJSON.features) {
+    const cbgId = getFeatureCbgId(feature);
+    if (!cbgId) continue;
+
+    const summary = summarizeGeometry(feature.geometry, longitudeScale);
+    if (!summary) continue;
+
+    const anchorLat = summary.centerLat;
+    const anchorLng = summary.centerLng * longitudeScale;
+    const homeCount = homesByCbg.get(cbgId)?.length ?? 0;
+    const areaRadius = summary.area > 0 ? Math.sqrt(summary.area / Math.PI) : 0;
+
+    const validHomeDistances = (homesByCbg.get(cbgId) ?? [])
+      .map((home) => {
+        const lat =
+          typeof home?.latitude === 'number'
+            ? home.latitude
+            : Number(home?.latitude);
+        const lng =
+          typeof home?.longitude === 'number'
+            ? home.longitude
+            : Number(home?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+          return null;
+        }
+        const cos = Math.max(Math.cos((anchorLat * Math.PI) / 180), 0.35);
+        return Math.hypot((lng - summary.centerLng) * cos, lat - anchorLat);
+      })
+      .filter((value): value is number => value !== null)
+      .sort((left, right) => left - right);
+
+    const geoRadius = Math.max(
+      areaRadius,
+      validHomeDistances.length
+        ? quantileSorted(validHomeDistances, HOME_CIRCLE_RADIUS_QUANTILE)
+        : 0,
+      1e-4
+    );
+
+    circles.push({
+      cbgId,
+      anchorLat,
+      anchorLng,
+      x: anchorLng,
+      y: anchorLat,
+      radius: geoRadius,
+      homeCount
+    });
+  }
+
+  if (!circles.length) {
+    return {
+      fallback: fallbackLayout,
+      byCbg: {}
+    };
+  }
+
+  const totalHomes = circles.reduce((sum, circle) => sum + circle.homeCount, 0);
+  const totalGeoArea = circles.reduce(
+    (sum, circle) => sum + Math.PI * circle.radius * circle.radius,
+    0
+  );
+
+  if (totalHomes > 0 && totalGeoArea > 0) {
+    const targetDensity = totalHomes / totalGeoArea;
+    for (const circle of circles) {
+      if (circle.homeCount <= 0) continue;
+      const capacityRadius = Math.sqrt(circle.homeCount / (Math.PI * targetDensity));
+      circle.radius = Math.max(circle.radius, capacityRadius);
+    }
+  }
+
+  relaxHouseholdCircles(circles);
+
+  const byCbg: Record<string, HouseholdCircleLayout> = {};
+  for (const circle of circles) {
+    const centerLat = circle.y;
+    const centerLng = circle.x / longitudeScale;
+    const displayCos = Math.max(Math.cos((centerLat * Math.PI) / 180), 0.35);
+    byCbg[circle.cbgId] = {
+      anchorLat: circle.anchorLat,
+      anchorLng: circle.anchorLng / longitudeScale,
+      centerLat,
+      centerLng,
+      radiusLat: circle.radius,
+      radiusLng: circle.radius / displayCos
+    };
+  }
+
+  return {
+    fallback: fallbackLayout,
+    byCbg
+  };
+}
+
+function buildHouseholdLayout(
+  homes: any[],
+  layouts: HouseholdLayoutBundle
+) {
+  if (!homes?.length) return;
+
+  const num = (v: unknown): number | null => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const groups = new Map<string, any[]>();
+  for (const home of homes) {
+    const cbgId = normalizeCbgId(home?.cbg);
+    const key = cbgId && layouts.byCbg[cbgId] ? cbgId : '__fallback__';
+    const group = groups.get(key) ?? [];
+    group.push(home);
+    groups.set(key, group);
+  }
+
+  for (const [groupKey, groupHomes] of groups) {
+    const layout =
+      groupKey === '__fallback__'
+        ? layouts.fallback
+        : layouts.byCbg[groupKey] ?? layouts.fallback;
+    const sourceCos = Math.max(Math.cos((layout.anchorLat * Math.PI) / 180), 0.35);
+
+    const validHomes = groupHomes
+      .map((home) => {
+        const lat = num(home.latitude);
+        const lng = num(home.longitude);
+        if (lat === null || lng === null || (lat === 0 && lng === 0)) {
+          return null;
+        }
+        const dx = (lng - layout.anchorLng) * sourceCos;
+        const dy = lat - layout.anchorLat;
+        return {
+          id: String(home.id),
+          angle: Math.atan2(dy, dx),
+          distance: Math.hypot(dx, dy)
+        };
+      })
+      .filter(Boolean) as { id: string; angle: number; distance: number }[];
+
+    const sortedDistances = validHomes
+      .map((home) => home.distance)
+      .sort((left, right) => left - right);
+    const sourceRadius = sortedDistances.length
+      ? quantileSorted(sortedDistances, HOME_CIRCLE_RADIUS_QUANTILE)
+      : 0;
+
+    if (sourceRadius > 1e-9) {
+      for (const home of validHomes) {
+        const radialWeight = clamp(home.distance / sourceRadius, 0, 1);
+        household_locs[home.id] = [
+          layout.centerLat + Math.sin(home.angle) * layout.radiusLat * radialWeight,
+          layout.centerLng + Math.cos(home.angle) * layout.radiusLng * radialWeight
+        ];
+      }
+    }
+
+    for (const home of groupHomes) {
+      const id = String(home.id);
+      if (id in household_locs) continue;
+
+      const seed = hashString(`home:${id}`);
+      const angle = hashUnit(seed, 1) * Math.PI * 2;
+      const radialWeight = Math.sqrt(hashUnit(seed, 2));
+      household_locs[id] = [
+        layout.centerLat + Math.sin(angle) * layout.radiusLat * radialWeight,
+        layout.centerLng + Math.cos(angle) * layout.radiusLng * radialWeight
+      ];
+    }
+  }
+}
 
 function updateIcons(
   mapCenter: [number, number],
   sim_data: any,
   pap_data: any,
-  hotspots: any
+  hotspots: any,
+  zoneGeoJSON: GeoJSONData | null
 ) {
   const icons: any[] = [];
   if (!sim_data || !pap_data) return icons;
@@ -79,10 +663,61 @@ function updateIcons(
   }
 
   const hasPlaceBounds = validPlaceCount > 0 && minLat !== Infinity;
-  const homeCenterLat = hasPlaceBounds ? (minLat + maxLat) / 2 : mapCenter[0];
-  const homeCenterLng = hasPlaceBounds ? (minLng + maxLng) / 2 : mapCenter[1];
-  const homeSpreadLat = hasPlaceBounds ? Math.max(maxLat - minLat, 0.02) : 0.06;
-  const homeSpreadLng = hasPlaceBounds ? Math.max(maxLng - minLng, 0.02) : 0.06;
+  const placeCenterLat = hasPlaceBounds ? (minLat + maxLat) / 2 : mapCenter[0];
+  const placeCenterLng = hasPlaceBounds ? (minLng + maxLng) / 2 : mapCenter[1];
+  const placeSpreadLat = hasPlaceBounds ? Math.max(maxLat - minLat, 0.02) : 0.06;
+  const placeSpreadLng = hasPlaceBounds ? Math.max(maxLng - minLng, 0.02) : 0.06;
+  const householdLayouts = computeCbgHouseholdLayouts(
+    zoneGeoJSON,
+    pap_data.homes,
+    placeCenterLat,
+    placeCenterLng,
+    placeSpreadLat,
+    placeSpreadLng
+  );
+  const zoneKey = zoneGeoJSON?.features?.length
+    ? zoneGeoJSON.features.map((feature) => getFeatureCbgId(feature)).join(',')
+    : 'no-zone';
+  let homeChecksum = 0;
+  for (const home of pap_data.homes ?? []) {
+    const lat = num(home?.latitude);
+    const lng = num(home?.longitude);
+    homeChecksum =
+      (homeChecksum +
+        hashString(
+          [
+            home?.id ?? 'none',
+            normalizeCbgId(home?.cbg) || 'nocbg',
+            lat === null ? 'na' : lat.toFixed(4),
+            lng === null ? 'na' : lng.toFixed(4)
+          ].join(':')
+        )) >>>
+      0;
+  }
+  const circleDigest = Object.entries(householdLayouts.byCbg)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([cbgId, layout]) =>
+        `${cbgId}:${layout.centerLat.toFixed(4)}:${layout.centerLng.toFixed(4)}:${layout.radiusLat.toFixed(4)}`
+    )
+    .join('|');
+  const homeLayoutKey = Array.isArray(pap_data.homes)
+    ? [
+        pap_data.homes.length,
+        homeChecksum,
+        zoneKey,
+        circleDigest,
+        householdLayouts.fallback.centerLat.toFixed(4),
+        householdLayouts.fallback.centerLng.toFixed(4),
+        householdLayouts.fallback.radiusLat.toFixed(4)
+      ].join(':')
+    : 'empty';
+
+  if (pap_data.homes && household_layout_key !== homeLayoutKey) {
+    household_locs = {};
+    household_layout_key = homeLayoutKey;
+    buildHouseholdLayout(pap_data.homes, householdLayouts);
+  }
 
   const processLocs = (type: string, dataArray: any[], statArray: number[]) => {
     if (!dataArray || !statArray) return;
@@ -91,19 +726,27 @@ function updateIcons(
       let lng: number | null = num(data.longitude);
       if (type === 'homes') {
         data.label = `Home #${data.id}`;
-        if (!(data.id in household_locs)) {
-          household_locs[data.id] = [
-            homeCenterLat + (Math.random() - 0.5) * homeSpreadLat,
-            homeCenterLng + (Math.random() - 0.5) * homeSpreadLng
-          ];
+        const layout = household_locs[String(data.id)];
+        if (layout) {
+          lat = layout[0];
+          lng = layout[1];
+        } else {
+          const cbgId = normalizeCbgId(data?.cbg);
+          const circle =
+            (cbgId && householdLayouts.byCbg[cbgId]) || householdLayouts.fallback;
+          const seed = hashString(`home:${data.id}`);
+          const angle = hashUnit(seed, 1) * Math.PI * 2;
+          const radialWeight = Math.sqrt(hashUnit(seed, 2));
+          lat =
+            circle.centerLat + Math.sin(angle) * circle.radiusLat * radialWeight;
+          lng =
+            circle.centerLng + Math.cos(angle) * circle.radiusLng * radialWeight;
         }
-        lat = household_locs[data.id][0];
-        lng = household_locs[data.id][1];
       } else if (lat === null || lng === null || (lat === 0 && lng === 0)) {
         if (!(data.id in place_locs)) {
           place_locs[data.id] = [
-            homeCenterLat + (Math.random() - 0.5) * homeSpreadLat,
-            homeCenterLng + (Math.random() - 0.5) * homeSpreadLng
+            placeCenterLat + (Math.random() - 0.5) * placeSpreadLat,
+            placeCenterLng + (Math.random() - 0.5) * placeSpreadLng
           ];
         }
         lat = place_locs[data.id][0];
@@ -123,6 +766,7 @@ function updateIcons(
         longitude: lng,
         label: data.label,
         description,
+        footprint: type === 'places' ? (data.footprint ?? null) : null,
         icon:
           (type === 'homes'
             ? icon_lookup.Home
@@ -224,8 +868,10 @@ function EmojiOverlay({
 }
 
 const MAX_PERSON_DOTS = 8000;
-const MAX_DOTS_PER_LOCATION = 300;
+const MAX_HOME_DOTS_PER_LOCATION = 80;
+const MAX_PLACE_DOTS_PER_LOCATION = 220;
 const DOT_JITTER_DEGREES = 0.0035;
+const HOME_DOT_DOWNSAMPLE = 1.8;
 
 function hashString(input: string) {
   let hash = 2166136261;
@@ -263,8 +909,27 @@ function makePeopleDotGeoJSON(pois: any[], mode: string) {
       continue;
     }
 
-    const dotCount = Math.min(MAX_DOTS_PER_LOCATION, Math.ceil(count / peoplePerDot));
+    const isHome = poi.type === 'homes';
+    const perLocationCap = isHome
+      ? MAX_HOME_DOTS_PER_LOCATION
+      : MAX_PLACE_DOTS_PER_LOCATION;
+    const dotCount = Math.min(
+      perLocationCap,
+      Math.ceil(count / (peoplePerDot * (isHome ? HOME_DOT_DOWNSAMPLE : 1)))
+    );
     const baseSeed = hashString(`${poi.type}:${poi.id}`);
+    const footprintKey = poi.footprint
+      ? `${poi.type}:${poi.id}:${dotCount}:${JSON.stringify(poi.footprint)}`
+      : '';
+    const footprintDots =
+      !isHome && poi.footprint
+        ? place_dot_layouts[footprintKey] ??
+          (place_dot_layouts[footprintKey] = samplePointsInFootprint(
+            poi.footprint,
+            dotCount,
+            baseSeed
+          ))
+        : null;
 
     for (let i = 0; i < dotCount; i++) {
       if (features.length >= MAX_PERSON_DOTS) {
@@ -272,10 +937,12 @@ function makePeopleDotGeoJSON(pois: any[], mode: string) {
         break;
       }
 
+      const footprintDot =
+        footprintDots && i < footprintDots.length ? footprintDots[i] : null;
       const angle = hashUnit(baseSeed, i) * Math.PI * 2;
       const radius = Math.sqrt(hashUnit(baseSeed, i + 100_000)) * DOT_JITTER_DEGREES;
-      const lat = poi.latitude + Math.sin(angle) * radius;
-      const lng = poi.longitude + Math.cos(angle) * radius;
+      const lat = footprintDot ? footprintDot[1] : poi.latitude + Math.sin(angle) * radius;
+      const lng = footprintDot ? footprintDot[0] : poi.longitude + Math.cos(angle) * radius;
 
       features.push({
         type: 'Feature',
@@ -319,6 +986,7 @@ interface ClusteredMapProps {
   currentTime: number;
   mapCenter: [number, number];
   pois: any[];
+  zoneGeoJSON: any;
   hotspots: Record<string, number[]>;
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
   heatmapMode: string;
@@ -330,6 +998,7 @@ function ClusteredMap({
   currentTime: _currentTime,
   mapCenter,
   pois,
+  zoneGeoJSON,
   hotspots,
   onMarkerClick,
   heatmapMode,
@@ -348,7 +1017,7 @@ function ClusteredMap({
       minLng = Infinity,
       maxLng = -Infinity;
     for (const poi of pois) {
-      if (poi.latitude && poi.longitude) {
+      if (Number.isFinite(poi.latitude) && Number.isFinite(poi.longitude)) {
         minLat = Math.min(minLat, poi.latitude);
         maxLat = Math.max(maxLat, poi.latitude);
         minLng = Math.min(minLng, poi.longitude);
@@ -387,12 +1056,14 @@ function ClusteredMap({
     }
     const isDots =
       heatmapMode === 'population' || heatmapMode === 'infection';
-    if (mapInstance.getLayer('people-dots'))
-      mapInstance.setLayoutProperty(
-        'people-dots',
-        'visibility',
-        isDots ? 'visible' : 'none'
-      );
+    for (const id of ['people-dots-homes', 'people-dots-places']) {
+      if (mapInstance.getLayer(id))
+        mapInstance.setLayoutProperty(
+          id,
+          'visibility',
+          isDots ? 'visible' : 'none'
+        );
+    }
   }, [heatmapMode, mapInstance]);
 
   const handleMapLoad = (event: any) => {
@@ -497,6 +1168,34 @@ function ClusteredMap({
         ]}
         onClick={handleClick}
       >
+        {zoneGeoJSON?.features?.length ? (
+          <Source id="zone-cbgs" type="geojson" data={zoneGeoJSON}>
+            <Layer
+              id="zone-cbgs-fill"
+              type="fill"
+              paint={{
+                'fill-color': '#2563eb',
+                'fill-opacity': 0.08
+              }}
+            />
+            <Layer
+              id="zone-cbgs-outline"
+              type="line"
+              paint={{
+                'line-color': '#1d4ed8',
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  8, 0.8,
+                  11, 1.2,
+                  14, 2
+                ] as any,
+                'line-opacity': 0.45
+              }}
+            />
+          </Source>
+        ) : null}
         <Source
           id="points"
           type="geojson"
@@ -575,8 +1274,36 @@ function ClusteredMap({
         </Source>
         <Source id="people-dots" type="geojson" data={peopleDotGeoJSON}>
           <Layer
-            id="people-dots"
+            id="people-dots-homes"
             type="circle"
+            filter={['==', ['get', 'loc_type'], 'homes']}
+            layout={
+              {
+                visibility:
+                  heatmapMode === 'population' || heatmapMode === 'infection'
+                    ? 'visible'
+                    : 'none'
+              } as any
+            }
+            paint={{
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 1.0,
+                13, 1.6,
+                16, 2.4,
+                18, 3.6,
+              ] as any,
+              'circle-color': '#2f855a',
+              'circle-opacity': 0.38,
+              'circle-stroke-width': 0,
+            }}
+          />
+          <Layer
+            id="people-dots-places"
+            type="circle"
+            filter={['!=', ['get', 'loc_type'], 'homes']}
             layout={
               {
                 visibility:
@@ -596,11 +1323,31 @@ function ClusteredMap({
                 18, 6,
               ] as any,
               'circle-color': peopleDotColor,
-              'circle-opacity': 0.7,
+              'circle-opacity': 0.72,
               'circle-stroke-width': 0,
             }}
           />
         </Source>
+        {zoneGeoJSON?.features?.length ? (
+          <Source id="zone-cbgs-top-outline" type="geojson" data={zoneGeoJSON}>
+            <Layer
+              id="zone-cbgs-top-outline"
+              type="line"
+              paint={{
+                'line-color': '#1d4ed8',
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  8, 1,
+                  11, 1.5,
+                  14, 2.4
+                ] as any,
+                'line-opacity': 0.8
+              }}
+            />
+          </Source>
+        ) : null}
         {popupInfo && (
           <Popup
             longitude={popupInfo.coordinates[0]}
@@ -632,6 +1379,7 @@ interface ModelMapProps {
   selectedZone: {
     latitude: number;
     longitude: number;
+    cbg_list?: string[];
     start_date: string;
     length: number;
   };
@@ -644,6 +1392,7 @@ export default function ModelMap({
   const sim_data = useMapData((state) => state.simdata);
   const pap_data = useMapData((state) => state.papdata);
   const hotspots = useMapData((state) => state.hotspots) || {};
+  const [zoneGeoJSON, setZoneGeoJSON] = useState<any>(null);
 
   const [maxHours, setMaxHours] = useState(1);
   const [currentTime, setCurrentTime] = useState(1);
@@ -653,7 +1402,38 @@ export default function ModelMap({
   useEffect(() => {
     household_locs = {};
     place_locs = {};
+    place_dot_layouts = {};
+    household_layout_key = '';
   }, []);
+
+  useEffect(() => {
+    const cbgList = selectedZone?.cbg_list?.filter(Boolean) ?? [];
+    if (cbgList.length === 0) {
+      setZoneGeoJSON(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const cbgs = cbgList.join(',');
+    const url = new URL('cbg-geojson', ALG_URL);
+    url.searchParams.set('cbgs', cbgs);
+    url.searchParams.set('include_neighbors', 'false');
+
+    fetch(url.toString(), { signal: controller.signal })
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setZoneGeoJSON(data?.features?.length ? data : null);
+        }
+      })
+      .catch((err) => {
+        if ((err as Error)?.name !== 'AbortError') {
+          console.warn('Failed to load zone CBG overlay:', err);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedZone]);
 
   const availableTimesteps = useMemo(() => {
     if (!sim_data) return [];
@@ -687,14 +1467,15 @@ export default function ModelMap({
     const nearestTs = findNearestTimestep(targetMinutes);
     const dataForTime =
       nearestTs !== null ? sim_data?.[nearestTs.toString()] : null;
-    return updateIcons(mapCenter, dataForTime, pap_data, hotspots);
+    return updateIcons(mapCenter, dataForTime, pap_data, hotspots, zoneGeoJSON);
   }, [
     currentTime,
     hotspots,
     mapCenter,
     pap_data,
     sim_data,
-    findNearestTimestep
+    findNearestTimestep,
+    zoneGeoJSON
   ]);
 
   useEffect(() => {
@@ -762,6 +1543,7 @@ export default function ModelMap({
         currentTime={currentTime}
         mapCenter={mapCenter}
         pois={pois}
+        zoneGeoJSON={zoneGeoJSON}
         hotspots={hotspots as Record<string, number[]>}
         onMarkerClick={onMarkerClick}
         heatmapMode={heatmapMode}

@@ -5,15 +5,21 @@ export type PapData = {
     id: string;
     cbg?: string;
     members?: number;
+    latitude?: number | null;
+    longitude?: number | null;
   }[];
   places: {
     id: string;
     placekey?: string;
     label: string;
-    latitude: number;
-    longitude: number;
+    latitude: number | null;
+    longitude: number | null;
     top_category: string;
     postal_code?: number;
+    footprint?: {
+      type: string;
+      coordinates: unknown;
+    } | null;
   }[];
 };
 
