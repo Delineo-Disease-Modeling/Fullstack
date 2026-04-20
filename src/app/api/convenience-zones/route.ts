@@ -58,13 +58,39 @@ export async function POST(request: NextRequest) {
     } = parsed.data;
 
     const session = await auth.api.getSession({ headers: request.headers });
-    const user_id = session?.user?.id ?? bodyUserId;
+    const sessionUserId = session?.user?.id;
+
+    if (sessionUserId && bodyUserId && bodyUserId !== sessionUserId) {
+      return Response.json(
+        { message: 'Authenticated user does not match request user_id.' },
+        { status: 403 }
+      );
+    }
+
+    const user_id = sessionUserId ?? bodyUserId;
 
     if (!user_id) {
       return Response.json(
         { message: 'Authentication required' },
         { status: 401 }
       );
+    }
+
+    if (!sessionUserId) {
+      const existingUser = await prisma.user.findUnique({
+        where: { id: user_id },
+        select: { id: true }
+      });
+
+      if (!existingUser) {
+        return Response.json(
+          {
+            message:
+              'Authentication required. Please log in again before creating a convenience zone.'
+          },
+          { status: 401 }
+        );
+      }
     }
 
     const zone = await prisma.convenienceZone.create({

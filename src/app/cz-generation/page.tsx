@@ -2072,6 +2072,18 @@ export default function CZGeneration() {
       return;
     }
 
+    if (isPending) {
+      setError('Please wait for your login session to finish loading.');
+      return;
+    }
+
+    if (!user?.id) {
+      setError(
+        'Please log in before finalizing and generating a convenience zone.'
+      );
+      return;
+    }
+
     const lengthHours = getLengthHours(startDate, endDate);
     if (!lengthHours || lengthHours <= 0) {
       setError('End date must be after start date.');
