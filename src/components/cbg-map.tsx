@@ -73,6 +73,11 @@ function interpolateHexColor(startHex: string, endHex: string, t: number) {
   });
 }
 
+type SelectionStyle = {
+  fillColor: string;
+  lineColor: string;
+};
+
 export default function CBGMap({
   cbgData,
   center = null,
@@ -84,6 +89,7 @@ export default function CBGMap({
   seedGuardRadiusKm = 0,
   showSeedGuardCircle = false,
   traceLayer = null,
+  selectionStyleByCbg = null,
   editingEnabled = true,
   focusedCbgId = '',
   focusNonce = 0
@@ -98,6 +104,7 @@ export default function CBGMap({
   seedGuardRadiusKm?: number;
   showSeedGuardCircle?: boolean;
   traceLayer?: TraceLayerData | null;
+  selectionStyleByCbg?: Map<string, SelectionStyle> | null;
   editingEnabled?: boolean;
   focusedCbgId?: string;
   focusNonce?: number;
@@ -226,6 +233,15 @@ export default function CBGMap({
               };
             }
 
+            const customStyle = selectionStyleByCbg?.get(cbgId);
+            if (customStyle) {
+              return {
+                _fill_color: customStyle.fillColor,
+                _fill_opacity: 0.6,
+                _line_color: isFocused ? '#0f172a' : customStyle.lineColor,
+                _line_width: isFocused ? 4 : 2
+              };
+            }
             const isSelected = selectedCBGs.includes(cbgId);
             return {
               _fill_color: isSelected ? '#70B4D4' : '#BDBDBD',
@@ -241,7 +257,7 @@ export default function CBGMap({
         }
       }))
     };
-  }, [cbgData, focusedCbgId, getCandidateHeatColor, selectedCBGs, traceLayer]);
+  }, [cbgData, focusedCbgId, getCandidateHeatColor, selectedCBGs, selectionStyleByCbg, traceLayer]);
 
   const focusedFeature = useMemo<GeoJSONFeature | null>(
     () =>
