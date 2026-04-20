@@ -1,5 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
+import { rename, rm } from 'node:fs/promises';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { createGzip } from 'node:zlib';
 
 export const saveFileStream = async (
@@ -7,24 +11,22 @@ export const saveFileStream = async (
   filePath: string,
   compress = false
 ) => {
-  const writeStream = createWriteStream(filePath);
-  const readStream = Readable.fromWeb(file.stream() as any);
+  const tempPath = `${filePath}.tmp-${randomUUID()}`;
+  const readStream = Readable.fromWeb(
+    file.stream() as unknown as NodeReadableStream
+  );
+  const writeStream = createWriteStream(tempPath);
 
-  if (compress) {
-    const gzip = createGzip();
-    await new Promise<void>((resolve, reject) => {
-      readStream
-        .pipe(gzip)
-        .pipe(writeStream)
-        .on('finish', () => resolve())
-        .on('error', reject);
-    });
-  } else {
-    await new Promise<void>((resolve, reject) => {
-      readStream
-        .pipe(writeStream)
-        .on('finish', () => resolve())
-        .on('error', reject);
-    });
+  try {
+    if (compress) {
+      await pipeline(readStream, createGzip(), writeStream);
+    } else {
+      await pipeline(readStream, writeStream);
+    }
+
+    await rename(tempPath, filePath);
+  } catch (error) {
+    await rm(tempPath, { force: true }).catch(() => undefined);
+    throw error;
   }
 };
