@@ -9,7 +9,69 @@ type LookupResponse = {
   cbg: string;
   city: string;
   state: string;
+  zip?: string;
+  seed_type: 'zip' | 'cbg';
+  seed_name: string;
+  seed_cbgs: string[];
 };
+
+type SeedRegionResponse = {
+  zip?: string;
+  city?: string | null;
+  state?: string | null;
+  seed_name?: string;
+  seed_cbgs?: string[];
+};
+
+function normalizeZip(value: unknown): string | null {
+  const digits = String(value ?? '')
+    .trim()
+    .replace(/\D+/g, '');
+  return digits.length === 5 ? digits : null;
+}
+
+function normalizeCbg(value: unknown): string | null {
+  const digits = String(value ?? '')
+    .trim()
+    .replace(/\D+/g, '');
+  return digits.length === 12 ? digits : null;
+}
+
+function getAlgorithmsBaseUrl(): string {
+  return (
+    process.env.ALG_URL ||
+    process.env.NEXT_PUBLIC_ALG_URL ||
+    'http://localhost:1880'
+  ).replace(/\/+$/, '');
+}
+
+async function lookupSeedRegionByZip(
+  zip: string
+): Promise<SeedRegionResponse | null> {
+  const response = await fetch(
+    `${getAlgorithmsBaseUrl()}/seed-region?zip=${encodeURIComponent(zip)}`,
+    {
+      cache: 'no-store'
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as
+      | Record<string, unknown>
+      | null;
+    const message =
+      typeof payload?.message === 'string'
+        ? payload.message
+        : `Algorithms seed-region lookup failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return (await response.json()) as SeedRegionResponse;
+}
 
 async function lookupLocation(
   query: string
@@ -42,6 +104,8 @@ async function lookupLocation(
 
   const city =
     result.address.city || result.address.town || result.address.village || '';
+  const inputZip = normalizeZip(query);
+  const postcode = normalizeZip(result.address.postcode) || inputZip;
 
   const fccResp = await fetch(
     `https://geo.fcc.gov/api/census/block/find?latitude=${lat}&longitude=${lng}&censusYear=2010&format=json`,
@@ -59,10 +123,41 @@ async function lookupLocation(
   }
 
   const state = fccData?.State?.code || result.address.state || '';
+  const fallbackCbg = String(fips).slice(0, 12);
+  const seedRegion = postcode
+    ? await lookupSeedRegionByZip(postcode).catch((error) => {
+        console.warn(
+          `Seed-region lookup failed for ZIP ${postcode}:`,
+          error instanceof Error ? error.message : error
+        );
+        return null;
+      })
+    : null;
+  const seedCbgs = Array.isArray(seedRegion?.seed_cbgs)
+    ? Array.from(
+        new Set(
+          seedRegion.seed_cbgs
+            .map((cbg) => normalizeCbg(cbg))
+            .filter((cbg): cbg is string => Boolean(cbg))
+        )
+      )
+    : [fallbackCbg];
+  const seedType = seedRegion ? 'zip' : 'cbg';
+  const seedName =
+    (typeof seedRegion?.seed_name === 'string' && seedRegion.seed_name.trim()) ||
+    (postcode ? `ZIP ${postcode}` : city || state || query);
+  const resolvedCity =
+    (typeof seedRegion?.city === 'string' && seedRegion.city.trim()) || city;
+  const resolvedState =
+    (typeof seedRegion?.state === 'string' && seedRegion.state.trim()) || state;
   return {
-    cbg: String(fips).slice(0, 12),
-    city,
-    state
+    cbg: fallbackCbg,
+    city: resolvedCity,
+    state: resolvedState,
+    zip: postcode || undefined,
+    seed_type: seedType,
+    seed_name: seedName,
+    seed_cbgs: seedCbgs
   };
 }
 
