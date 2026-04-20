@@ -868,10 +868,8 @@ function EmojiOverlay({
 }
 
 const MAX_PERSON_DOTS = 8000;
-const MAX_HOME_DOTS_PER_LOCATION = 80;
 const MAX_PLACE_DOTS_PER_LOCATION = 220;
 const DOT_JITTER_DEGREES = 0.0035;
-const HOME_DOT_DOWNSAMPLE = 1.8;
 
 function hashString(input: string) {
   let hash = 2166136261;
@@ -910,12 +908,11 @@ function makePeopleDotGeoJSON(pois: any[], mode: string) {
     }
 
     const isHome = poi.type === 'homes';
-    const perLocationCap = isHome
-      ? MAX_HOME_DOTS_PER_LOCATION
-      : MAX_PLACE_DOTS_PER_LOCATION;
+    if (isHome) continue;
+
     const dotCount = Math.min(
-      perLocationCap,
-      Math.ceil(count / (peoplePerDot * (isHome ? HOME_DOT_DOWNSAMPLE : 1)))
+      MAX_PLACE_DOTS_PER_LOCATION,
+      Math.ceil(count / peoplePerDot)
     );
     const baseSeed = hashString(`${poi.type}:${poi.id}`);
     const footprintKey = poi.footprint
@@ -1056,7 +1053,7 @@ function ClusteredMap({
     }
     const isDots =
       heatmapMode === 'population' || heatmapMode === 'infection';
-    for (const id of ['people-dots-homes', 'people-dots-places']) {
+    for (const id of ['people-dots-places']) {
       if (mapInstance.getLayer(id))
         mapInstance.setLayoutProperty(
           id,
@@ -1273,33 +1270,6 @@ function ClusteredMap({
           />
         </Source>
         <Source id="people-dots" type="geojson" data={peopleDotGeoJSON}>
-          <Layer
-            id="people-dots-homes"
-            type="circle"
-            filter={['==', ['get', 'loc_type'], 'homes']}
-            layout={
-              {
-                visibility:
-                  heatmapMode === 'population' || heatmapMode === 'infection'
-                    ? 'visible'
-                    : 'none'
-              } as any
-            }
-            paint={{
-              'circle-radius': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                10, 1.0,
-                13, 1.6,
-                16, 2.4,
-                18, 3.6,
-              ] as any,
-              'circle-color': '#2f855a',
-              'circle-opacity': 0.38,
-              'circle-stroke-width': 0,
-            }}
-          />
           <Layer
             id="people-dots-places"
             type="circle"
