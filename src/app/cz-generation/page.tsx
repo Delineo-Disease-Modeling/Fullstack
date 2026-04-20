@@ -26,10 +26,6 @@ const CLUSTER_ALGORITHM_OPTIONS = [
     value: 'guided_second_order_regions',
     label: 'Guided Connected Cities'
   },
-  {
-    value: 'hierarchical_core_satellites',
-    label: 'Hierarchical Core + Satellites'
-  },
   { value: 'greedy_fast', label: 'Greedy Fast' },
   { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' }
 ] as const;
