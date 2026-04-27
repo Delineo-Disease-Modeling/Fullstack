@@ -869,7 +869,7 @@ function EmojiOverlay({
 
 const MAX_PERSON_DOTS = 8000;
 const MAX_PLACE_DOTS_PER_LOCATION = 220;
-const DOT_JITTER_DEGREES = 0.0035;
+const NO_FOOTPRINT_DOT_JITTER_DEGREES = 0.0008;
 
 function hashString(input: string) {
   let hash = 2166136261;
@@ -918,15 +918,18 @@ function makePeopleDotGeoJSON(pois: any[], mode: string) {
     const footprintKey = poi.footprint
       ? `${poi.type}:${poi.id}:${dotCount}:${JSON.stringify(poi.footprint)}`
       : '';
-    const footprintDots =
-      !isHome && poi.footprint
-        ? place_dot_layouts[footprintKey] ??
-          (place_dot_layouts[footprintKey] = samplePointsInFootprint(
-            poi.footprint,
-            dotCount,
-            baseSeed
-          ))
-        : null;
+    let footprintDots: [number, number][] | null = null;
+    if (!isHome && poi.footprint) {
+      footprintDots = place_dot_layouts[footprintKey] ?? null;
+      if (!footprintDots) {
+        footprintDots = samplePointsInFootprint(
+          poi.footprint,
+          dotCount,
+          baseSeed
+        );
+        place_dot_layouts[footprintKey] = footprintDots;
+      }
+    }
 
     for (let i = 0; i < dotCount; i++) {
       if (features.length >= MAX_PERSON_DOTS) {
@@ -937,7 +940,9 @@ function makePeopleDotGeoJSON(pois: any[], mode: string) {
       const footprintDot =
         footprintDots && i < footprintDots.length ? footprintDots[i] : null;
       const angle = hashUnit(baseSeed, i) * Math.PI * 2;
-      const radius = Math.sqrt(hashUnit(baseSeed, i + 100_000)) * DOT_JITTER_DEGREES;
+      const radius =
+        Math.sqrt(hashUnit(baseSeed, i + 100_000)) *
+        NO_FOOTPRINT_DOT_JITTER_DEGREES;
       const lat = footprintDot ? footprintDot[1] : poi.latitude + Math.sin(angle) * radius;
       const lng = footprintDot ? footprintDot[0] : poi.longitude + Math.cos(angle) * radius;
 
