@@ -104,7 +104,15 @@ export default function SimSettings({
   const endDateParam = toSimulationDateParam(endDateIso);
 
   const updateZone = useCallback(
-    (zone: ConvenienceZone) => setSettings({ zone }),
+    (nextZone: ConvenienceZone) => {
+      const currentZone = useSimSettings.getState().zone;
+      const zoneChanged = currentZone?.id !== nextZone.id;
+
+      setSettings({
+        zone: nextZone,
+        ...(zoneChanged ? { hours: nextZone.length } : {})
+      });
+    },
     [setSettings]
   );
 
