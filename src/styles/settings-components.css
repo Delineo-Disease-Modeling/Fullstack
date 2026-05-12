@@ -10,6 +10,15 @@
   min-width: 0;
 }
 
+/* SimParameter's Slider has Tailwind w-75 (300px) baked in, which
+   overflows the card once it's sized by an auto-fit grid. Constrain it
+   to the card's content width. */
+.simset_slider .ui-slider--default,
+.simset_slider input[type="range"] {
+  width: 100%;
+  max-width: 100%;
+}
+
 div.simset_slider_label {
   display: flex;
   justify-content: space-between;
