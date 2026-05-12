@@ -13,6 +13,7 @@ import {
   SimRunSelector
 } from './settings-components';
 import Button from '@/components/ui/button';
+import ZoneActions from './zone-actions';
 import {
   formatDateDisplay,
   getInclusiveEndDateIso,
@@ -97,6 +98,7 @@ export default function SimSettings({
   const router = useRouter();
   const [patternAvailability, setPatternAvailability] =
     useState<PatternAvailabilityState>({ status: 'idle' });
+  const [locations, setLocations] = useState<ConvenienceZone[]>([]);
 
   const detectedState = getStateFromCBG(zone?.cbg_list);
   const endDateIso = getInclusiveEndDateIso(zone?.start_date, hours);
@@ -245,7 +247,12 @@ export default function SimSettings({
             <span className="sim_data_col_label_num">1</span>
             <span>Pick a convenience zone</span>
           </div>
-          <CzDict zone={zone} setZone={updateZone} />
+          <CzDict
+            zone={zone}
+            setZone={updateZone}
+            locations={locations}
+            setLocations={setLocations}
+          />
         </div>
         <div className="sim_data_col">
           <div className="sim_data_col_label">
@@ -259,6 +266,13 @@ export default function SimSettings({
           />
         </div>
       </div>
+
+      <ZoneActions
+        zone={zone}
+        setZone={updateZone}
+        locations={locations}
+        setLocations={setLocations}
+      />
 
       {(zone?.start_date || patternStatus) && (
         <div className="flex flex-col items-center gap-2">
