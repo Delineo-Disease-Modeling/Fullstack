@@ -93,6 +93,32 @@ h1.sim_title {
   flex-shrink: 0;
 }
 
+.instruction-banner-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary-blue);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(61, 136, 173, 0.40);
+  transition: text-decoration-color 160ms ease, color 160ms ease;
+}
+
+.instruction-banner-link:hover {
+  color: var(--color-primary-blue);
+  text-decoration-color: var(--color-primary-blue);
+}
+
+.instruction-banner-link:focus-visible {
+  outline: 2px solid var(--color-primary-blue-soft);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* ---------- Settings container ---------- */
 div.sim_settings {
   width: 100%;

@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { useSession } from '@/lib/auth-client';
 import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
-import InstructionBanner from './instruction-banner';
 import Button from './ui/button';
 
 interface ZoneActionsProps {
@@ -26,7 +25,7 @@ export default function ZoneActions({ zone, setZone, locations, setLocations }: 
   const [clearError, setClearError] = useState('');
 
   if (!user) {
-    return <InstructionBanner text="Login to generate a Convenience Zone" />;
+    return null;
   }
 
   const myZones = locations.filter((loc) => loc.user_id === user.id);
