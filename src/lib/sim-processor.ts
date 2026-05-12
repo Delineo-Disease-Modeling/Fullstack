@@ -28,7 +28,14 @@ const bitmask_states: [string, number][] = [
 const all_state_names = ['Susceptible', ...bitmask_states.map(([n]) => n)];
 
 type DataPoint = { time: number; [key: string]: number };
-type ChartData = { [type: string]: DataPoint[] };
+type ChartData = {
+  iot: DataPoint[];
+  ages: DataPoint[];
+  sexes: DataPoint[];
+  states: DataPoint[];
+  metadata?: unknown;
+  [type: string]: DataPoint[] | unknown;
+};
 
 interface ProcessOpts {
   simDataId: number;
@@ -37,6 +44,7 @@ interface ProcessOpts {
   papdataId: string;
   mapCachePath: string;
   totalLength: number;
+  metadata?: unknown;
 }
 
 /** In-memory progress tracker for active processing jobs (simDataId -> 0-100). */
@@ -129,6 +137,9 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     sexes: [],
     states: []
   };
+  if (opts.metadata !== undefined) {
+    globalStats.metadata = opts.metadata;
+  }
 
   // Hotspot tracking
   const hotspots: Record<string, number[]> = {};

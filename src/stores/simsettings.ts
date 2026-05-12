@@ -15,6 +15,8 @@ export type ConvenienceZone = {
   ready?: boolean;
 };
 
+// Intervention values are 0.0-1.0 thresholds/proportions. The simulator
+// applies them by comparing each person's stable intervention threshold.
 export type Interventions = {
   time: number;
   mask: number;
@@ -24,6 +26,8 @@ export type Interventions = {
   selfiso: number;
 };
 
+export type DmpMode = 'auto' | 'required' | 'off';
+
 export type SimSettings = {
   sim_id: number | null;
   zone: ConvenienceZone | null;
@@ -31,6 +35,10 @@ export type SimSettings = {
   randseed: boolean;
   usecache: boolean;
   initial_infected_count: number;
+  disease_name: string;
+  variants: string[];
+  dmp_mode: DmpMode;
+  model_path_by_variant: Record<string, string | null>;
   interventions: Interventions[];
 };
 
@@ -62,6 +70,13 @@ const default_settings: SimSettings = {
   randseed: true,
   usecache: true,
   initial_infected_count: 1,
+  disease_name: 'COVID-19',
+  variants: ['Delta', 'Omicron'],
+  dmp_mode: 'auto',
+  model_path_by_variant: {
+    Delta: 'variant.Delta.general',
+    Omicron: 'variant.Omicron.general'
+  },
   interventions: [{ ...default_interventions }]
 };
 

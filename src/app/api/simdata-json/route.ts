@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
+import type { Prisma } from '@/generated/prisma/client';
 import { DB_FOLDER } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { processingProgress, processSimulation } from '@/lib/sim-processor';
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
       .then((stats) =>
         prisma.simData.update({
           where: { id: simData.id },
-          data: { global_stats: stats }
+          data: { global_stats: stats as Prisma.InputJsonValue }
         })
       )
       .catch((error) => {

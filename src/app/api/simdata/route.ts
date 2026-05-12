@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import type { Prisma } from '@/generated/prisma/client';
 import { DB_FOLDER } from '@/lib/db-files';
 import { saveFileStream } from '@/lib/filestream';
 import { prisma } from '@/lib/prisma';
@@ -28,18 +29,31 @@ export async function POST(request: NextRequest) {
     }
 
     const { czone_id, length } = parsed.data;
+    const metadataRaw = formData.get('metadata');
+    let metadata: unknown;
+    if (typeof metadataRaw === 'string' && metadataRaw.trim()) {
+      try {
+        metadata = JSON.parse(metadataRaw);
+      } catch {
+        return Response.json({ message: 'Invalid metadata JSON' }, { status: 400 });
+      }
+    }
 
     await mkdir(DB_FOLDER, { recursive: true });
 
     const simdata_obj = await prisma.simData.create({
-      data: { czone_id, length }
+      data: {
+        czone_id,
+        length,
+        ...(metadata !== undefined ? { global_stats: { metadata } } : {})
+      }
     });
 
     const fileId = simdata_obj.file_id;
     const simIsGz = simdata.name.endsWith('.gz');
     const patIsGz = patterns.name.endsWith('.gz');
-    const simPath = DB_FOLDER + fileId + '.sim' + (simIsGz ? '.gz' : '');
-    const patPath = DB_FOLDER + fileId + '.pat' + (patIsGz ? '.gz' : '');
+    const simPath = `${DB_FOLDER}${fileId}.sim${simIsGz ? '.gz' : ''}`;
+    const patPath = `${DB_FOLDER}${fileId}.pat${patIsGz ? '.gz' : ''}`;
 
     await Promise.all([
       saveFileStream(simdata, simPath),
@@ -58,12 +72,13 @@ export async function POST(request: NextRequest) {
         patternsPath: patPath,
         papdataId: czone.papdata_id,
         mapCachePath: `${DB_FOLDER}${fileId}.map.json`,
-        totalLength: length
+        totalLength: length,
+        metadata
       })
         .then((stats) =>
           prisma.simData.update({
             where: { id: simdata_obj.id },
-            data: { global_stats: stats }
+            data: { global_stats: stats as Prisma.InputJsonValue }
           })
         )
         .catch((e) => {
@@ -78,7 +93,7 @@ export async function POST(request: NextRequest) {
                 }
               }
             })
-            .catch((dbErr) =>
+            .catch((dbErr: unknown) =>
               console.error('Failed to persist error state:', dbErr)
             );
         });

@@ -6,12 +6,7 @@ import InstructionBanner from '@/components/instruction-banner';
 import LoginModal from '@/components/login-modal';
 import SimSettings from '@/components/simsettings';
 import { useSession } from '@/lib/auth-client';
-import {
-  getInclusiveEndDateIso,
-  getStateFromCBG,
-  getZoneLocationName,
-  toSimulationDateParam
-} from '@/lib/simulation-zone';
+import { buildSimulationRequest } from '@/lib/simulation-request';
 import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
@@ -89,35 +84,12 @@ export default function Simulator() {
       }
     }
 
-    const zone = settings.zone;
-    if (!zone) {
-      setError('Please pick a convenience zone first.');
+    const request = buildSimulationRequest(settings);
+    if (request.error) {
+      setError(request.error);
       return false;
     }
-
-    const startDate = toSimulationDateParam(zone.start_date);
-    const endDate = toSimulationDateParam(
-      getInclusiveEndDateIso(zone.start_date, settings.hours)
-    );
-    const state = getStateFromCBG(zone.cbg_list);
-
-    if (!startDate || !endDate || !state) {
-      setError('Selected convenience zone is missing required simulation data.');
-      return false;
-    }
-
-    const reqbody = {
-      ...settings,
-      czone_id: zone.id,
-      length: settings.hours * 60,
-      start_date: startDate,
-      end_date: endDate,
-      state,
-      location: getZoneLocationName(zone),
-      initial_infected_count: settings.initial_infected_count,
-      interventions: settings.interventions,
-      randseed: settings.randseed
-    };
+    const reqbody = request.body;
 
     setProgress(0);
     setProgressMessage('Starting simulation...');

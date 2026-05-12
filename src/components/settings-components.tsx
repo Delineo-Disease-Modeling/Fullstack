@@ -77,6 +77,64 @@ export function SimBoolean({
   );
 }
 
+interface SimTextProps {
+  label: string;
+  value: string;
+  callback: (v: string) => void;
+  placeholder?: string;
+}
+
+export function SimText({
+  label,
+  value,
+  callback,
+  placeholder
+}: SimTextProps) {
+  return (
+    <div className="simset_fileup">
+      <div className="simset_fileup_label">{label}</div>
+      <input
+        type="text"
+        className="max-w-72 border border-(--color-border-dark) rounded-md px-2 py-1 bg-white"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => callback(e.target.value)}
+      />
+    </div>
+  );
+}
+
+interface SimSelectProps {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  callback: (v: string) => void;
+}
+
+export function SimSelect({
+  label,
+  value,
+  options,
+  callback
+}: SimSelectProps) {
+  return (
+    <div className="simset_fileup">
+      <div className="simset_fileup_label">{label}</div>
+      <select
+        className="max-w-72 border border-(--color-border-dark) rounded-md px-2 py-1 bg-white"
+        value={value}
+        onChange={(e) => callback(e.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 interface SimFileProps {
   label: string;
   callback: (files: FileList | null) => void;
