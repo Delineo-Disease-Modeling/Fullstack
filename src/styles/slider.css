@@ -1,91 +1,107 @@
-/* --- Default variant --- */
+/* ---------- Shared base ---------- */
+.ui-slider--default,
+.ui-slider--dark {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.ui-slider--default:focus-visible,
+.ui-slider--dark:focus-visible {
+  outline: 2px solid var(--color-primary-blue-soft);
+  outline-offset: 4px;
+}
+
+/* ---------- Default variant ---------- */
 .ui-slider--default {
-  background-color: var(--color-text-main);
+  background-color: rgba(47, 53, 64, 0.10);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .ui-slider--default::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  background-color: var(--color-primary-blue);
-  width: 25px;
-  height: 25px;
+  background: linear-gradient(180deg, var(--color-primary-blue-soft), var(--color-primary-blue));
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--color-text-main);
+  border: 2px solid white;
   cursor: pointer;
-  transition: 0.2s ease-in-out;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 4px 10px rgba(61, 136, 173, 0.25);
+  transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .ui-slider--default::-webkit-slider-thumb:hover {
-  filter: brightness(0.9);
+  transform: scale(1.12);
 }
 
 .ui-slider--default::-webkit-slider-thumb:active {
-  transform: translateY(1px);
-  filter: brightness(0.9);
+  transform: scale(1.05);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15), 0 6px 14px rgba(61, 136, 173, 0.35);
 }
 
 .ui-slider--default::-moz-range-thumb {
   appearance: none;
-  background-color: var(--color-primary-blue);
-  width: 25px;
-  height: 25px;
+  background: linear-gradient(180deg, var(--color-primary-blue-soft), var(--color-primary-blue));
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--color-text-main);
+  border: 2px solid white;
   cursor: pointer;
-  transition: 0.2s ease-in-out;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 4px 10px rgba(61, 136, 173, 0.25);
+  transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .ui-slider--default::-moz-range-thumb:hover {
-  filter: brightness(0.9);
+  transform: scale(1.12);
 }
 
 .ui-slider--default::-moz-range-thumb:active {
-  transform: translateY(1px);
-  filter: brightness(0.9);
+  transform: scale(1.05);
 }
 
-/* --- Dark variant --- */
+/* ---------- Dark variant ---------- */
 .ui-slider--dark {
-  background-color: var(--color-gray-mid);
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .ui-slider--dark::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  background-color: var(--color-accent-teal);
-  width: 25px;
-  height: 25px;
+  background: linear-gradient(180deg, var(--color-accent-teal), var(--color-primary-blue));
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--color-gray-dark);
+  border: 2px solid var(--color-bg-dark);
   cursor: pointer;
-  transition: 0.2s ease-in-out;
+  transition: transform 160ms ease;
 }
 
 .ui-slider--dark::-webkit-slider-thumb:hover {
-  background-color: var(--color-primary-blue);
+  transform: scale(1.12);
+  background: var(--color-primary-blue-soft);
 }
 
 .ui-slider--dark::-webkit-slider-thumb:active {
-  transform: translateY(1px);
-  background-color: var(--color-primary-blue);
+  transform: scale(1.05);
+  background: var(--color-primary-blue);
 }
 
 .ui-slider--dark::-moz-range-thumb {
   appearance: none;
-  background-color: var(--color-accent-teal);
-  width: 25px;
-  height: 25px;
+  background: linear-gradient(180deg, var(--color-accent-teal), var(--color-primary-blue));
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--color-gray-dark);
+  border: 2px solid var(--color-bg-dark);
   cursor: pointer;
-  transition: 0.2s ease-in-out;
+  transition: transform 160ms ease;
 }
 
 .ui-slider--dark::-moz-range-thumb:hover {
-  background-color: var(--color-primary-blue);
+  transform: scale(1.12);
 }
 
 .ui-slider--dark::-moz-range-thumb:active {
-  transform: translateY(1px);
-
+  transform: scale(1.05);
 }

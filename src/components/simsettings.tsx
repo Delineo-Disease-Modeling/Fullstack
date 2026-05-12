@@ -238,61 +238,65 @@ export default function SimSettings({
   })();
 
   return (
-    <div className="flex flex-col items-center gap-16">
+    <div className="flex flex-col items-center gap-12 w-full">
       <CzDict zone={zone} setZone={updateZone} />
 
       {zone?.start_date && (
-        <div className="text-sm text-gray-600 -mt-10">
-          <span className="font-medium">Date Range:</span>{' '}
-          {formatDateDisplay(zone.start_date)} to {formatDateDisplay(endDateIso)}
-          <span className="text-xs text-gray-400 ml-2">
+        <div className="sim_date_range">
+          <span className="sim_date_range_label">Date range:</span>
+          <span>
+            {formatDateDisplay(zone.start_date)} → {formatDateDisplay(endDateIso)}
+          </span>
+          <span className="sim_date_range_days">
             ({zone.length ? Math.round(zone.length / 24) : '?'} days)
           </span>
         </div>
       )}
 
       {patternStatus && (
-        <div className={`text-xs -mt-12 ${patternStatus.tone}`}>
+        <div className={`text-xs ${patternStatus.tone}`}>
           {patternStatus.message}
         </div>
       )}
 
-      <div className="flex flex-wrap justify-center gap-8">
-        <SimParameter
-          label={'Simulation Length'}
-          value={hours}
-          callback={(hours) => setSettings({ hours })}
-          min={24}
-          max={zone?.length ?? 168}
-          percent={false}
-          units=" hours"
-        />
-        <SimBoolean
-          label={'Random Seed'}
-          value={randseed}
-          callback={(randseed) => setSettings({ randseed })}
-        />
-        <SimParameter
-          label={'Initial Infected'}
-          value={initialInfectedCount}
-          callback={(initial_infected_count) =>
-            setSettings({ initial_infected_count })
-          }
-          min={1}
-          max={Math.min(100, zone?.size ?? 100)}
-          percent={false}
-          units=" people"
-        />
-        <SimFile label={'Custom DMP Matrix Files'} callback={console.log} />
+      <div className="sim_section">
+        <h2 className="sim_section_title">Parameters</h2>
+        <div className="sim_settings_row">
+          <SimParameter
+            label={'Simulation Length'}
+            value={hours}
+            callback={(hours) => setSettings({ hours })}
+            min={24}
+            max={zone?.length ?? 168}
+            percent={false}
+            units=" hours"
+          />
+          <SimBoolean
+            label={'Random Seed'}
+            value={randseed}
+            callback={(randseed) => setSettings({ randseed })}
+          />
+          <SimParameter
+            label={'Initial Infected'}
+            value={initialInfectedCount}
+            callback={(initial_infected_count) =>
+              setSettings({ initial_infected_count })
+            }
+            min={1}
+            max={Math.min(100, zone?.size ?? 100)}
+            percent={false}
+            units=" people"
+          />
+          <SimFile label={'Custom DMP Matrix Files'} callback={console.log} />
+        </div>
       </div>
 
-      <InterventionTimeline />
-
-      <div className="relative flex items-center w-96 max-w-[90vw]">
-        <div className="grow border-t border-(--color-border-dark)"></div>
-        <span className="mx-4">or</span>
-        <div className="grow border-t border-(--color-border-dark)"></div>
+      <div className="sim_section">
+        <h2 className="sim_section_title">Interventions</h2>
+        <InterventionTimeline />
       </div>
+
+      <div className="sim_divider"><span>or</span></div>
 
       <SimRunSelector
         czone_id={zone?.id}
@@ -300,9 +304,10 @@ export default function SimSettings({
         callback={(sim_id) => setSettings({ sim_id })}
       />
 
-      <div className="flex flex-col items-center gap-8 w-full">
+      <div className="flex flex-col items-center gap-6 w-full">
         <Button
-          className="w-32 disabled:bg-gray-400!"
+          variant="primary"
+          className="px-8! py-2.5! text-sm font-medium disabled:bg-gray-400!"
           disabled={loading || (!!zone && zone.ready === false)}
           onClick={() => {
             if (!zone) {
@@ -316,27 +321,26 @@ export default function SimSettings({
             sendData();
           }}
         >
-          {loading ? 'Processing...' : (zone?.ready === false ? 'Generating...' : 'Simulate')}
+          {loading
+            ? 'Processing…'
+            : zone?.ready === false
+              ? 'Generating…'
+              : sim_id
+                ? 'Open run →'
+                : 'Simulate →'}
         </Button>
         {loading && (
-          <div className="w-80 max-w-[85vw] flex flex-col gap-1">
-            <div className="w-full h-3 bg-(--color-bg-dark) rounded-full overflow-hidden">
-              <div
-                className="h-full bg-(--color-primary-blue) rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
+          <div className="sim_progress">
+            <div className="sim_progress_track">
+              <div className="sim_progress_fill" style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-sm text-center text-gray-400">
-              {progressMessage || 'Starting...'}
-              {progress > 0 ? ` ${progress}%` : ''}
+            <p className="sim_progress_label">
+              {progressMessage || 'Starting…'}
+              {progress > 0 ? ` · ${progress}%` : ''}
             </p>
           </div>
         )}
-        {error && (
-          <div className="text-red-500 text-sm max-w-md text-center">
-            {error}
-          </div>
-        )}
+        {error && <div className="sim_error">{error}</div>}
       </div>
     </div>
   );

@@ -116,72 +116,60 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory)">
-        <div className="flex items-center justify-center h-6 text-white bg-(--color-primary-blue)">
-          Zones
+      <div className="sim_table sim_table--zones">
+        <div className="sim_table_header">
+          <h3 className="sim_table_title">Zones</h3>
         </div>
 
-        <div className="flex px-2 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
-          <p className="flex-1">Name</p>
-          <p className="flex-1 text-center">Population Size</p>
-          <p className="flex-1 text-right">Created Date</p>
+        <div className="sim_table_columns">
+          <span className="flex-1">Name</span>
+          <span className="flex-1 text-center">Population Size</span>
+          <span className="flex-1 text-right">Created Date</span>
         </div>
 
-        <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1 px-1 py-1" style={{ overflowAnchor: 'none' }}>
+        <div className="sim_table_body" style={{ overflowAnchor: 'none' }}>
           {loading ? (
-            <p className="text-center my-auto">Loading...</p>
+            <p className="sim_table_empty">Loading...</p>
           ) : locations.length === 0 && (
-            <p className="text-center my-auto">
-              {loadError || 'No zones found, create one to get started!'}
+            <p className="sim_table_empty">
+              {loadError || 'No zones found, create one to get started.'}
             </p>
           )}
-          {locations.map((loc) => (
+          {locations.map((loc) => {
+            const isSelected = zone?.id === loc.id;
+            const rowClasses = [
+              'sim_table_row',
+              isSelected ? 'is-selected' : '',
+              !loc.ready ? 'is-pending' : ''
+            ]
+              .filter(Boolean)
+              .join(' ');
+            return (
               <button
                 type="button"
                 key={loc.id}
-                className={`flex w-full text-left px-1 justify-between items-center py-1 relative select-none rounded-md hover:cursor-pointer hover:outline-solid hover:outline-1 ${zone?.id === loc.id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
-                style={
-                  zone?.id === loc.id
-                    ? (
-                        loc.ready
-                          ? {
-                              background: 'var(--color-primary-blue)',
-                              color: 'white'
-                            }
-                          : {
-                              background: '#11111175',
-                              color: 'white'
-                            }
-                      )
-                    : !loc.ready
-                      ? {
-                          background: '#11111140',
-                          color: 'white'
-                        }
-                      : undefined
-                }
+                className={rowClasses}
                 onClick={() => {
                   setZone(loc);
                   setSettings({ sim_id: null });
                 }}
               >
-                <p className="flex-1">{loc.name}</p>
-                <p className="flex-1 text-center">{loc.size}</p>
-                <p className="flex-1 text-right">
+                <span className="flex-1 truncate">{loc.name}</span>
+                <span className="flex-1 text-center">{loc.size}</span>
+                <span className="flex-1 text-right">
                   {new Date(loc.created_at).toLocaleDateString()}
-                </p>
+                </span>
                 {!loc.ready && (
-                  <div className="absolute z-10 px-2 py-1 text-xs text-white -translate-x-1/2 -translate-y-1/2 bg-black rounded-sm shadow-lg top-1/2 left-1/2">
-                    Currently Generating
-                  </div>
+                  <span className="sim_table_row_badge">Generating…</span>
                 )}
               </button>
-            ))}
+            );
+          })}
         </div>
       </div>
 
-      {zone && (
-        <div className="w-120 max-w-[90vw] py-1 px-1.5 outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory) italic whitespace-pre-line">
+      {zone && zone.description && (
+        <div className="sim_zone_description">
           {zone.description}
         </div>
       )}

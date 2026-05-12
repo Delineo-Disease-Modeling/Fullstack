@@ -23,11 +23,15 @@ export function SimParameter({
   percent = true,
   units = ''
 }: SimParameterProps) {
+  const displayValue = percent ? Math.ceil(value * 100) : value;
   return (
     <div className="simset_slider">
       <div className="simset_slider_label">
-        {label}: {percent ? Math.ceil(value * 100) : value}
-        {percent ? '%' : units}
+        <span className="simset_slider_label_text">{label}</span>
+        <span className="simset_slider_label_value">
+          {displayValue}
+          {percent ? '%' : units}
+        </span>
       </div>
       <Slider
         className="w-75"
@@ -56,22 +60,20 @@ export function SimBoolean({
   callback
 }: SimBooleanProps) {
   return (
-    <div className="simset_checkbox">
-      <div className="flex items-start justify-center gap-x-2 flex-nowrap">
-        <input
-          type="checkbox"
-          className="w-6 h-6"
-          checked={value}
-          onChange={(e) => callback(e.target.checked)}
-        />
-        <div>
-          {label}
-          {description && (
-            <p className="text-gray-400 italic max-w-72">{description}</p>
-          )}
-        </div>
+    <label className="simset_checkbox">
+      <input
+        type="checkbox"
+        className="simset_checkbox_input"
+        checked={value}
+        onChange={(e) => callback(e.target.checked)}
+      />
+      <div className="simset_checkbox_body">
+        <span className="simset_checkbox_label">{label}</span>
+        {description && (
+          <span className="simset_checkbox_description">{description}</span>
+        )}
       </div>
-    </div>
+    </label>
   );
 }
 
@@ -84,12 +86,12 @@ export function SimFile({ label, callback }: SimFileProps) {
   return (
     <div className="simset_fileup">
       <div className="simset_fileup_label">
-        {label}
-        <p className="text-gray-400 italic">for advanced users</p>
+        <span className="simset_fileup_label_text">{label}</span>
+        <span className="simset_fileup_hint">For advanced users</span>
       </div>
       <input
         type="file"
-        className="max-w-72"
+        className="simset_fileup_input"
         multiple={true}
         onChange={(e) => callback(e.target.files)}
       />
@@ -137,38 +139,33 @@ export function SimRunSelector({
   }, [czone_id]);
 
   return (
-    <div className="flex flex-col w-120 h-80 max-w-[90vw] outline-solid outline-2 outline-(--color-primary-blue) bg-(--color-bg-ivory)">
-      <div className="bg-(--color-primary-blue) text-center text-white w-full h-6">
-        Visit a Previous Run
+    <div className="sim_table">
+      <div className="sim_table_header">
+        <h3 className="sim_table_title">Visit a Previous Run</h3>
       </div>
-      <div className="flex px-2 justify-between text-xs font-semibold bg-(--color-primary-blue) text-white py-1">
-        <p className="flex-1">Name</p>
-        <p className="flex-1 text-right">Created Date</p>
+      <div className="sim_table_columns">
+        <span className="flex-1">Name</span>
+        <span className="flex-1 text-right">Created Date</span>
       </div>
-      <div className="relative flex flex-col h-full overflow-y-scroll gap-y-1 px-1 py-1" style={{ overflowAnchor: 'none' }}>
+      <div className="sim_table_body" style={{ overflowAnchor: 'none' }}>
         {loading ? (
-          <p className="text-center text-wrap my-auto">Loading...</p>
+          <p className="sim_table_empty">Loading...</p>
         ) : !data?.length && (
-          <p className="text-center text-wrap my-auto">
-            No previous runs found, run a simulation to get started!
+          <p className="sim_table_empty">
+            No previous runs found, run a simulation to get started.
           </p>
         )}
         {data?.map((run) => (
           <button
             type="button"
             key={run.sim_id}
-            className={`flex w-full text-left px-1 justify-between items-center hover:cursor-pointer py-1 relative select-none bg-transparent border-none p-0 font-[inherit] text-inherit rounded-md hover:outline-solid hover:outline-1 ${run.sim_id === sim_id ? 'hover:outline-(--color-bg-dark)' : 'hover:outline-(--color-primary-blue)'}`}
-            style={
-              run.sim_id === sim_id
-                ? { background: 'var(--color-primary-blue)', color: 'white' }
-                : undefined
-            }
+            className={`sim_table_row ${run.sim_id === sim_id ? 'is-selected' : ''}`}
             onClick={() => callback(run.sim_id === sim_id ? null : run.sim_id)}
           >
-            <p className="flex-1">{run.name}</p>
-            <p className="flex-1 text-right">
+            <span className="flex-1 truncate">{run.name}</span>
+            <span className="flex-1 text-right">
               {new Date(run.created_at).toLocaleDateString()}
-            </p>
+            </span>
           </button>
         ))}
       </div>

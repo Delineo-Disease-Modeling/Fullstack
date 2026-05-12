@@ -5,7 +5,6 @@ import useSimSettings from '@/stores/simsettings';
 
 import '@/styles/intervention-timeline.css';
 import Interventions from './interventions';
-import Button from './ui/button';
 
 export default function InterventionTimeline() {
   const hours = useSimSettings((state) => state.hours);
@@ -77,7 +76,7 @@ export default function InterventionTimeline() {
         className="relative flex items-center w-full h-6 select-none"
         onDoubleClick={addThumb}
       >
-        <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-2 bg-(--color-text-main) rounded-md outline-0" />
+        <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-1.5 bg-(--color-border-subtle) rounded-full outline-0" />
         {values.map((value, i) => (
           <input
             key={value}
@@ -103,29 +102,28 @@ export default function InterventionTimeline() {
         ))}
       </div>
 
-      <div className="flex w-full items-center justify-center gap-2">
-        <Button
-          type="button"
-          className="py-1! px-4! text-sm text-nowrap disabled:bg-stone-600!"
-          onClick={moveLeft}
-        >
-          &lt;
-        </Button>
-        <div className={values.length <= 1 ? 'cursor-not-allowed' : ''}>
-          <Button
+      <div className="flex w-full items-center justify-center">
+        <div className="iv_controls">
+          <button
             type="button"
-            variant="destructive"
-            className="py-1! px-8! text-sm text-nowrap disabled:bg-red-800!"
+            className="iv_control_btn"
+            onClick={moveLeft}
+            disabled={values.length <= 1}
+            aria-label="Previous intervention"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="iv_control_btn iv_control_btn--danger"
             onClick={() => deleteThumb(values.indexOf(curtime))}
             disabled={values.length <= 1}
           >
             Delete
-          </Button>
-        </div>
-        <div className={values.length >= 10 ? 'cursor-not-allowed' : ''}>
-          <Button
+          </button>
+          <button
             type="button"
-            className="py-1! px-8! text-sm text-nowrap disabled:bg-stone-600!"
+            className="iv_control_btn iv_control_btn--add"
             onClick={() => {
               const newvalue = Array.from(
                 { length: hours },
@@ -138,25 +136,29 @@ export default function InterventionTimeline() {
             disabled={values.length >= 10}
           >
             + Add
-          </Button>
+          </button>
+          <button
+            type="button"
+            className="iv_control_btn"
+            onClick={moveRight}
+            disabled={values.length <= 1}
+            aria-label="Next intervention"
+          >
+            ›
+          </button>
         </div>
-        <Button
-          type="button"
-          className="py-1! px-4! text-sm text-nowrap disabled:bg-stone-600!"
-          onClick={moveRight}
-        >
-          &gt;
-        </Button>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <h4 className="text-center text-lg">
-          Intervention #{values.indexOf(curtime) + 1} - Hour #
-          {curtime.toString().padStart(3, '0')}
-        </h4>
-        <h4 className="text-center text-lg">
-          {zone &&
-            new Date(
+      <div className="iv_intervention_label">
+        <span className="iv_intervention_index">
+          Intervention #{values.indexOf(curtime) + 1}
+        </span>
+        <span className="iv_intervention_hour">
+          Hour {curtime.toString().padStart(3, '0')}
+        </span>
+        {zone && (
+          <span className="iv_intervention_date">
+            {new Date(
               new Date(zone.start_date).getTime() + curtime * 60 * 60 * 1000
             ).toLocaleString('en-US', {
               day: 'numeric',
@@ -166,7 +168,8 @@ export default function InterventionTimeline() {
               hour: '2-digit',
               minute: '2-digit'
             })}
-        </h4>
+          </span>
+        )}
       </div>
 
       <Interventions time={curtime} />
