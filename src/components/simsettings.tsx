@@ -2,16 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { ConvenienceZone, DmpMode } from '@/stores/simsettings';
+import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
 import CzDict from './czdict';
 import InterventionTimeline from './intervention-timeline';
 import {
   SimBoolean,
+  SimFile,
   SimParameter,
-  SimRunSelector,
-  SimSelect,
-  SimText
+  SimRunSelector
 } from './settings-components';
 import Button from '@/components/ui/button';
 import ZoneActions from './zone-actions';
@@ -45,38 +44,6 @@ type PatternAvailabilityState =
 
 function formatMonthList(months?: string[]): string {
   return months?.length ? months.join(', ') : '';
-}
-
-function splitCsv(value: string): string[] {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function defaultModelPath(diseaseName: string, variant: string): string | null {
-  return diseaseName === 'COVID-19' ? `variant.${variant}.general` : null;
-}
-
-function formatModelPaths(
-  variants: string[],
-  modelPaths: Record<string, string | null>
-): string {
-  return variants
-    .map((variant) => `${variant}=${modelPaths[variant] ?? ''}`)
-    .join(', ');
-}
-
-function parseModelPaths(value: string): Record<string, string | null> {
-  const result: Record<string, string | null> = {};
-  for (const item of splitCsv(value)) {
-    const [variant, ...pathParts] = item.split('=');
-    const normalizedVariant = variant?.trim();
-    if (!normalizedVariant) continue;
-    const modelPath = pathParts.join('=').trim();
-    result[normalizedVariant] = modelPath || null;
-  }
-  return result;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -127,12 +94,6 @@ export default function SimSettings({
   const initialInfectedCount = useSimSettings(
     (state) => state.initial_infected_count
   );
-  const diseaseName = useSimSettings((state) => state.disease_name);
-  const variants = useSimSettings((state) => state.variants);
-  const dmpMode = useSimSettings((state) => state.dmp_mode);
-  const modelPathByVariant = useSimSettings(
-    (state) => state.model_path_by_variant
-  );
   const setSettings = useSimSettings((state) => state.setSettings);
   const router = useRouter();
   const [patternAvailability, setPatternAvailability] =
@@ -155,36 +116,6 @@ export default function SimSettings({
       });
     },
     [setSettings]
-  );
-
-  const updateDiseaseName = useCallback(
-    (disease_name: string) => {
-      const nextModelPaths = Object.fromEntries(
-        variants.map((variant) => [
-          variant,
-          modelPathByVariant[variant] ?? defaultModelPath(disease_name, variant)
-        ])
-      );
-      setSettings({ disease_name, model_path_by_variant: nextModelPaths });
-    },
-    [modelPathByVariant, setSettings, variants]
-  );
-
-  const updateVariants = useCallback(
-    (value: string) => {
-      const nextVariants = splitCsv(value);
-      const nextModelPaths = Object.fromEntries(
-        nextVariants.map((variant) => [
-          variant,
-          modelPathByVariant[variant] ?? defaultModelPath(diseaseName, variant)
-        ])
-      );
-      setSettings({
-        variants: nextVariants,
-        model_path_by_variant: nextModelPaths
-      });
-    },
-    [diseaseName, modelPathByVariant, setSettings]
   );
 
   useEffect(() => {
@@ -392,35 +323,7 @@ export default function SimSettings({
             percent={false}
             units=" people"
           />
-          <SimText
-            label={'Disease'}
-            value={diseaseName}
-            callback={updateDiseaseName}
-          />
-          <SimText
-            label={'Variants'}
-            value={variants.join(', ')}
-            callback={updateVariants}
-          />
-          <SimSelect
-            label={'DMP Mode'}
-            value={dmpMode}
-            options={[
-              { value: 'auto', label: 'Auto' },
-              { value: 'required', label: 'Required' },
-              { value: 'off', label: 'Off' }
-            ]}
-            callback={(dmp_mode) =>
-              setSettings({ dmp_mode: dmp_mode as DmpMode })
-            }
-          />
-          <SimText
-            label={'DMP Model Paths'}
-            value={formatModelPaths(variants, modelPathByVariant)}
-            callback={(value) =>
-              setSettings({ model_path_by_variant: parseModelPaths(value) })
-            }
-          />
+          <SimFile label={'Custom DMP Matrix Files'} callback={console.log} />
         </div>
       </div>
 

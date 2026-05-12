@@ -71,11 +71,10 @@ const default_settings: SimSettings = {
   usecache: true,
   initial_infected_count: 1,
   disease_name: 'COVID-19',
-  variants: ['Delta', 'Omicron'],
+  variants: ['Delta'],
   dmp_mode: 'auto',
   model_path_by_variant: {
-    Delta: 'variant.Delta.general',
-    Omicron: 'variant.Omicron.general'
+    Delta: 'variant.Delta.general'
   },
   interventions: [{ ...default_interventions }]
 };

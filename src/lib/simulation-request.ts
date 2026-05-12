@@ -7,7 +7,7 @@ import {
 } from './simulation-zone';
 
 export const DEFAULT_DISEASE_NAME = 'COVID-19';
-export const DEFAULT_VARIANTS = ['Delta', 'Omicron'];
+export const DEFAULT_VARIANTS = ['Delta'];
 
 export type SimulationRequestBody = SimSettings & {
   czone_id: number;
