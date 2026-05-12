@@ -5,15 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
 import {
-  mergeGeoJsonFeatures,
-  normalizeCbgId,
-  getFeatureCbgId,
-  getBoundsForGeoJson,
   type GeoJSONData,
-  type LatLng
+  getBoundsForGeoJson,
+  getFeatureCbgId,
+  type LatLng,
+  mergeGeoJsonFeatures,
+  normalizeCbgId
 } from '@/lib/cz-geo';
-import type { ConvenienceZone } from '@/stores/simsettings';
 import { getStateFromCBG } from '@/lib/simulation-zone';
+import type { ConvenienceZone } from '@/stores/simsettings';
 import '@/styles/cz-generation.css';
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
@@ -27,7 +27,8 @@ const CLUSTER_ALGORITHM_OPTIONS = [
     label: 'Guided Connected Cities'
   },
   { value: 'greedy_fast', label: 'Greedy Fast' },
-  { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' }
+  { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' },
+  { value: 'mobility_prune', label: 'Mobility Prune' }
 ] as const;
 
 type ClusterAlgorithm = (typeof CLUSTER_ALGORITHM_OPTIONS)[number]['value'];
@@ -42,6 +43,8 @@ type TraceCandidate = {
   movement_to_outside?: number;
   movement_contributes_after_selection?: boolean;
   seed_distance_km?: number;
+  seed_movement_loss?: number;
+  seed_capture_after?: number;
   czi_after?: number;
   [key: string]: unknown;
 };
@@ -57,7 +60,7 @@ type TraceStep = {
 
 type TracePayload = {
   algorithm?: string;
-  algorithm_metadata?: HierarchicalAlgorithmMetadata | null;
+  algorithm_metadata?: ClusterAlgorithmMetadata | null;
   supports_stepwise?: boolean;
   steps?: TraceStep[];
   note?: string;
@@ -134,6 +137,40 @@ type HierarchicalAlgorithmMetadata = {
   population_target_met?: boolean;
 };
 
+type MobilityPruneAlgorithmMetadata = {
+  seed_cbgs?: string[];
+  missing_seed_cbgs?: string[];
+  seed_population?: number;
+  bounded_envelope?: boolean;
+  envelope_population_target?: number;
+  envelope_population_multiplier?: number;
+  envelope_population_floor?: number;
+  envelope_max_cbgs?: number;
+  min_seed_capture?: number;
+  envelope_growth_iterations?: number;
+  envelope_limited_by_cbg_cap?: boolean;
+  stopped_by_seed_capture_floor?: boolean;
+  initial_cbg_count?: number;
+  initial_population?: number;
+  initial_movement_inside?: number;
+  initial_movement_boundary?: number;
+  initial_czi?: number;
+  seed_movement_total?: number;
+  initial_seed_movement_captured?: number;
+  initial_seed_capture_share?: number;
+  final_seed_movement_captured?: number;
+  final_seed_capture_share?: number;
+  final_movement_inside?: number;
+  final_movement_boundary?: number;
+  final_czi?: number;
+  population_target_met?: boolean;
+  population_reduced?: number;
+  removed_cbg_count?: number;
+};
+
+type ClusterAlgorithmMetadata = HierarchicalAlgorithmMetadata &
+  MobilityPruneAlgorithmMetadata;
+
 type GuidedLinkedCbgDetail = {
   cbg?: string;
   population?: number;
@@ -208,11 +245,12 @@ type ClusteringPreviewResponse = {
   center?: [number, number] | null;
   size?: number | string;
   use_test_data?: boolean;
-  algorithm_metadata?: HierarchicalAlgorithmMetadata | null;
+  algorithm_metadata?: ClusterAlgorithmMetadata | null;
   trace?: TracePayload | null;
   algorithm?: string;
   clustering_params?: {
     seed_guard_distance_km?: number | string;
+    min_seed_capture?: number | string;
   } | null;
   geojson?: GeoJSONData | null;
   trace_geojson?: GeoJSONData | null;
@@ -545,6 +583,8 @@ export default function CZGeneration() {
   );
   const [showAdvancedClustering, setShowAdvancedClustering] = useState(false);
   const [seedGuardDistanceKm, setSeedGuardDistanceKm] = useState(20);
+  const [mobilityPruneMinSeedCapturePct, setMobilityPruneMinSeedCapturePct] =
+    useState(80);
   const [setupSeedCbg, setSetupSeedCbg] = useState('');
   const [setupSeedLabel, setSetupSeedLabel] = useState('');
   const [setupSeedCount, setSetupSeedCount] = useState(0);
@@ -567,13 +607,13 @@ export default function CZGeneration() {
   const [cbgGeoJSON, setCbgGeoJSON] = useState<GeoJSONData | null>(null);
   const [selectedCBGs, setSelectedCBGs] = useState<string[]>([]);
   const [seedCBG, setSeedCBG] = useState('');
-  const [, setTotalPopulation] = useState(0);
+  const [totalPopulation, setTotalPopulation] = useState(0);
   const [useTestData, setUseTestData] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [cityName, setCityName] = useState('');
   const [growthTrace, setGrowthTrace] = useState<TracePayload | null>(null);
   const [algorithmMetadata, setAlgorithmMetadata] =
-    useState<HierarchicalAlgorithmMetadata | null>(null);
+    useState<ClusterAlgorithmMetadata | null>(null);
   const [guidedMetadata, setGuidedMetadata] =
     useState<GuidedSecondOrderMetadata | null>(null);
   const [guidedDestinations, setGuidedDestinations] = useState<
@@ -614,12 +654,31 @@ export default function CZGeneration() {
   const isFinalizing = phase === 'finalizing';
   const isGuidedSecondOrderAlgorithm =
     clusterAlgorithm === 'guided_second_order_regions';
+  const isMobilityPruneAlgorithm = clusterAlgorithm === 'mobility_prune';
   const guidedSelectionMode = hasGenerated && isGuidedSecondOrderAlgorithm;
   const isTestLocationInput =
     String(location ?? '')
       .trim()
       .toUpperCase() === 'TEST';
   const traceSteps = growthTrace?.steps ?? [];
+  const mobilityPruneMetadata =
+    hasGenerated &&
+    isMobilityPruneAlgorithm &&
+    algorithmMetadata?.bounded_envelope
+      ? algorithmMetadata
+      : null;
+  const mapSeedCbgIds = useMemo(() => {
+    const source = algorithmMetadata?.seed_cbgs?.length
+      ? algorithmMetadata.seed_cbgs
+      : guidedSeedCbgs.length
+        ? guidedSeedCbgs
+        : seedCBG
+          ? [seedCBG]
+          : [];
+    return Array.from(
+      new Set(source.map((cbg) => normalizeCbgId(cbg)).filter(Boolean))
+    );
+  }, [algorithmMetadata, guidedSeedCbgs, seedCBG]);
   const maxTraceStep = traceSteps.length > 0 ? traceSteps.length - 1 : 0;
   const activeTraceStep =
     traceSteps[clampIndex(traceStepIndex, 0, maxTraceStep)] ?? null;
@@ -1289,6 +1348,15 @@ export default function CZGeneration() {
         req.seed_guard_distance_km = Number(seedGuardDistanceKm);
       }
     }
+    if (clusterAlgorithm === 'mobility_prune') {
+      const minSeedCapture = Number(mobilityPruneMinSeedCapturePct) / 100;
+      if (Number.isFinite(minSeedCapture)) {
+        req.mobility_prune_min_seed_capture = Math.min(
+          1,
+          Math.max(0, minSeedCapture)
+        );
+      }
+    }
 
     fetch(algUrl('frontier-candidates'), {
       method: 'POST',
@@ -1355,6 +1423,7 @@ export default function CZGeneration() {
     guidedSelectionMode,
     manualEditPanelsActive,
     minPop,
+    mobilityPruneMinSeedCapturePct,
     seedCBG,
     seedGuardDistanceKm,
     selectedCBGs,
@@ -1950,6 +2019,15 @@ export default function CZGeneration() {
           clusterReq.seed_guard_distance_km = Number(seedGuardDistanceKm);
         }
       }
+      if (clusterAlgorithm === 'mobility_prune') {
+        const minSeedCapture = Number(mobilityPruneMinSeedCapturePct) / 100;
+        if (Number.isFinite(minSeedCapture)) {
+          clusterReq.mobility_prune_min_seed_capture = Math.min(
+            1,
+            Math.max(0, minSeedCapture)
+          );
+        }
+      }
 
       if (coreCbg) {
         clusterReq.cbg = coreCbg;
@@ -2005,8 +2083,11 @@ export default function CZGeneration() {
       setAlgorithmMetadata(
         data.algorithm_metadata || data.trace?.algorithm_metadata || null
       );
+      const responseAlgorithm = isClusterAlgorithm(data.algorithm)
+        ? data.algorithm
+        : clusterAlgorithm;
       if (isClusterAlgorithm(data.algorithm)) {
-        setClusterAlgorithm(data.algorithm);
+        setClusterAlgorithm(responseAlgorithm);
       }
 
       if (
@@ -2020,10 +2101,23 @@ export default function CZGeneration() {
           setSeedGuardDistanceKm(rawThreshold);
         }
       }
+      if (data.clustering_params && data.algorithm === 'mobility_prune') {
+        const rawMinSeedCapture = Number(
+          data.clustering_params.min_seed_capture
+        );
+        if (Number.isFinite(rawMinSeedCapture)) {
+          setMobilityPruneMinSeedCapturePct(
+            Math.round(Math.min(1, Math.max(0, rawMinSeedCapture)) * 100)
+          );
+        }
+      }
 
       setGrowthTrace(data.trace || null);
       setTraceStepIndex(0);
-      setTraceEnabled(Boolean(data.trace?.steps?.length));
+      setTraceEnabled(
+        Boolean(data.trace?.steps?.length) &&
+          responseAlgorithm !== 'mobility_prune'
+      );
       setZoneEditMode(false);
       setManualFrontierCandidates([]);
       setManualFrontierError('');
@@ -2117,9 +2211,13 @@ export default function CZGeneration() {
         `Location: ${cityName || location || 'N/A'}`,
         `Seed CBG: ${seedCBG || 'N/A'}`,
         `Algorithm: ${algorithmLabel}`,
-        isGuidedSecondOrderAlgorithm
-          ? 'Minimum population filter: not used in guided connected cities mode'
-          : `Minimum population: ${Number(minPop || 0).toLocaleString()}`,
+        clusterAlgorithm === 'mobility_prune'
+          ? `Minimum seed movement captured: ${Number(
+              mobilityPruneMinSeedCapturePct || 0
+            ).toFixed(0)}%`
+          : isGuidedSecondOrderAlgorithm
+            ? 'Minimum population filter: not used in guided connected cities mode'
+            : `Minimum population: ${Number(minPop || 0).toLocaleString()}`,
         `Date range: ${startDate} to ${endDate}`,
         `CBGs in zone: ${selectedCBGs.length}`,
         `Test data mode: ${useTestData ? 'Yes' : 'No'}`
@@ -2171,7 +2269,6 @@ export default function CZGeneration() {
           `Seed guard distance (km): ${seedGuardDistanceKm}`
         );
       }
-
       const descriptionToSave =
         trimmedDescription || generatedDescription.join('\n');
       if (!trimmedDescription) {
@@ -2508,6 +2605,7 @@ coupling =
                     }
                     selectedCBGs={selectedCBGs}
                     seedCbgId={seedCBG}
+                    seedCbgIds={mapSeedCbgIds}
                     seedGuardRadiusKm={seedGuardDistanceKm}
                     showSeedGuardCircle={
                       clusterAlgorithm === 'greedy_weight_seed_guard'
@@ -2996,10 +3094,38 @@ coupling =
                               : 'No'}
                           </div>
                         )}
+                        {selectedAnalysisCandidate.seed_movement_loss !==
+                          undefined && (
+                          <div>
+                            <span className="font-semibold">
+                              Seed Movement Lost:
+                            </span>{' '}
+                            {Number(
+                              selectedAnalysisCandidate.seed_movement_loss ?? 0
+                            ).toLocaleString(undefined, {
+                              maximumFractionDigits: 1
+                            })}
+                          </div>
+                        )}
+                        {selectedAnalysisCandidate.seed_capture_after !==
+                          undefined && (
+                          <div>
+                            <span className="font-semibold">
+                              Seed Capture After Selection:
+                            </span>{' '}
+                            {(
+                              Number(
+                                selectedAnalysisCandidate.seed_capture_after ??
+                                  0
+                              ) * 100
+                            ).toFixed(1)}
+                            %
+                          </div>
+                        )}
                         {selectedAnalysisCandidate.czi_after !== undefined && (
                           <div>
                             <span className="font-semibold">
-                              CZI After Add:
+                              Zone CZI After Selection:
                             </span>{' '}
                             {Number(
                               selectedAnalysisCandidate.czi_after ?? 0
@@ -3115,7 +3241,130 @@ coupling =
               ) : (
                 <>
                   <div>
-                    {showTraceControls ? (
+                    {mobilityPruneMetadata ? (
+                      <>
+                        <div className="text-sm font-semibold mb-2">
+                          Mobility Prune Summary
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-gray-700">
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Final Zone:
+                            </span>{' '}
+                            {selectedCBGs.length} CBGs, pop{' '}
+                            {Number(totalPopulation || 0).toLocaleString()}
+                          </div>
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Seed Pop:
+                            </span>{' '}
+                            {Number(
+                              mobilityPruneMetadata.seed_population ?? 0
+                            ).toLocaleString()}
+                          </div>
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Envelope:
+                            </span>{' '}
+                            {Number(
+                              mobilityPruneMetadata.initial_cbg_count ?? 0
+                            ).toLocaleString()}{' '}
+                            CBGs, pop{' '}
+                            {Number(
+                              mobilityPruneMetadata.initial_population ?? 0
+                            ).toLocaleString()}
+                          </div>
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Envelope Target:
+                            </span>{' '}
+                            {Number(
+                              mobilityPruneMetadata.envelope_population_target ??
+                                0
+                            ).toLocaleString()}
+                          </div>
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Pruned:
+                            </span>{' '}
+                            {Number(
+                              mobilityPruneMetadata.removed_cbg_count ?? 0
+                            ).toLocaleString()}{' '}
+                            CBGs, pop{' '}
+                            {Number(
+                              mobilityPruneMetadata.population_reduced ?? 0
+                            ).toLocaleString()}
+                          </div>
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Minimum Seed Capture:
+                            </span>{' '}
+                            {Number(
+                              (mobilityPruneMetadata.min_seed_capture ?? 0) *
+                                100
+                            ).toFixed(0)}
+                            %
+                          </div>
+                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+                            <span className="font-semibold text-[#1f2937]">
+                              Seed Capture:
+                            </span>{' '}
+                            {Number(
+                              (mobilityPruneMetadata.final_seed_capture_share ??
+                                0) * 100
+                            ).toFixed(1)}
+                            %
+                          </div>
+                        </div>
+                        {showTraceControls &&
+                          growthTrace?.supports_stepwise &&
+                          traceSteps.length > 0 && (
+                            <div className="mt-3 border-t border-[#dbeafe] pt-3">
+                              <label className="flex items-center gap-2 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={traceEnabled}
+                                  onChange={(e) =>
+                                    setTraceEnabled(e.target.checked)
+                                  }
+                                />
+                                Show pruning trace heat map
+                              </label>
+                              {traceEnabled && (
+                                <>
+                                  <div className="mt-2 text-xs text-gray-600">
+                                    Step{' '}
+                                    {Math.min(traceStepIndex, maxTraceStep) + 1}{' '}
+                                    of {traceSteps.length}
+                                  </div>
+                                  <div className="mt-2 flex gap-2">
+                                    <button
+                                      type="button"
+                                      className="px-2 py-1 text-xs rounded border border-[#70B4D4] disabled:opacity-40"
+                                      disabled={traceStepIndex <= 0}
+                                      onClick={() =>
+                                        jumpToTraceStep(traceStepIndex - 1)
+                                      }
+                                    >
+                                      Previous Step
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="px-2 py-1 text-xs rounded border border-[#70B4D4] disabled:opacity-40"
+                                      disabled={traceStepIndex >= maxTraceStep}
+                                      onClick={() =>
+                                        jumpToTraceStep(traceStepIndex + 1)
+                                      }
+                                    >
+                                      Next Step
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                      </>
+                    ) : showTraceControls ? (
                       <>
                         <div className="text-sm font-semibold mb-2">
                           Trace Controls
@@ -3264,7 +3513,7 @@ coupling =
                       </div>
                     )}
 
-                  {algorithmMetadata && (
+                  {algorithmMetadata && !algorithmMetadata.bounded_envelope && (
                     <div className="min-w-[16rem] max-w-[22rem] flex flex-col gap-1 text-xs text-gray-700">
                       <div className="text-sm font-semibold text-[#1f2937]">
                         Hierarchy Summary
@@ -3440,7 +3689,28 @@ coupling =
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {!isGuidedSecondOrderAlgorithm && (
+                  {clusterAlgorithm === 'mobility_prune' ? (
+                    <div className="w-full">
+                      <FormField
+                        label="Minimum Seed Movement Captured (%)"
+                        name="mobility_prune_min_seed_capture"
+                        type="number"
+                        value={mobilityPruneMinSeedCapturePct}
+                        min={0}
+                        max={100}
+                        onChange={(e) =>
+                          setMobilityPruneMinSeedCapturePct(
+                            Number(e.target.value)
+                          )
+                        }
+                        disabled={loading}
+                      />
+                      <div className="mt-1 text-xs text-gray-600">
+                        Pruning stops before a removal would drop captured seed
+                        movement below this threshold.
+                      </div>
+                    </div>
+                  ) : !isGuidedSecondOrderAlgorithm ? (
                     <div className="w-full">
                       <FormField
                         label="Minimum Population"
@@ -3453,7 +3723,7 @@ coupling =
                         disabled={loading}
                       />
                     </div>
-                  )}
+                  ) : null}
                   <div className="w-full sm:col-span-2">
                     <FormField
                       label="Clustering Algorithm"
@@ -3594,6 +3864,14 @@ coupling =
                     connected cities by how much travel they share with it, and
                     asks you which connected cities should contribute linked
                     CBGs to the explicit simulation.
+                  </div>
+                )}
+
+                {clusterAlgorithm === 'mobility_prune' && (
+                  <div className="rounded-lg border border-[#70B4D4] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e3a8a]">
+                    This mode grows a large mobility envelope, then prunes low
+                    seed-capture CBGs while preserving the seed CBGs' movement
+                    field.
                   </div>
                 )}
 
