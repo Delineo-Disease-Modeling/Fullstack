@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
+import { downloadApiFile } from '@/lib/client-download';
 import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
 import EditDeleteActions from './edit-delete-actions';
@@ -26,6 +27,8 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
   const [clearOpen, setClearOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState('');
+  const [exportingZone, setExportingZone] = useState(false);
+  const [exportError, setExportError] = useState('');
   const zoneRef = useRef(zone);
   zoneRef.current = zone;
 
@@ -161,6 +164,7 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
                       : undefined
                 }
                 onClick={() => {
+                  setExportError('');
                   setZone(loc);
                   setSettings({ sim_id: null });
                 }}
@@ -186,50 +190,104 @@ export default function CzDict({ zone, setZone }: CzDictProps) {
         </div>
       )}
 
-      {zone && user && zone.user_id === user.id && zone.ready && (
-        <div className="flex gap-2 w-120 max-w-[90vw] justify-center">
-          <EditDeleteActions
-            fields={[
-              { key: 'name', label: 'Name' },
-              { key: 'description', label: 'Description', type: 'textarea', rows: 3 },
-            ]}
-            itemName={zone.name}
-            getInitialValues={() => ({ name: zone.name, description: zone.description })}
-            onSave={async (values) => {
-              const res = await fetch(`/api/convenience-zones/${zone.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: values.name.trim(), description: values.description }),
-              });
-              
-              if (res.ok) {
-                const { data } = await res.json();
-                setZone(data);
-                setLocations((prev) => prev.map((l) => (l.id === data.id ? data : l)));
-                return true;
-              }
+      {zone && user && zone.ready && (
+        <div className="flex flex-col gap-2 w-120 max-w-[90vw] items-center">
+          <div className="flex flex-wrap gap-2 w-full justify-center">
+            {zone.user_id === user.id && (
+              <EditDeleteActions
+                fields={[
+                  { key: 'name', label: 'Name' },
+                  {
+                    key: 'description',
+                    label: 'Description',
+                    type: 'textarea',
+                    rows: 3
+                  }
+                ]}
+                itemName={zone.name}
+                getInitialValues={() => ({
+                  name: zone.name,
+                  description: zone.description
+                })}
+                onSave={async (values) => {
+                  const res = await fetch(`/api/convenience-zones/${zone.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: values.name.trim(),
+                      description: values.description
+                    })
+                  });
 
-              return false;
-            }}
-            onDelete={async () => {
-              const res = await fetch(`/api/convenience-zones/${zone.id}`, {
-                method: 'DELETE',
-              });
+                  if (res.ok) {
+                    const { data } = await res.json();
+                    setZone(data);
+                    setLocations((prev) =>
+                      prev.map((l) => (l.id === data.id ? data : l))
+                    );
+                    return true;
+                  }
 
-              if (res.ok) {
-                const remaining = locations.filter((l) => l.id !== zone.id);
-                setLocations(remaining);
-                if (remaining.length > 0) {
-                  setZone(remaining[0]);
-                } else {
-                  setSettings({ zone: null, sim_id: null });
+                  return false;
+                }}
+                onDelete={async () => {
+                  const res = await fetch(`/api/convenience-zones/${zone.id}`, {
+                    method: 'DELETE'
+                  });
+
+                  if (res.ok) {
+                    const remaining = locations.filter((l) => l.id !== zone.id);
+                    setLocations(remaining);
+                    if (remaining.length > 0) {
+                      setZone(remaining[0]);
+                    } else {
+                      setSettings({ zone: null, sim_id: null });
+                    }
+                    return true;
+                  }
+
+                  return false;
+                }}
+              />
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              className="text-sm py-1! px-3!"
+              disabled={exportingZone}
+              onClick={async () => {
+                setExportingZone(true);
+                setExportError('');
+
+                try {
+                  await downloadApiFile(
+                    `/api/cz-export/${zone.id}?limit=0`,
+                    `cz-${zone.id}-inputs.tar`
+                  );
+                } catch (error) {
+                  console.error('Failed to export CZ inputs:', error);
+                  setExportError(
+                    error instanceof Error
+                      ? error.message
+                      : 'Failed to export zone inputs.'
+                  );
+                } finally {
+                  setExportingZone(false);
                 }
-                return true;
-              }
-              
-              return false;
-            }}
-          />
+              }}
+            >
+              {exportingZone ? 'Exporting...' : 'Export Inputs'}
+            </Button>
+          </div>
+          <p className="text-xs text-center text-gray-600">
+            Diagnostic export for validation workflows. Includes zone metadata,
+            <code className="mx-1">papdata.gz</code>
+            and
+            <code className="ml-1">patterns.gz</code>.
+          </p>
+          {exportError && (
+            <p className="text-xs text-center text-red-600">{exportError}</p>
+          )}
         </div>
       )}
 

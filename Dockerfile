@@ -50,4 +50,4 @@ COPY --from=builder /app/src/generated ./src/generated
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]
+CMD ["pnpm", "start"]

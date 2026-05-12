@@ -52,6 +52,7 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
         </Link>
         <ul>
           <li>{navLink('/simulator', 'Simulator')}</li>
+          <li>{navLink('/validation', 'Validation')}</li>
           <li>{navLink('/about', 'About')}</li>
           <li>{navLink('/team', 'Team')}</li>
           <li>

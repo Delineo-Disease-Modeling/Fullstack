@@ -3,6 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useSession } from '@/lib/auth-client';
+import { downloadApiFile } from '@/lib/client-download';
 import EditDeleteActions from '@/components/edit-delete-actions';
 import InstructionBanner from '@/components/instruction-banner';
 import OutputGraphs from '@/components/outputgraphs';
@@ -24,6 +26,7 @@ interface SelectedLoc {
 export default function SimulatorRun() {
   const { run_id } = useParams<{ run_id: string }>();
   const router = useRouter();
+  const { data: session } = useSession();
   const sim_id = useSimSettings((state) => state.sim_id);
   const zone = useSimSettings((state) => state.zone);
   const runName = useMapData((state) => state.name);
@@ -39,6 +42,8 @@ export default function SimulatorRun() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [exportingRun, setExportingRun] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) {
@@ -60,6 +65,7 @@ export default function SimulatorRun() {
     const loadRun = async () => {
       setLoading(true);
       setProgress(0);
+      setExportError(null);
       setSimData(null);
       setPapData(null);
       setError(null);
@@ -238,43 +244,82 @@ export default function SimulatorRun() {
               <h3 className="text-md font-semibold text-(--color-text-dark)">
                 {runName || 'Untitled Run'}
               </h3>
-              <EditDeleteActions
-                align="right"
-                fields={[{ key: 'name', label: 'Name' }]}
-                itemName={runName || 'Untitled Run'}
-                getInitialValues={() => ({ name: runName || '' })}
-                onSave={async (values) => {
-                  const res = await fetch(`/api/simdata/${sim_id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: values.name.trim() }),
-                  });
+              <div className="flex flex-col items-end gap-2">
+                <EditDeleteActions
+                  align="right"
+                  fields={[{ key: 'name', label: 'Name' }]}
+                  itemName={runName || 'Untitled Run'}
+                  getInitialValues={() => ({ name: runName || '' })}
+                  onSave={async (values) => {
+                    const res = await fetch(`/api/simdata/${sim_id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: values.name.trim() })
+                    });
 
-                  if (res.ok) {
-                    const json = await res.json();
-                    if (json.data?.name) setRunName(json.data.name);
-                    return true;
-                  }
-                  
-                  return false;
-                }}
-                onDelete={async () => {
-                  const res = await fetch(`/api/simdata/${sim_id}`, {
-                    method: 'DELETE',
-                  });
+                    if (res.ok) {
+                      const json = await res.json();
+                      if (json.data?.name) setRunName(json.data.name);
+                      return true;
+                    }
 
-                  if (!res.ok) {
                     return false;
-                  }
+                  }}
+                  onDelete={async () => {
+                    const res = await fetch(`/api/simdata/${sim_id}`, {
+                      method: 'DELETE'
+                    });
 
-                  setSimData(null);
-                  setPapData(null);
-                  setRunName('');
-                  setSettings({ sim_id: null });
-                  router.push('/simulator');
-                  return true;
-                }}
-              />
+                    if (!res.ok) {
+                      return false;
+                    }
+
+                    setSimData(null);
+                    setPapData(null);
+                    setRunName('');
+                    setSettings({ sim_id: null });
+                    router.push('/simulator');
+                    return true;
+                  }}
+                />
+                {session?.user && (
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="text-sm py-1! px-3!"
+                      disabled={exportingRun}
+                      onClick={async () => {
+                        setExportingRun(true);
+                        setExportError(null);
+
+                        try {
+                          await downloadApiFile(
+                            `/api/sim-export/${sim_id ?? Number(run_id)}`,
+                            `sim-${sim_id ?? Number(run_id)}-export.tar`
+                          );
+                        } catch (error) {
+                          console.error('Failed to export simulation run:', error);
+                          setExportError(
+                            error instanceof Error
+                              ? error.message
+                              : 'Failed to export simulation run.'
+                          );
+                        } finally {
+                          setExportingRun(false);
+                        }
+                      }}
+                    >
+                      {exportingRun ? 'Exporting...' : 'Export Run Bundle'}
+                    </Button>
+                    {exportError && (
+                      <p className="max-w-xs text-xs text-right text-red-600">
+                        {exportError}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </span>
           </div>
           <ModelMap

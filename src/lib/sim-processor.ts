@@ -4,6 +4,12 @@ import { createGunzip } from 'node:zlib';
 import chain from 'stream-chain';
 import parser from 'stream-json';
 import StreamObject from 'stream-json/streamers/StreamObject.js';
+import {
+  SIM_CHART_SCHEMA_VERSION,
+  addCombinedStateBit,
+  createExclusiveStatePoint,
+  populateExclusiveStateCounts
+} from './disease-states';
 import { getCachedPapdata } from './papdata-cache';
 
 const age_ranges: [number, number][] = [
@@ -16,19 +22,101 @@ const age_ranges: [number, number][] = [
 
 const age_range_labels = age_ranges.map(([lo, hi]) => `${lo}-${hi}`);
 
-const bitmask_states: [string, number][] = [
-  ['Infected', 1],
-  ['Infectious', 2],
-  ['Symptomatic', 4],
-  ['Hospitalized', 8],
-  ['Recovered', 16],
-  ['Removed', 32]
-];
-
-const all_state_names = ['Susceptible', ...bitmask_states.map(([n]) => n)];
-
 type DataPoint = { time: number; [key: string]: number };
-type ChartData = { [type: string]: DataPoint[] };
+type PoiPoint = {
+  id: string;
+  name: string;
+  infections: number;
+  category: string | null;
+};
+type PapPerson = {
+  age: number;
+  sex: number;
+};
+type PapHome = {
+  cbg: string;
+  members: string[];
+  latitude?: unknown;
+  longitude?: unknown;
+};
+type PapPlace = {
+  placekey?: string;
+  latitude?: unknown;
+  longitude?: unknown;
+  label?: string;
+  top_category?: string;
+  footprint?: unknown;
+};
+type PapData = {
+  people?: Record<string, PapPerson>;
+  homes: Record<string, PapHome>;
+  places: Record<string, PapPlace>;
+};
+type ChartData = {
+  schema_version: number;
+  iot: DataPoint[];
+  ages: DataPoint[];
+  sexes: DataPoint[];
+  states: DataPoint[];
+  pois: PoiPoint[];
+};
+
+const TOP_POI_LIMIT = 12;
+
+function attributeNewCasesToPois(
+  newlyInfected: Set<string>,
+  previousPlaces: Record<string, string[]> | undefined,
+  papPlaces: Record<string, PapPlace> | undefined,
+  infectionsByPoi: Map<string, PoiPoint>
+) {
+  if (!newlyInfected.size || !previousPlaces) {
+    return;
+  }
+
+  const attributedPeople = new Set<string>();
+
+  for (const [placeId, occupants] of Object.entries(previousPlaces)) {
+    if (!occupants?.length) {
+      continue;
+    }
+
+    let newCaseCount = 0;
+    for (const personId of occupants) {
+      if (!newlyInfected.has(personId) || attributedPeople.has(personId)) {
+        continue;
+      }
+      attributedPeople.add(personId);
+      newCaseCount += 1;
+    }
+
+    if (!newCaseCount) {
+      continue;
+    }
+
+    const place = papPlaces?.[placeId];
+    const label =
+      typeof place?.label === 'string' && place.label.trim()
+        ? place.label.trim()
+        : `Place #${placeId}`;
+    const category =
+      typeof place?.top_category === 'string' && place.top_category.trim()
+        ? place.top_category.trim()
+        : null;
+
+    const existing = infectionsByPoi.get(placeId);
+    if (existing) {
+      existing.infections += newCaseCount;
+      continue;
+    }
+
+    infectionsByPoi.set(placeId, {
+      id: placeId,
+      name: label,
+      infections: newCaseCount,
+      category
+    });
+  }
+}
 
 interface ProcessOpts {
   simDataId: number;
@@ -54,7 +142,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   processingProgress.set(simDataId, 0);
 
   // Load papdata from shared cache (avoids redundant gunzip)
-  const papdata = await getCachedPapdata(papdataId);
+  const papdata = (await getCachedPapdata(papdataId)) as PapData;
 
   const homeIds = Object.keys(papdata.homes).sort(
     (a, b) => Number(a) - Number(b)
@@ -91,11 +179,11 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   };
 
   // Population count and age index for global stats
-  const popCount = Object.keys(papdata.people ?? {}).length;
+  const populationIds = Object.keys(papdata.people ?? {});
   const ageIndex = new Map<string, number>();
   for (const [id, person] of Object.entries(papdata.people ?? {}) as [
     string,
-    any
+    PapPerson
   ][]) {
     for (let i = 0; i < age_ranges.length; i++) {
       if (person.age >= age_ranges[i][0] && person.age <= age_ranges[i][1]) {
@@ -106,15 +194,19 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   }
 
   // Set up streams
-  const simChain: any[] = [createReadStream(simdataPath)];
-  if (simdataPath.endsWith('.gz')) simChain.push(createGunzip());
-  simChain.push(parser(), StreamObject.streamObject());
-  const simIter = chain(simChain)[Symbol.asyncIterator]();
+  const simIter = chain([
+    createReadStream(simdataPath),
+    ...(simdataPath.endsWith('.gz') ? [createGunzip()] : []),
+    parser(),
+    StreamObject.streamObject()
+  ])[Symbol.asyncIterator]();
 
-  const patChain: any[] = [createReadStream(patternsPath)];
-  if (patternsPath.endsWith('.gz')) patChain.push(createGunzip());
-  patChain.push(parser(), StreamObject.streamObject());
-  const patIter = chain(patChain)[Symbol.asyncIterator]();
+  const patIter = chain([
+    createReadStream(patternsPath),
+    ...(patternsPath.endsWith('.gz') ? [createGunzip()] : []),
+    parser(),
+    StreamObject.streamObject()
+  ])[Symbol.asyncIterator]();
 
   // Accumulate map cache parts
   const cacheParts: string[] = [
@@ -124,15 +216,20 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
 
   // Global stats accumulators
   const globalStats: ChartData = {
+    schema_version: SIM_CHART_SCHEMA_VERSION,
     iot: [],
     ages: [],
     sexes: [],
-    states: []
+    states: [],
+    pois: []
   };
 
   // Hotspot tracking
   const hotspots: Record<string, number[]> = {};
   const prevInfected: Record<string, number> = {};
+  const infectionsByPoi = new Map<string, PoiPoint>();
+  let prevInfectedPeople: Set<string> | null = null;
+  let prevPlaces: Record<string, string[]> | undefined;
 
   let first = true;
   let spl = await simIter.next();
@@ -161,6 +258,22 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       for (const key of Object.keys(people as Record<string, unknown>)) {
         curinfected.add(key);
       }
+    }
+
+    if (prevInfectedPeople) {
+      const newlyInfected = new Set<string>();
+      for (const personId of curinfected) {
+        if (!prevInfectedPeople.has(personId)) {
+          newlyInfected.add(personId);
+        }
+      }
+
+      attributeNewCasesToPois(
+        newlyInfected,
+        prevPlaces,
+        papdata.places,
+        infectionsByPoi
+      );
     }
 
     const homesArray: number[] = [];
@@ -208,11 +321,9 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     const iot_data: DataPoint = { time };
     const ages_data: DataPoint = { time };
     const sexes_data: DataPoint = { time, Male: 0, Female: 0 };
-    const states_data: DataPoint = { time };
+    const states_data = createExclusiveStatePoint(time);
+    const combinedStates = new Map<string, number>();
     for (const label of age_range_labels) ages_data[label] = 0;
-    for (const name of all_state_names) states_data[name] = 0;
-
-    let totalInfected = 0;
 
     for (const [disease, people] of Object.entries(svalue) as [
       string,
@@ -220,14 +331,11 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     ][]) {
       const entries = Object.entries(people);
       iot_data[disease] = entries.length;
-      totalInfected += entries.length;
 
       for (const [id, stateBitmask] of entries) {
-        for (const [stateName, bit] of bitmask_states) {
-          if (stateBitmask & bit) states_data[stateName]++;
-        }
+        addCombinedStateBit(combinedStates, id, stateBitmask);
 
-        const person = papdata.people[id];
+        const person = papdata.people?.[id];
         if (person) {
           sexes_data[person.sex === 0 ? 'Male' : 'Female']++;
           const ageIdx = ageIndex.get(id);
@@ -236,7 +344,11 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       }
     }
 
-    states_data.Susceptible = Math.max(0, popCount - totalInfected);
+    populateExclusiveStateCounts(
+      states_data,
+      populationIds,
+      combinedStates
+    );
 
     globalStats.iot.push(iot_data);
     globalStats.ages.push(ages_data);
@@ -247,11 +359,20 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       processingProgress.set(simDataId, Math.min(99, Math.round((+skey / totalLength) * 100)));
     }
 
+    prevInfectedPeople = curinfected;
+    prevPlaces = pvalue.places as Record<string, string[]> | undefined;
+
     spl = await simIter.next();
     ppl = await patIter.next();
   }
 
   processingProgress.delete(simDataId);
+  globalStats.pois = Array.from(infectionsByPoi.values())
+    .sort(
+      (left, right) =>
+        right.infections - left.infections || left.name.localeCompare(right.name)
+    )
+    .slice(0, TOP_POI_LIMIT);
 
   // Finalize map cache
   cacheParts.push(`},"hotspots":${JSON.stringify(hotspots)}`);
