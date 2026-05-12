@@ -106,7 +106,7 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
       if (fallbackTimer) clearInterval(fallbackTimer);
       clearInterval(heartbeat);
     };
-  }, [setZone]);
+  }, [setZone, setLocations]);
 
   return (
     <div className="flex flex-col items-center gap-4">

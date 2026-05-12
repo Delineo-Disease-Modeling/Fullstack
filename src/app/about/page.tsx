@@ -49,7 +49,7 @@ const SECTIONS = [
       },
       {
         title: 'Always improving',
-        body: 'We&rsquo;re constantly enhancing our visualizations to present data in more meaningful and actionable ways, helping users uncover patterns and insights at a glance.'
+        body: 'We’re constantly enhancing our visualizations to present data in more meaningful and actionable ways, helping users uncover patterns and insights at a glance.'
       }
     ]
   }
@@ -95,7 +95,7 @@ export default function About() {
                 {section.points.map((point) => (
                   <li key={point.title} className="entry_point">
                     <strong>{point.title}</strong>
-                    <span dangerouslySetInnerHTML={{ __html: point.body }} />
+                    <span>{point.body}</span>
                   </li>
                 ))}
               </ul>
