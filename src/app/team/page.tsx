@@ -97,7 +97,7 @@ function MemberImage({ name }: { name: string }) {
   return (
     <Image
       key={src}
-      className="member bg-(--color-accent-teal)"
+      className="member-img"
       onError={() => setSrc('/images/delineo.svg')}
       src={src}
       alt={name}
@@ -109,80 +109,95 @@ function MemberImage({ name }: { name: string }) {
 
 function TeamSection({
   team,
-  teamName
+  teamName,
+  compact = false
 }: {
   team: TeamMember[];
   teamName: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="team-section" data-aos="fade-up" data-aos-once="true">
-      <h1 className="teamheader">{teamName}</h1>
-      <div className="team">
+    <section className="team-section" data-aos="fade-up" data-aos-once="true">
+      <h2 className="team-section-title">{teamName}</h2>
+      <div className={`team ${compact ? 'team-compact' : ''}`}>
         {team.map((member) => (
           <div className="member" key={member.name}>
             <MemberImage name={member.name} />
-            <h1 className="name">{member.name}</h1>
-
-            {member.department && <h2 className="role">{member.department}</h2>}
-            {member.gradYear && (
-              <h2 className="gradYear">Class of {member.gradYear}</h2>
-            )}
-
-            <div className="w-full flex items-center justify-center min-h-6">
-              {member.github && (
-                <a href={member.github}>
-                  <i className="px-2 bi-github"></i>
-                </a>
+            <div className="member-info">
+              <h3 className="member-name">{member.name}</h3>
+              {member.department && (
+                <p className="member-role">{member.department}</p>
               )}
-              {member.linkedin && (
-                <a href={member.linkedin}>
-                  <i className="px-2 bi-linkedin"></i>
-                </a>
+              {member.gradYear && (
+                <p className="member-grad">Class of {member.gradYear}</p>
               )}
             </div>
+            {(member.github || member.linkedin) && (
+              <div className="member-socials">
+                {member.github && (
+                  <a
+                    href={member.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${member.name}'s GitHub`}
+                  >
+                    <i className="bi-github"></i>
+                  </a>
+                )}
+                {member.linkedin && (
+                  <a
+                    href={member.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${member.name}'s LinkedIn`}
+                  >
+                    <i className="bi-linkedin"></i>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
 export default function Team() {
   return (
-    <div>
-      <div
-        className="w-full text-center m-auto py-32"
-        data-aos="fade-up"
-        data-aos-once="true"
-      >
-        <header className="teamheader">Core Team</header>
-        <p className="teamheader">The Delineo Project</p>
+    <div className="team-page">
+      <div className="team-header" data-aos="fade-up" data-aos-once="true">
+        <span className="team-eyebrow">The Delineo Project</span>
+        <h1 className="team-title">Core team</h1>
+        <p className="team-lede">
+          A multidisciplinary group of faculty and students from Johns Hopkins
+          working on community-level disease modeling.
+        </p>
       </div>
 
-      <TeamSection team={teamData.professors} teamName="Professors" />
-      <TeamSection team={teamData.fullstackTeam} teamName="Full-Stack Team" />
-      <TeamSection team={teamData.algorithmsTeam} teamName="Algorithms Team" />
+      <TeamSection team={teamData.professors} teamName="Faculty" />
+      <TeamSection team={teamData.fullstackTeam} teamName="Fullstack" />
+      <TeamSection team={teamData.algorithmsTeam} teamName="Algorithms" />
+      <TeamSection team={teamData.simulationsTeam} teamName="Simulation" />
       <TeamSection
-        team={teamData.simulationsTeam}
-        teamName="Simulations Team"
+        team={teamData.pastAlumn}
+        teamName="Past contributors"
+        compact
       />
-      <TeamSection team={teamData.pastAlumn} teamName="Past Team Members" />
 
-      <div
-        className="w-full text-center m-auto py-32"
-        data-aos="fade-up"
-        data-aos-once="true"
-      >
-        <header className="font-medium text-4xl">Join Delineo</header>
-        <p>
-          Contact Dr. Dahbura at{' '}
-          <a
-            className="email"
-            href="mailto:atd@hublabels.com?Subject=Delineo%20Project%20Interest"
-          >
-            atd@hublabels.com
-          </a>
+      <div className="join-cta" data-aos="fade-up" data-aos-once="true">
+        <span className="team-eyebrow">Get involved</span>
+        <h2 className="join-title">Join Delineo</h2>
+        <p className="join-body">
+          Interested in contributing? We&apos;re always looking for students,
+          researchers, and collaborators across disciplines.
         </p>
+        <a
+          className="join-link"
+          href="mailto:atd@hublabels.com?Subject=Delineo%20Project%20Interest"
+        >
+          atd@hublabels.com →
+        </a>
       </div>
     </div>
   );
