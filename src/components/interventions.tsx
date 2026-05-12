@@ -12,7 +12,7 @@ export default function Interventions({ time }: { time: number }) {
   if (!interventions) return null;
 
   return (
-    <div className="flex flex-wrap max-w-[90vw] justify-center gap-8">
+    <div className="iv_sliders_grid">
       <SimParameter
         label={'Percent Masking'}
         value={interventions.mask}

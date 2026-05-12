@@ -2,11 +2,11 @@ div.sim_container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  row-gap: 32px;
-  padding: 56px 32px 96px 32px;
+  row-gap: 28px;
+  padding: 56px 32px 80px 32px;
   min-height: calc(100vh - 60px);
   width: 100%;
-  max-width: 1120px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -122,15 +122,62 @@ div.sim_output {
 /* ---------- Section card (groups related settings) ---------- */
 .sim_section {
   width: 100%;
-  max-width: 720px;
   background: white;
   border: 1px solid var(--color-border-subtle);
   border-radius: 16px;
-  padding: 24px;
+  padding: 24px 28px;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* ---------- Two-column "data" row (Zones + Previous Runs) ---------- */
+.sim_data_row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .sim_data_row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sim_data_col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.sim_data_col_label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 0 2px;
+}
+
+.sim_data_col_label_num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(112, 180, 212, 0.15);
+  color: var(--color-primary-blue);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .sim_section_title {
@@ -147,7 +194,6 @@ div.sim_output {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 520px;
   height: 320px;
   background: white;
   border: 1px solid var(--color-border-subtle);
@@ -288,7 +334,6 @@ div.sim_output {
 
 .sim_zone_description {
   width: 100%;
-  max-width: 520px;
   padding: 12px 16px;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border-subtle);
@@ -301,10 +346,17 @@ div.sim_output {
 
 /* ---------- Settings row (sliders + checkbox + file) ---------- */
 .sim_settings_row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+
+/* Intervention sliders grid */
+.iv_sliders_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
   width: 100%;
 }
 

@@ -238,24 +238,46 @@ export default function SimSettings({
   })();
 
   return (
-    <div className="flex flex-col items-center gap-12 w-full">
-      <CzDict zone={zone} setZone={updateZone} />
-
-      {zone?.start_date && (
-        <div className="sim_date_range">
-          <span className="sim_date_range_label">Date range:</span>
-          <span>
-            {formatDateDisplay(zone.start_date)} → {formatDateDisplay(endDateIso)}
-          </span>
-          <span className="sim_date_range_days">
-            ({zone.length ? Math.round(zone.length / 24) : '?'} days)
-          </span>
+    <div className="flex flex-col items-center gap-7 w-full">
+      <div className="sim_data_row">
+        <div className="sim_data_col">
+          <div className="sim_data_col_label">
+            <span className="sim_data_col_label_num">1</span>
+            <span>Pick a convenience zone</span>
+          </div>
+          <CzDict zone={zone} setZone={updateZone} />
         </div>
-      )}
+        <div className="sim_data_col">
+          <div className="sim_data_col_label">
+            <span className="sim_data_col_label_num">2</span>
+            <span>Or open a previous run</span>
+          </div>
+          <SimRunSelector
+            czone_id={zone?.id}
+            sim_id={sim_id}
+            callback={(sim_id) => setSettings({ sim_id })}
+          />
+        </div>
+      </div>
 
-      {patternStatus && (
-        <div className={`text-xs ${patternStatus.tone}`}>
-          {patternStatus.message}
+      {(zone?.start_date || patternStatus) && (
+        <div className="flex flex-col items-center gap-2">
+          {zone?.start_date && (
+            <div className="sim_date_range">
+              <span className="sim_date_range_label">Date range:</span>
+              <span>
+                {formatDateDisplay(zone.start_date)} → {formatDateDisplay(endDateIso)}
+              </span>
+              <span className="sim_date_range_days">
+                ({zone.length ? Math.round(zone.length / 24) : '?'} days)
+              </span>
+            </div>
+          )}
+          {patternStatus && (
+            <div className={`text-xs ${patternStatus.tone}`}>
+              {patternStatus.message}
+            </div>
+          )}
         </div>
       )}
 
@@ -295,14 +317,6 @@ export default function SimSettings({
         <h2 className="sim_section_title">Interventions</h2>
         <InterventionTimeline />
       </div>
-
-      <div className="sim_divider"><span>or</span></div>
-
-      <SimRunSelector
-        czone_id={zone?.id}
-        sim_id={sim_id}
-        callback={(sim_id) => setSettings({ sim_id })}
-      />
 
       <div className="flex flex-col items-center gap-6 w-full">
         <Button
