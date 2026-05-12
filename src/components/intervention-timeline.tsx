@@ -20,6 +20,33 @@ export default function InterventionTimeline() {
   const [values, setValues] = useState([0]);
   const [curtime, setCurtime] = useState(0);
 
+  const getTrackTime = (clientX: number, track: HTMLDivElement) => {
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return curtime;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return Math.round(ratio * hours);
+  };
+
+  const isTimelineThumb = (target: EventTarget | null) =>
+    target instanceof HTMLInputElement &&
+    target.classList.contains('iv_timeline');
+
+  const moveIntervention = (fromTime: number, toTime: number) => {
+    if (fromTime === toTime) return;
+    if (values.includes(toTime)) {
+      setCurtime(toTime);
+      return;
+    }
+
+    setInterventions(fromTime, { time: toTime });
+    setValues((cur) =>
+      cur
+        .map((value) => (value === fromTime ? toTime : value))
+        .sort((a, b) => a - b)
+    );
+    setCurtime(toTime);
+  };
+
   useEffect(() => {
     const unused = Array.from({ length: hours }, (_, i) => i + 1).filter(
       (v) => !values.includes(v)
@@ -37,16 +64,9 @@ export default function InterventionTimeline() {
     }
   }, [curtime, setInterventions, hours, values]);
 
-  const addThumb = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (values.length >= 10) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('[role="slider"]')) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickRatio = (e.clientX - rect.left) / (rect.right - rect.left);
-    const newtime = Math.round(clickRatio * hours);
-    addInterventions(newtime);
-    setValues((prev) => [...prev, newtime].sort((a, b) => a - b));
-    setCurtime(newtime);
+  const moveSelectedThumb = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isTimelineThumb(e.target)) return;
+    moveIntervention(curtime, getTrackTime(e.clientX, e.currentTarget));
   };
 
   const deleteThumb = (i: number) => {
@@ -69,12 +89,15 @@ export default function InterventionTimeline() {
     else setCurtime(sorted[sorted.indexOf(curtime) + 1]);
   };
 
+  const nextAddTime = Array.from({ length: hours }, (_, i) => i + 1).find(
+    (value) => !values.includes(value)
+  );
+
   return (
     <div className="flex flex-col w-full max-w-250 gap-4">
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: custom slider track; range inputs inside handle keyboard accessibility */}
       <div
-        className="relative flex items-center w-full h-6 select-none"
-        onDoubleClick={addThumb}
+        className="relative flex items-center w-full h-8 select-none cursor-pointer"
+        onPointerDown={moveSelectedThumb}
       >
         <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-1.5 bg-(--color-border-subtle) rounded-full outline-0" />
         {values.map((value, i) => (
@@ -85,11 +108,13 @@ export default function InterventionTimeline() {
             min={0}
             max={hours}
             value={value}
+            aria-label={`Intervention ${i + 1} hour`}
             onChange={(e) => {
-              if (value === 0 || values.includes(+e.target.value)) return;
-              setInterventions(values[i], { time: +e.target.value });
-              setValues((cur) => [...cur].with(i, +e.target.value));
-              setCurtime(+e.target.value);
+              const nextTime = +e.target.value;
+              if (values.includes(nextTime) && nextTime !== value) return;
+              setInterventions(values[i], { time: nextTime });
+              setValues((cur) => cur.with(i, nextTime).sort((a, b) => a - b));
+              setCurtime(nextTime);
             }}
             onMouseDownCapture={(e) =>
               setCurtime(+(e.target as HTMLInputElement).value)
@@ -125,15 +150,12 @@ export default function InterventionTimeline() {
             type="button"
             className="iv_control_btn iv_control_btn--add"
             onClick={() => {
-              const newvalue = Array.from(
-                { length: hours },
-                (_, i) => i + 1
-              ).filter((v) => !values.includes(v))[0];
-              addInterventions(newvalue);
-              setValues((cur) => [...cur, newvalue]);
-              setCurtime(newvalue);
+              if (nextAddTime === undefined) return;
+              addInterventions(nextAddTime);
+              setValues((cur) => [...cur, nextAddTime].sort((a, b) => a - b));
+              setCurtime(nextAddTime);
             }}
-            disabled={values.length >= 10}
+            disabled={values.length >= 10 || nextAddTime === undefined}
           >
             + Add
           </button>
