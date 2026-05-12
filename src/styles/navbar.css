@@ -4,11 +4,13 @@ nav {
   left: 0;
 
   width: 100%;
-  height: 30px;
-  background-color: var(--color-bg-dark);
+  height: 60px;
+  background-color: rgba(27, 31, 34, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 
-  padding-left: 25%;
-  padding-right: 25%;
+  padding: 0 32px;
 
   display: flex;
   justify-content: space-between;
@@ -17,42 +19,70 @@ nav {
   z-index: 9999;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--color-text-light);
+}
+
+.nav-brand img {
+  width: 26px;
+  height: 26px;
+}
+
+.nav-brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text-light);
+}
+
 /* This is to add a height buffer at the top for other elements */
 div.navbuffer {
   top: 0;
   left: 0;
   width: 100%;
-  height: 30px;
+  height: 60px;
 }
 
 @media screen and (max-width: 800px) {
   nav {
-    padding-left: 15px;
-    padding-right: 10px;
+    padding: 0 16px;
+  }
+  .nav-brand-name {
+    display: none;
   }
 }
 
 img {
   display: inline-block;
   vertical-align: middle;
-  width: 25px;
-  height: 25px;
+  width: 26px;
+  height: 26px;
 }
 
 ul {
   list-style: none;
   display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
 }
 
 a.link,
 button.link {
-  font-size: 12px;
-  color: var(--color-text-light);
+  position: relative;
+  font-size: 13.5px;
+  color: rgba(245, 245, 240, 0.78);
   font-weight: 500;
   display: inline-block;
   text-decoration: none;
-  padding: 10px 15px;
-  transition: 200ms;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: color 160ms ease, background-color 160ms ease;
   background: none;
   border: none;
   cursor: pointer;
@@ -60,8 +90,23 @@ button.link {
 
 a.link:hover,
 button.link:hover {
-  transform: scale(1.05);
-  filter: brightness(80%);
+  color: var(--color-text-light);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+a.link.active {
+  color: var(--color-text-light);
+}
+
+a.link.active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 2px;
+  height: 2px;
+  background: var(--color-primary-blue-soft);
+  border-radius: 2px;
 }
 
 .user-dropdown-container {
@@ -70,17 +115,18 @@ button.link:hover {
 
 .user-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 6px);
   right: 0;
-  min-width: 180px;
+  min-width: 200px;
   background: var(--color-bg-dark);
-  border: 1px solid var(--color-border-light);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  padding: 12px 14px;
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
 .user-dropdown-name {
@@ -93,7 +139,7 @@ button.link:hover {
 .user-dropdown-org {
   font-size: 11px;
   color: var(--color-text-light);
-  opacity: 0.7;
+  opacity: 0.6;
   margin: 0;
 }
 

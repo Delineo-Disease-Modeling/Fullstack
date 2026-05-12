@@ -47,8 +47,9 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
     <div>
       <div className="navbuffer"></div>
       <nav>
-        <Link href="/" className="link">
-          <Image src="/images/logo.png" alt="logo" width={25} height={25} />
+        <Link href="/" className="nav-brand">
+          <Image src="/images/logo.png" alt="logo" width={26} height={26} />
+          <span className="nav-brand-name">Delineo</span>
         </Link>
         <ul>
           <li>{navLink('/simulator', 'Simulator')}</li>

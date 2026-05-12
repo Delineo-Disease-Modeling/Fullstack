@@ -3,7 +3,126 @@ footer.site_footer {
   bottom: 0;
   background-color: var(--color-bg-dark);
   width: 100%;
-  padding: 40px;
-  padding-bottom: calc(40px + env(safe-area-inset-bottom));
-  text-align: center;
+  padding: 56px 32px 24px 32px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  color: var(--color-text-light);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.footer-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  padding-bottom: 40px;
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 360px;
+}
+
+.footer-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-brand-row img {
+  width: 24px;
+  height: 24px;
+}
+
+.footer-brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-light);
+}
+
+.footer-tagline {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(245, 245, 240, 0.55);
+  margin: 0;
+}
+
+.footer-cols {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+}
+
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-col-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 245, 240, 0.5);
+  margin: 0 0 6px 0;
+}
+
+.footer-link {
+  font-size: 13.5px;
+  color: rgba(245, 245, 240, 0.78);
+  text-decoration: none;
+  transition: color 160ms ease;
+  width: fit-content;
+}
+
+.footer-link:hover {
+  color: var(--color-primary-blue-soft);
+}
+
+.footer-bottom {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: rgba(245, 245, 240, 0.45);
+}
+
+.footer-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: rgba(245, 245, 240, 0.7);
+  font-size: 18px;
+  text-decoration: none;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.footer-icon-link:hover {
+  color: var(--color-text-light);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 720px) {
+  .footer-inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .footer-cols {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

@@ -1,18 +1,64 @@
 'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 import '@/styles/footer.css';
-import Button from './ui/button';
 
 export default function Footer() {
   return (
     <footer className="site_footer">
-      <a
-        href="https://github.com/Delineo-Disease-Modeling/"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Button type="button" className="w-25 p-2!">Github</Button>
-      </a>
+      <div className="footer-inner">
+        <div className="footer-brand">
+          <div className="footer-brand-row">
+            <Image src="/images/logo.png" alt="Delineo" width={24} height={24} />
+            <span className="footer-brand-name">Delineo</span>
+          </div>
+          <p className="footer-tagline">
+            Community-level infectious disease modeling, built open-source.
+          </p>
+        </div>
+
+        <div className="footer-cols">
+          <div className="footer-col">
+            <h4 className="footer-col-title">Product</h4>
+            <Link href="/simulator" className="footer-link">Simulator</Link>
+            <Link href="/about" className="footer-link">About</Link>
+            <Link href="/team" className="footer-link">Team</Link>
+          </div>
+          <div className="footer-col">
+            <h4 className="footer-col-title">Resources</h4>
+            <a
+              href="https://github.com/Delineo-Disease-Modeling/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-link"
+            >
+              GitHub
+            </a>
+            <a
+              href="https://github.com/Delineo-Disease-Modeling/Fullstack#readme"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-link"
+            >
+              Documentation
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="footer-bottom">
+        <span className="footer-copy">© {new Date().getFullYear()} Delineo Disease Modeling</span>
+        <a
+          href="https://github.com/Delineo-Disease-Modeling/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="footer-icon-link"
+          aria-label="GitHub"
+        >
+          <i className="bi-github"></i>
+        </a>
+      </div>
     </footer>
   );
 }

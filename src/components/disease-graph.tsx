@@ -225,6 +225,7 @@ export default function DiseaseGraph() {
   return (
     <canvas
       ref={canvasRef}
+      className="disease-graph"
       style={{
         position: 'absolute',
         top: 0,
