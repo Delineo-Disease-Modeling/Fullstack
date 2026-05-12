@@ -42,6 +42,24 @@ div.simset_slider_label {
   font-variant-numeric: tabular-nums;
 }
 
+.simset_slider--disabled {
+  background: rgba(47, 53, 64, 0.04);
+  border-color: rgba(47, 53, 64, 0.10);
+  opacity: 0.68;
+}
+
+.simset_slider--disabled .simset_slider_label_value {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: normal;
+}
+
+.simset_slider--disabled input[type="range"] {
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
 /* ---------- Boolean toggle ---------- */
 .simset_checkbox {
   display: flex;

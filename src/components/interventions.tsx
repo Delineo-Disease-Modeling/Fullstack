@@ -27,6 +27,7 @@ export default function Interventions({ time }: { time: number }) {
         label={'Maximum Facility Capacity'}
         value={interventions.capacity}
         callback={(capacity) => setInterventions(time, { capacity })}
+        disabled
       />
       <SimParameter
         label={'Lockdown Probability'}
@@ -37,6 +38,7 @@ export default function Interventions({ time }: { time: number }) {
         label={'Self-Isolation Percent'}
         value={interventions.selfiso}
         callback={(selfiso) => setInterventions(time, { selfiso })}
+        disabled
       />
     </div>
   );

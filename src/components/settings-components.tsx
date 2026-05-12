@@ -12,6 +12,8 @@ interface SimParameterProps {
   max?: number;
   percent?: boolean;
   units?: string;
+  disabled?: boolean;
+  disabledLabel?: string;
 }
 
 export function SimParameter({
@@ -21,16 +23,27 @@ export function SimParameter({
   min = 0,
   max = 100,
   percent = true,
-  units = ''
+  units = '',
+  disabled = false,
+  disabledLabel = 'Currently unavailable'
 }: SimParameterProps) {
   const displayValue = percent ? Math.ceil(value * 100) : value;
   return (
-    <div className="simset_slider">
+    <div
+      className={`simset_slider${disabled ? ' simset_slider--disabled' : ''}`}
+      aria-disabled={disabled}
+    >
       <div className="simset_slider_label">
         <span className="simset_slider_label_text">{label}</span>
         <span className="simset_slider_label_value">
-          {displayValue}
-          {percent ? '%' : units}
+          {disabled ? (
+            disabledLabel
+          ) : (
+            <>
+              {displayValue}
+              {percent ? '%' : units}
+            </>
+          )}
         </span>
       </div>
       <Slider
@@ -38,6 +51,7 @@ export function SimParameter({
         min={min}
         max={max}
         value={percent ? value * 100.0 : value}
+        disabled={disabled}
         onChange={(e) =>
           callback(percent ? +e.target.value / 100.0 : +e.target.value)
         }
