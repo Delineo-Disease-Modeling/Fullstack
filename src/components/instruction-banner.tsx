@@ -2,9 +2,11 @@
 
 export default function InstructionBanner({ text }: { text: string }) {
   return (
-    <div className="p-4 mb-4 text-blue-800 bg-blue-100 border border-blue-200 rounded-sm text-center">
-      <i className="bi bi-info-circle pr-2" />
-      {text}
+    <div className="instruction-banner">
+      <span className="instruction-banner-icon" aria-hidden="true">
+        <i className="bi bi-info-circle" />
+      </span>
+      <span>{text}</span>
     </div>
   );
 }
