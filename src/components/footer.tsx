@@ -14,13 +14,13 @@ export default function Footer() {
             <span className="footer-brand-name">Delineo</span>
           </div>
           <p className="footer-tagline">
-            Community-level infectious disease modeling, built open-source.
+            Community-level infectious disease modeling.
           </p>
         </div>
 
         <div className="footer-cols">
           <div className="footer-col">
-            <h4 className="footer-col-title">Product</h4>
+            <h4 className="footer-col-title">Pages</h4>
             <Link href="/simulator" className="footer-link">Simulator</Link>
             <Link href="/about" className="footer-link">About</Link>
             <Link href="/team" className="footer-link">Team</Link>

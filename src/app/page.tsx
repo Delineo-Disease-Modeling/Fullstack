@@ -12,7 +12,6 @@ export default function Home() {
       <div className="main" data-aos="fade-up">
         <DiseaseGraph />
         <div className="left relative">
-          <span className="hero-eyebrow">Disease modeling platform</span>
           <h1 className="title">
             Model how disease moves through a <span className="accent">community</span>.
           </h1>
@@ -24,7 +23,7 @@ export default function Home() {
           <div className="hero-ctas">
             <Link href="/simulator">
               <Button variant="primary" className="px-5! py-2.5! text-sm font-medium">
-                Launch simulator →
+                Launch simulator
               </Button>
             </Link>
             <Link href="/about">
@@ -32,20 +31,6 @@ export default function Home() {
                 How it works
               </Button>
             </Link>
-          </div>
-          <div className="hero-meta">
-            <div className="hero-meta-item">
-              <span className="hero-meta-value">U.S. Census</span>
-              <span className="hero-meta-label">Data source</span>
-            </div>
-            <div className="hero-meta-item">
-              <span className="hero-meta-value">SafeGraph</span>
-              <span className="hero-meta-label">Mobility</span>
-            </div>
-            <div className="hero-meta-item">
-              <span className="hero-meta-value">Open</span>
-              <span className="hero-meta-label">Source</span>
-            </div>
           </div>
         </div>
         <Image className="logo" src="/images/logo.png" alt="logo" width={400} height={400} />

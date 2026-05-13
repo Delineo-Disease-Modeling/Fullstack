@@ -148,7 +148,7 @@ div.sim_output {
 /* ---------- Section card (groups related settings) ---------- */
 .sim_section {
   width: 100%;
-  background: white;
+  background: var(--color-bg-ivory);
   border: 1px solid var(--color-border-subtle);
   border-radius: 16px;
   padding: 24px 28px;
@@ -171,6 +171,28 @@ div.sim_output {
   .sim_data_row {
     grid-template-columns: 1fr;
   }
+}
+
+.sim_section_divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.sim_section_divider_line {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border, #e2e8f0);
+}
+
+.sim_section_divider_text {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .sim_data_col {
@@ -221,7 +243,7 @@ div.sim_output {
   flex-direction: column;
   width: 100%;
   height: 320px;
-  background: white;
+  background: var(--color-bg-ivory);
   border: 1px solid var(--color-border-subtle);
   border-radius: 14px;
   overflow: hidden;
@@ -238,7 +260,7 @@ div.sim_output {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--color-text-main);
+  color: var(--color-primary-blue);
   margin: 0;
   text-align: left;
 }
@@ -293,7 +315,7 @@ div.sim_output {
   border: 1px solid transparent;
   background: transparent;
   font-size: 13.5px;
-  color: var(--color-text-main);
+  color: var(--color-text-muted);
   border-radius: 10px;
   cursor: pointer;
   transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
@@ -308,7 +330,7 @@ div.sim_output {
 .sim_table_row.is-selected {
   background: linear-gradient(180deg, rgba(112, 180, 212, 0.18), rgba(61, 136, 173, 0.14));
   border-color: rgba(61, 136, 173, 0.40);
-  color: var(--color-text-main);
+  color: var(--color-primary-blue);
   font-weight: 500;
 }
 
@@ -406,8 +428,8 @@ div.sim_output {
   padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: white;
-  color: var(--color-text-main);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -463,7 +485,7 @@ div.sim_output {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--color-text-main);
+  color: var(--color-primary-blue);
   font-variant-numeric: tabular-nums;
 }
 

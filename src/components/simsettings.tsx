@@ -14,6 +14,7 @@ import {
 } from './settings-components';
 import Button from '@/components/ui/button';
 import ZoneActions from './zone-actions';
+import Modal from 'react-modal';
 import {
   formatDateDisplay,
   getInclusiveEndDateIso,
@@ -99,6 +100,7 @@ export default function SimSettings({
   const [patternAvailability, setPatternAvailability] =
     useState<PatternAvailabilityState>({ status: 'idle' });
   const [locations, setLocations] = useState<ConvenienceZone[]>([]);
+  const [showZoneModal, setShowZoneModal] = useState(false);
 
   const detectedState = getStateFromCBG(zone?.cbg_list);
   const endDateIso = getInclusiveEndDateIso(zone?.start_date, hours);
@@ -257,7 +259,7 @@ export default function SimSettings({
         <div className="sim_data_col">
           <div className="sim_data_col_label">
             <span className="sim_data_col_label_num">2</span>
-            <span>Or open a previous run</span>
+            <span>Visit a previous run</span>
           </div>
           <SimRunSelector
             czone_id={zone?.id}
@@ -265,6 +267,11 @@ export default function SimSettings({
             callback={(sim_id) => setSettings({ sim_id })}
           />
         </div>
+      </div>
+      <div className="sim_section_divider">
+        <div className="sim_section_divider_line" />
+        <span className="sim_section_divider_text">or customize and run a new simulation</span>
+        <div className="sim_section_divider_line" />
       </div>
 
       <ZoneActions
@@ -339,7 +346,7 @@ export default function SimSettings({
           disabled={loading || (!!zone && zone.ready === false)}
           onClick={() => {
             if (!zone) {
-              alert('Please pick a convenience zone first.');
+              setShowZoneModal(true);
               return;
             }
             if (sim_id) {
@@ -370,6 +377,50 @@ export default function SimSettings({
         )}
         {error && <div className="sim_error">{error}</div>}
       </div>
+      <Modal
+        ariaHideApp={false}
+        style={{
+          overlay: {
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 9999
+          },
+          content: {
+            top: '50%',
+            left: '50%',
+            right: 'auto',
+            bottom: 'auto',
+            marginRight: '-50%',
+            transform: 'translate(-50%, -50%)',
+            maxWidth: '400px',
+            width: '90vw',
+            borderRadius: '0.5rem',
+            background: 'var(--color-bg-dark)',
+            border: '1px solid var(--color-border-light)',
+            color: 'var(--color-text-light)',
+            padding: '2rem'
+          }
+        }}
+        isOpen={showZoneModal}
+        onRequestClose={() => setShowZoneModal(false)}
+        closeTimeoutMS={100}
+      >
+        <div className="flex flex-col gap-5 items-center text-center">
+          <div className="flex flex-col gap-2 items-center">
+            <h2 className="text-base font-semibold">No Zone Selected</h2>
+            <p className="text-sm" style={{ color: 'var(--color-text-muted, #9ca3af)' }}>
+              Please pick a convenience zone before running a simulation.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            className="px-6! py-2! text-sm font-medium"
+            onClick={() => setShowZoneModal(false)}
+          >
+            Return
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

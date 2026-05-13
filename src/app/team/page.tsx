@@ -15,10 +15,8 @@ interface TeamMember {
 
 const teamData: {
   professors: TeamMember[];
-  fullstackTeam: TeamMember[];
-  algorithmsTeam: TeamMember[];
-  simulationsTeam: TeamMember[];
-  pastAlumn: TeamMember[];
+  currentTeam: TeamMember[];
+  pastAlumni: TeamMember[];
 } = {
   professors: [
     { name: 'Dr. Anton Dahbura', department: 'Computer Science' },
@@ -29,7 +27,7 @@ const teamData: {
     { name: 'Dr. Eili Klein', department: 'Emergency Medicine' }
   ],
 
-  fullstackTeam: [
+  currentTeam: [
     {
       name: 'Mahmoud Said',
       github: 'https://github.com/stickms',
@@ -37,22 +35,35 @@ const teamData: {
       gradYear: '2026'
     },
     {
-      name: 'Caroline Jia',
-      linkedin: 'https://www.linkedin.com/in/carolinejjia/',
-      department: 'Computer Science, Cognitive Science',
-      gradYear: '2028'
-    }
-  ],
-
-  algorithmsTeam: [
-    {
-      name: 'Ryan Taleb',
+      name: 'Ryad Taleb',
       department: 'Applied Mathematics and Statistics',
       linkedin: 'https://www.linkedin.com/in/ryad-taleb-654850251'
+    },
+    {
+      name: 'Liam Perez',
+      linkedin: 'https://www.linkedin.com/in/liam-p-5a4033323/',
+      gradYear: '2027',
+      department: 'Computer Science'
+    },
+    {
+      name: 'Crystal Yang',
+      department: 'Computer Science'
+    },
+    {
+      name: 'Naavya Jain',
+      department: 'Computer Science'
+    },
+    {
+      name: 'Vrinda Sehgal',
+      department: 'Computer Science'
+    },
+    {
+      name: 'Zeyu Shen',
+      department: 'Computer Science'
     }
   ],
 
-  simulationsTeam: [
+  pastAlumni: [
     { name: 'Iason Mihalopoulos' },
     {
       name: 'Navya Mehrotra',
@@ -61,14 +72,11 @@ const teamData: {
       gradYear: '2028'
     },
     {
-      name: 'Liam Perez',
-      linkedin: 'https://www.linkedin.com/in/liam-p-5a4033323/',
-      gradYear: '2027',
-      department: 'Computer Science'
-    }
-  ],
-
-  pastAlumn: [
+      name: 'Caroline Jia',
+      linkedin: 'https://www.linkedin.com/in/carolinejjia/',
+      department: 'Computer Science, Cognitive Science',
+      gradYear: '2028'
+    },
     { name: 'Jeffrey Yao' },
     { name: 'Matthew Yu' },
     { name: 'Zoe Xie' },
@@ -167,8 +175,7 @@ export default function Team() {
   return (
     <div className="team-page">
       <div className="team-header" data-aos="fade-up" data-aos-once="true">
-        <span className="team-eyebrow">The Delineo Project</span>
-        <h1 className="team-title">Core team</h1>
+        <h1 className="team-title">The Delineo Team</h1>
         <p className="team-lede">
           A multidisciplinary group of faculty and students from Johns Hopkins
           working on community-level disease modeling.
@@ -176,17 +183,14 @@ export default function Team() {
       </div>
 
       <TeamSection team={teamData.professors} teamName="Faculty" />
-      <TeamSection team={teamData.fullstackTeam} teamName="Fullstack" />
-      <TeamSection team={teamData.algorithmsTeam} teamName="Algorithms" />
-      <TeamSection team={teamData.simulationsTeam} teamName="Simulation" />
+      <TeamSection team={teamData.currentTeam} teamName="Students" />
       <TeamSection
-        team={teamData.pastAlumn}
-        teamName="Past contributors"
+        team={teamData.pastAlumni}
+        teamName="Delineo alumni"
         compact
       />
 
       <div className="join-cta" data-aos="fade-up" data-aos-once="true">
-        <span className="team-eyebrow">Get involved</span>
         <h2 className="join-title">Join Delineo</h2>
         <p className="join-body">
           Interested in contributing? We&apos;re always looking for students,
@@ -196,7 +200,7 @@ export default function Team() {
           className="join-link"
           href="mailto:atd@hublabels.com?Subject=Delineo%20Project%20Interest"
         >
-          atd@hublabels.com →
+          atd@hublabels.com
         </a>
       </div>
     </div>

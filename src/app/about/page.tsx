@@ -59,14 +59,12 @@ export default function About() {
   return (
     <div className="about_page">
       <div className="about_header" data-aos="fade-up" data-aos-once="true">
-        <span className="about_eyebrow">About Delineo</span>
         <h1 className="about_title">
-          A research platform for modeling how disease moves through real communities.
+          A research platform for modeling how disease moves through small communities
         </h1>
         <p className="about_lede">
-          Delineo brings together algorithms, simulation, and visualization into
-          a single open-source platform for community-level infectious disease
-          research.
+          Delineo integrates unique algorithms, simulations, and visualizations into
+          a single platform for community-level infectious disease modeling
         </p>
       </div>
 

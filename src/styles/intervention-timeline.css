@@ -72,6 +72,21 @@ input.iv_timeline::-moz-range-thumb:active {
   transform: scale(1.03);
 }
 
+/* Locked seed intervention — not draggable */
+input.iv_timeline.locked::-webkit-slider-thumb {
+  background: linear-gradient(180deg, #9ca3af, #6b7280);
+  border-color: rgba(255, 255, 255, 0.5);
+  cursor: default;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+input.iv_timeline.locked::-moz-range-thumb {
+  background: linear-gradient(180deg, #9ca3af, #6b7280);
+  border-color: rgba(255, 255, 255, 0.5);
+  cursor: default;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
 /* Currently-selected intervention — render bigger and accented */
 input.iv_timeline.current::-webkit-slider-thumb {
   background: var(--color-bg-dark);
@@ -87,4 +102,15 @@ input.iv_timeline.current::-moz-range-thumb {
   border-color: var(--color-primary-blue-soft);
   width: 12px;
   height: 26px;
+}
+
+/* Locked + selected: keep the current outline but keep the gray fill */
+input.iv_timeline.locked.current::-webkit-slider-thumb {
+  background: var(--color-bg-dark);
+  border-color: #9ca3af;
+}
+
+input.iv_timeline.locked.current::-moz-range-thumb {
+  background: var(--color-bg-dark);
+  border-color: #9ca3af;
 }

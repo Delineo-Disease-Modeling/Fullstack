@@ -1,7 +1,24 @@
 'use client';
 
-import useSimSettings from '@/stores/simsettings';
+import { useLayoutEffect, useRef, useState } from 'react';
+import useSimSettings, { type Interventions } from '@/stores/simsettings';
 import { SimParameter } from './settings-components';
+
+type DisplayValues = Omit<Interventions, 'time'>;
+
+const ANIM_KEYS: (keyof DisplayValues)[] = [
+  'mask',
+  'vaccine',
+  'capacity',
+  'lockdown',
+  'selfiso'
+];
+
+const DURATION = 280;
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 export default function Interventions({ time }: { time: number }) {
   const allInterventions = useSimSettings((state) => state.interventions);
@@ -9,34 +26,87 @@ export default function Interventions({ time }: { time: number }) {
 
   const interventions = allInterventions.find((i) => i.time === time);
 
+  const [animValues, setAnimValues] = useState<DisplayValues | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const prevTimeRef = useRef(time);
+  const allInterventionsRef = useRef(allInterventions);
+  allInterventionsRef.current = allInterventions;
+
+  useLayoutEffect(() => {
+    const prevTime = prevTimeRef.current;
+    if (prevTime === time) return;
+    prevTimeRef.current = time;
+
+    const from = allInterventionsRef.current.find((i) => i.time === prevTime);
+    const to = allInterventionsRef.current.find((i) => i.time === time);
+
+    if (!from || !to) return;
+
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+
+    // Pin display to FROM values immediately — this re-renders synchronously
+    // before the browser paints, preventing any flash of the destination values.
+    setAnimValues(Object.fromEntries(ANIM_KEYS.map((k) => [k, from[k]])) as DisplayValues);
+
+    const startTs = performance.now();
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - startTs) / DURATION);
+      const eased = easeOutCubic(t);
+
+      const animated = Object.fromEntries(
+        ANIM_KEYS.map((k) => [k, from[k] + (to[k] - from[k]) * eased])
+      ) as DisplayValues;
+
+      if (t < 1) {
+        setAnimValues(animated);
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setAnimValues(null);
+        rafRef.current = null;
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [time]);
+
   if (!interventions) return null;
+
+  const display: DisplayValues = animValues ?? interventions;
 
   return (
     <div className="iv_sliders_grid">
       <SimParameter
         label={'Percent Masking'}
-        value={interventions.mask}
+        value={display.mask}
         callback={(mask) => setInterventions(time, { mask })}
       />
       <SimParameter
         label={'Percent Vaccinated'}
-        value={interventions.vaccine}
+        value={display.vaccine}
         callback={(vaccine) => setInterventions(time, { vaccine })}
       />
       <SimParameter
         label={'Maximum Facility Capacity'}
-        value={interventions.capacity}
+        value={display.capacity}
         callback={(capacity) => setInterventions(time, { capacity })}
         disabled
       />
       <SimParameter
         label={'Lockdown Probability'}
-        value={interventions.lockdown}
+        value={display.lockdown}
         callback={(lockdown) => setInterventions(time, { lockdown })}
       />
       <SimParameter
         label={'Self-Isolation Percent'}
-        value={interventions.selfiso}
+        value={display.selfiso}
         callback={(selfiso) => setInterventions(time, { selfiso })}
         disabled
       />

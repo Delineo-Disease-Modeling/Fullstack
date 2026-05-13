@@ -54,7 +54,7 @@ export default function ZoneActions({ zone, setZone, locations, setLocations }: 
               <p className="text-sm font-semibold">
                 Delete your {myZones.length} zone{myZones.length === 1 ? '' : 's'}?
               </p>
-              <p className="text-xs text-gray-600">This action cannot be undone.</p>
+              <p className="text-xs text-(--color-text-muted)">This action cannot be undone.</p>
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"

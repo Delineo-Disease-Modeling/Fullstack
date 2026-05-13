@@ -66,11 +66,12 @@ export default function InterventionTimeline() {
 
   const moveSelectedThumb = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isTimelineThumb(e.target)) return;
+    if (curtime === values[0]) return; // seed is locked
     moveIntervention(curtime, getTrackTime(e.clientX, e.currentTarget));
   };
 
   const deleteThumb = (i: number) => {
-    if (values[i] === 0 || values.length === 1) return;
+    if (i === 0 || values.length === 1) return; // index 0 is the locked seed
     const next = [...values].filter((_, idx) => idx !== i);
     deleteInterventions(values[i]);
     setValues(next);
@@ -102,14 +103,15 @@ export default function InterventionTimeline() {
         <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-1.5 bg-(--color-border-subtle) rounded-full outline-0" />
         {values.map((value, i) => (
           <input
-            key={value}
-            className={`iv_timeline absolute top-1/2 -translate-y-1/2 left-0 w-full ${curtime === value ? 'current ' : ''}`}
+            key={i}
+            className={`iv_timeline absolute top-1/2 -translate-y-1/2 left-0 w-full ${curtime === value ? 'current ' : ''}${i === 0 ? 'locked' : ''}`}
             type="range"
             min={0}
             max={hours}
             value={value}
-            aria-label={`Intervention ${i + 1} hour`}
+            aria-label={i === 0 ? 'Seed intervention (locked at hour 1)' : `Intervention ${i + 1} hour`}
             onChange={(e) => {
+              if (i === 0) return; // seed is locked
               const nextTime = +e.target.value;
               if (values.includes(nextTime) && nextTime !== value) return;
               setInterventions(values[i], { time: nextTime });
@@ -121,7 +123,7 @@ export default function InterventionTimeline() {
             }
             onContextMenu={(e) => {
               e.preventDefault();
-              deleteThumb(i);
+              if (i !== 0) deleteThumb(i);
             }}
           />
         ))}
@@ -142,7 +144,7 @@ export default function InterventionTimeline() {
             type="button"
             className="iv_control_btn iv_control_btn--danger"
             onClick={() => deleteThumb(values.indexOf(curtime))}
-            disabled={values.length <= 1}
+            disabled={values.length <= 1 || values.indexOf(curtime) === 0}
           >
             Delete
           </button>
@@ -173,7 +175,7 @@ export default function InterventionTimeline() {
 
       <div className="iv_intervention_label">
         <span className="iv_intervention_index">
-          Intervention #{values.indexOf(curtime) + 1}
+          {values.indexOf(curtime) === 0 ? 'Seed Intervention' : `Intervention #${values.indexOf(curtime) + 1}`}
         </span>
         <span className="iv_intervention_hour">
           Hour {curtime.toString().padStart(3, '0')}

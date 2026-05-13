@@ -109,7 +109,7 @@ export function SimText({
       <div className="simset_fileup_label">{label}</div>
       <input
         type="text"
-        className="max-w-72 border border-(--color-border-dark) rounded-md px-2 py-1 bg-white"
+        className="max-w-72 border border-(--color-border-dark) rounded-md px-2 py-1 bg-(--color-bg-ivory)"
         value={value}
         placeholder={placeholder}
         onChange={(e) => callback(e.target.value)}
@@ -135,7 +135,7 @@ export function SimSelect({
     <div className="simset_fileup">
       <div className="simset_fileup_label">{label}</div>
       <select
-        className="max-w-72 border border-(--color-border-dark) rounded-md px-2 py-1 bg-white"
+        className="max-w-72 border border-(--color-border-dark) rounded-md px-2 py-1 bg-(--color-bg-ivory)"
         value={value}
         onChange={(e) => callback(e.target.value)}
       >

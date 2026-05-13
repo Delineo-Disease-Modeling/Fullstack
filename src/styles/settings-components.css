@@ -36,9 +36,9 @@ div.simset_slider_label {
 }
 
 .simset_slider_label_value {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--color-text-main);
+  color: var(--color-primary-blue);
   font-variant-numeric: tabular-nums;
 }
 
@@ -85,7 +85,7 @@ div.simset_slider_label {
   height: 20px;
   border: 1.5px solid rgba(47, 53, 64, 0.25);
   border-radius: 5px;
-  background: white;
+  background: var(--color-bg-ivory);
   cursor: pointer;
   transition: background-color 160ms ease, border-color 160ms ease;
   flex-shrink: 0;
@@ -124,7 +124,7 @@ div.simset_slider_label {
 .simset_checkbox_label {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-text-main);
+  color: var(--color-text-muted);
 }
 
 .simset_checkbox_description {

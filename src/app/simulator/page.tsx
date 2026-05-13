@@ -211,8 +211,7 @@ export default function Simulator() {
   return (
     <div className="sim_container">
       <div className="sim_header">
-        <span className="sim_eyebrow">Simulator</span>
-        <h1 className="sim_title">Run a simulation</h1>
+      <h1 className="sim_title">Run a simulation</h1>
         <p className="sim_lede">
           Pick or generate a Convenience Zone, tune the disease and
           intervention parameters, then run the simulation.
