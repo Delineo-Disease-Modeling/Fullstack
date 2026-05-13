@@ -13,8 +13,25 @@ const postSchema = z.object({
   start_date: z.string().datetime(),
   length: z.number().nonnegative(),
   size: z.number().nonnegative(),
-  user_id: z.string().min(1).optional()
+  user_id: z.string().min(1).nullable().optional()
 });
+
+const ANONYMOUS_ZONE_USER_EMAIL = 'anonymous-zones@delineo.local';
+
+async function getAnonymousZoneUserId() {
+  const user = await prisma.user.upsert({
+    where: { email: ANONYMOUS_ZONE_USER_EMAIL },
+    update: {},
+    create: {
+      name: 'Anonymous Zone User',
+      email: ANONYMOUS_ZONE_USER_EMAIL,
+      organization: 'Delineo'
+    },
+    select: { id: true }
+  });
+
+  return user.id;
+}
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -67,18 +84,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user_id = sessionUserId ?? bodyUserId;
+    const requestedUserId = sessionUserId ?? bodyUserId ?? null;
 
-    if (!user_id) {
-      return Response.json(
-        { message: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    if (!sessionUserId) {
+    if (requestedUserId && !sessionUserId) {
       const existingUser = await prisma.user.findUnique({
-        where: { id: user_id },
+        where: { id: requestedUserId },
         select: { id: true }
       });
 
@@ -92,6 +102,8 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    const user_id = requestedUserId ?? (await getAnonymousZoneUserId());
 
     const zone = await prisma.convenienceZone.create({
       data: {

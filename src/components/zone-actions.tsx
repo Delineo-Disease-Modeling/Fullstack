@@ -24,11 +24,9 @@ export default function ZoneActions({ zone, setZone, locations, setLocations }: 
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState('');
 
-  if (!user) {
-    return null;
-  }
-
-  const myZones = locations.filter((loc) => loc.user_id === user.id);
+  const myZones = user
+    ? locations.filter((loc) => loc.user_id === user.id)
+    : [];
 
   return (
     <div className="flex gap-2 items-start justify-center">
@@ -39,7 +37,7 @@ export default function ZoneActions({ zone, setZone, locations, setLocations }: 
       >
         + Generate Zone
       </Button>
-      {myZones.length > 0 && (
+      {user && myZones.length > 0 && (
         <div className="relative">
           <Button
             type="button"

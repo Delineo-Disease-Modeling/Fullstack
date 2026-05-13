@@ -38,7 +38,8 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
         if (!active) return;
 
         if (!res.ok) {
-          setLocations([]);
+          const currentZone = zoneRef.current;
+          setLocations(currentZone ? [currentZone] : []);
           setLoadError(res.status === 401 ? '' : `Failed to load zones (${res.status}).`);
           setLoading(false);
           return;
@@ -162,7 +163,7 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
         </div>
       </div>
 
-      {zone && zone.description && (
+      {zone?.description && (
         <div className="sim_zone_description">
           {zone.description}
         </div>

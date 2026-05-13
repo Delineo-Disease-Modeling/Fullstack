@@ -13,7 +13,7 @@ import {
   normalizeCbgId
 } from '@/lib/cz-geo';
 import { getStateFromCBG } from '@/lib/simulation-zone';
-import type { ConvenienceZone } from '@/stores/simsettings';
+import useSimSettings, { type ConvenienceZone } from '@/stores/simsettings';
 import '@/styles/cz-generation.css';
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
@@ -492,12 +492,11 @@ function getPayloadErrorMessage(
 
 async function fetchZoneById(zoneId: number): Promise<ConvenienceZone | null> {
   try {
-    const res = await fetch('/api/convenience-zones');
+    const res = await fetch(`/api/convenience-zones/${zoneId}`);
     if (!res.ok) return null;
     const json = await res.json().catch(() => ({}));
-    const zones = Array.isArray(json?.data) ? json.data : [];
-    const match = zones.find((z: ConvenienceZone) => z.id === zoneId);
-    return match?.ready ? (match as ConvenienceZone) : null;
+    const zone = json?.data as ConvenienceZone | undefined;
+    return zone?.ready ? zone : null;
   } catch {
     return null;
   }
@@ -567,6 +566,7 @@ export default function CZGeneration() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const user = session?.user;
+  const setSettings = useSimSettings((state) => state.setSettings);
   const isResolvingMapClickRef = useRef(false);
   const attemptedTraceGeoJsonFetchRef = useRef(new Set<string>());
 
@@ -986,12 +986,6 @@ export default function CZGeneration() {
     setResolvedSeedLookup(null);
     setSeedResolveError('');
   }, []);
-
-  useEffect(() => {
-    if (!user && !isPending) {
-      router.replace('/simulator');
-    }
-  }, [isPending, router, user]);
 
   const seedStateCbg = setupSeedCbg || seedCBG || selectedCBGs[0] || '';
   const detectedStateAbbr = getStateFromCBG(
@@ -2163,13 +2157,8 @@ export default function CZGeneration() {
     }
 
     if (isPending) {
-      setError('Please wait for your login session to finish loading.');
-      return;
-    }
-
-    if (!user?.id) {
       setError(
-        'Please log in before finalizing and generating a convenience zone.'
+        'Please wait while we check whether this zone should be saved to your account.'
       );
       return;
     }
@@ -2275,20 +2264,22 @@ export default function CZGeneration() {
         setDescription(descriptionToSave);
       }
 
+      const finalizePayload = {
+        name: cityName,
+        description: descriptionToSave,
+        cbg_list: selectedCBGs,
+        start_date: new Date(`${startDate}T00:00:00`).toISOString(),
+        length: lengthHours,
+        latitude: mapCenter?.[0] || 0,
+        longitude: mapCenter?.[1] || 0,
+        use_test_data: useTestData,
+        ...(user?.id ? { user_id: user.id } : {})
+      };
+
       const resp = await fetch(algUrl('finalize-cz'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cityName,
-          description: descriptionToSave,
-          cbg_list: selectedCBGs,
-          start_date: new Date(`${startDate}T00:00:00`).toISOString(),
-          length: lengthHours,
-          latitude: mapCenter?.[0] || 0,
-          longitude: mapCenter?.[1] || 0,
-          user_id: user?.id,
-          use_test_data: useTestData
-        })
+        body: JSON.stringify(finalizePayload)
       });
       const data = await resp.json();
       if (!resp.ok || !data?.id) {
@@ -2300,11 +2291,23 @@ export default function CZGeneration() {
 
       const zoneId: number = data.id;
       setFinalizeProgress(15);
-      setFinalizeStatusMessage('Zone saved. Generating movement patterns...');
+      setFinalizeStatusMessage(
+        user?.id
+          ? 'Zone saved. Generating movement patterns...'
+          : 'Zone generated. Generating movement patterns...'
+      );
 
-      await waitForZoneReady(zoneId, (pct) => {
+      const readyZone = await waitForZoneReady(zoneId, (pct) => {
         setFinalizeProgress(pct);
       });
+
+      if (readyZone) {
+        setSettings({
+          zone: readyZone,
+          hours: readyZone.length,
+          sim_id: null
+        });
+      }
 
       setFinalizeProgress(100);
       setFinalizeStatusMessage('Generation complete. Opening simulator...');
@@ -2377,10 +2380,6 @@ export default function CZGeneration() {
 
   if (isPending) {
     return <div className="text-white text-center mt-20">Loading...</div>;
-  }
-
-  if (!user) {
-    return null;
   }
 
   return (
