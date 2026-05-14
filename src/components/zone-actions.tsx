@@ -30,13 +30,15 @@ export default function ZoneActions({ zone, setZone, locations, setLocations }: 
 
   return (
     <div className="flex gap-2 items-start justify-center">
-      <Button
-        type="button"
-        className="w-42 p-2!"
-        onClick={() => router.push('/cz-generation')}
-      >
-        + Generate Zone
-      </Button>
+      {user && (
+        <Button
+          type="button"
+          className="w-42 p-2!"
+          onClick={() => router.push('/cz-generation')}
+        >
+          + Generate Zone
+        </Button>
+      )}
       {user && myZones.length > 0 && (
         <div className="relative">
           <Button

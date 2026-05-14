@@ -47,15 +47,6 @@ div.navbuffer {
   height: 60px;
 }
 
-@media screen and (max-width: 800px) {
-  nav {
-    padding: 0 16px;
-  }
-  .nav-brand-name {
-    display: none;
-  }
-}
-
 img {
   display: inline-block;
   vertical-align: middle;
@@ -109,6 +100,139 @@ a.link.active::after {
   border-radius: 2px;
 }
 
+/* ── Hamburger button ── */
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 160ms ease;
+}
+
+.hamburger:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.hamburger-bar {
+  display: block;
+  width: 20px;
+  height: 1.5px;
+  background-color: rgba(245, 245, 240, 0.78);
+  border-radius: 2px;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.hamburger.open .hamburger-bar:nth-child(1) {
+  transform: translateY(6.5px) rotate(45deg);
+}
+
+.hamburger.open .hamburger-bar:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.hamburger.open .hamburger-bar:nth-child(3) {
+  transform: translateY(-6.5px) rotate(-45deg);
+}
+
+/* ── Mobile menu ── */
+
+@media screen and (max-width: 640px) {
+  nav {
+    padding: 0 16px;
+  }
+
+  .nav-links-desktop {
+    display: none;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+}
+
+.mobile-menu {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  background-color: rgba(27, 31, 34, 0.97);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 12px 14px;
+  animation: mobile-menu-fade 150ms ease;
+}
+
+@keyframes mobile-menu-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-menu.closing {
+  animation: mobile-menu-fade-out 150ms ease forwards;
+}
+
+@keyframes mobile-menu-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.mobile-menu-list {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.mobile-menu a.link,
+.mobile-menu button.link {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.mobile-user-section {
+  padding: 8px 14px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
+}
+
+.mobile-logout-btn {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-accent-red-light);
+  background: none;
+  border: none;
+  padding: 8px 0 4px;
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+
+.mobile-logout-btn:hover {
+  opacity: 0.75;
+}
+
+/* ── User dropdown (desktop) ── */
+
 .user-dropdown-container {
   position: relative;
 }
@@ -117,16 +241,17 @@ a.link.active::after {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 200px;
-  background: var(--color-bg-dark);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  min-width: 180px;
+  background: var(--color-bg-dark-soft);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 6px;
   z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.user-dropdown-info {
+  padding: 8px 10px;
 }
 
 .user-dropdown-name {
@@ -137,10 +262,36 @@ a.link.active::after {
 }
 
 .user-dropdown-org {
-  font-size: 11px;
-  color: var(--color-text-light);
-  opacity: 0.6;
+  font-size: 11.5px;
+  color: rgba(245, 245, 240, 0.5);
   margin: 0;
+  margin-top: 2px;
+}
+
+.user-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 4px 0;
+}
+
+.user-dropdown-logout {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(245, 245, 240, 0.7);
+  background: none;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.user-dropdown-logout:hover {
+  color: var(--color-accent-red-light);
+  background-color: rgba(232, 72, 90, 0.1);
 }
 
 button.modal {

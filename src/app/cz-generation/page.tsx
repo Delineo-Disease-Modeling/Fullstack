@@ -3067,7 +3067,7 @@ coupling =
         {hasGenerated ? (
           <div className="w-full flex flex-col gap-4">
             <div className="flex gap-4 w-full flex-wrap 2xl:flex-nowrap">
-              <div className="h-[calc(100vh-13rem)] min-h-[34rem] max-h-[48rem] relative flex-1 min-w-[44rem]">
+              <div className="h-[50vh] min-h-80 max-h-140 lg:h-[calc(100vh-13rem)] lg:min-h-136 lg:max-h-192 relative flex-1 min-w-0 w-full lg:min-w-176 rounded-lg border border-[#70B4D4] overflow-hidden">
                 {cbgGeoJSON ? (
                   <CBGMap
                     cbgData={cbgGeoJSON}
@@ -4112,7 +4112,7 @@ coupling =
           </div>
         ) : (
           <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-stretch">
-            <div className="h-[calc(100vh-10rem)] min-h-[36rem] lg:h-[calc(100vh-6rem)] lg:min-h-[42rem] w-full lg:min-w-0 lg:flex-1">
+            <div className="h-[50vh] min-h-80 max-h-112 lg:h-[calc(100vh-6rem)] lg:min-h-168 lg:max-h-none w-full lg:min-w-0 lg:flex-1 rounded-lg border border-[#70B4D4] overflow-hidden">
               <InteractiveMap
                 onLocationSelect={(coords) => {
                   resetSeedPreview();

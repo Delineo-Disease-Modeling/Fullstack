@@ -226,6 +226,7 @@ export default function Simulator() {
             </>
           ) : (
             <>
+              Pick a Convenience Zone and click &lsquo;Simulate&rsquo; to begin.{' '}
               <button
                 type="button"
                 className="instruction-banner-link"
@@ -233,8 +234,7 @@ export default function Simulator() {
               >
                 Login
               </button>{' '}
-              to generate a Convenience Zone or pick one that&apos;s already
-              generated, then click &lsquo;Simulate&rsquo; to begin.
+              to generate your own zone.
             </>
           )}
         </InstructionBanner>

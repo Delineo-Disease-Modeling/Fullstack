@@ -37,13 +37,9 @@ export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   const user_id = session?.user?.id;
 
-  if (!user_id) {
-    return Response.json({ message: 'Authentication required' }, { status: 401 });
-  }
-
-  const zones = await prisma.convenienceZone.findMany({
-    where: { user_id }
-  });
+  const zones = await prisma.convenienceZone.findMany(
+    user_id ? { where: { user_id } } : undefined
+  );
 
   return Response.json({
     data: zones.map((zone) => ({

@@ -5,8 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import EditDeleteActions from '@/components/edit-delete-actions';
 import InstructionBanner from '@/components/instruction-banner';
+import LoginModal from '@/components/login-modal';
 import OutputGraphs from '@/components/outputgraphs';
 import PersonPathPanel from '@/components/person-path-panel';
+import { useSession } from '@/lib/auth-client';
 import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
@@ -34,11 +36,15 @@ export default function SimulatorRun() {
   const setHotspots = useMapData((state) => state.setHotspots);
   const setRunName = useMapData((state) => state.setName);
 
+  const { data: session } = useSession();
+  const user = session?.user;
+
   const [selectedZone, setSelectedZone] = useState<typeof zone>(null);
   const [selectedLoc, setSelectedLoc] = useState<SelectedLoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   useEffect(() => {
     if (loading) {
@@ -238,43 +244,53 @@ export default function SimulatorRun() {
               <h3 className="text-md font-semibold text-(--color-text-dark)">
                 {runName || 'Untitled Run'}
               </h3>
-              <EditDeleteActions
-                align="right"
-                fields={[{ key: 'name', label: 'Name' }]}
-                itemName={runName || 'Untitled Run'}
-                getInitialValues={() => ({ name: runName || '' })}
-                onSave={async (values) => {
-                  const res = await fetch(`/api/simdata/${sim_id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: values.name.trim() }),
-                  });
+              {user ? (
+                <EditDeleteActions
+                  align="right"
+                  fields={[{ key: 'name', label: 'Name' }]}
+                  itemName={runName || 'Untitled Run'}
+                  getInitialValues={() => ({ name: runName || '' })}
+                  onSave={async (values) => {
+                    const res = await fetch(`/api/simdata/${sim_id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: values.name.trim() }),
+                    });
 
-                  if (res.ok) {
-                    const json = await res.json();
-                    if (json.data?.name) setRunName(json.data.name);
-                    return true;
-                  }
-                  
-                  return false;
-                }}
-                onDelete={async () => {
-                  const res = await fetch(`/api/simdata/${sim_id}`, {
-                    method: 'DELETE',
-                  });
+                    if (res.ok) {
+                      const json = await res.json();
+                      if (json.data?.name) setRunName(json.data.name);
+                      return true;
+                    }
 
-                  if (!res.ok) {
                     return false;
-                  }
+                  }}
+                  onDelete={async () => {
+                    const res = await fetch(`/api/simdata/${sim_id}`, {
+                      method: 'DELETE',
+                    });
 
-                  setSimData(null);
-                  setPapData(null);
-                  setRunName('');
-                  setSettings({ sim_id: null });
-                  router.push('/simulator');
-                  return true;
-                }}
-              />
+                    if (!res.ok) {
+                      return false;
+                    }
+
+                    setSimData(null);
+                    setPapData(null);
+                    setRunName('');
+                    setSettings({ sim_id: null });
+                    router.push('/simulator');
+                    return true;
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="text-xs text-(--color-text-muted) hover:underline cursor-pointer"
+                  onClick={() => setLoginOpen(true)}
+                >
+                  Login to edit or delete this run
+                </button>
+              )}
             </span>
           </div>
           <ModelMap
@@ -294,6 +310,10 @@ export default function SimulatorRun() {
       >
         Return
       </Button>
+      <LoginModal
+        isOpen={loginOpen}
+        onRequestClose={() => setLoginOpen(false)}
+      />
     </div>
   );
 }
