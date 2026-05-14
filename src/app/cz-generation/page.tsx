@@ -238,6 +238,8 @@ type GuidedSelectionStyle = {
   lineColor: string;
 };
 
+type SeedEditAction = 'add' | 'remove';
+
 type ClusteringPreviewResponse = {
   cluster?: string[];
   clustering_id?: number | string;
@@ -361,6 +363,40 @@ function dedupeCbgList(values: string[]) {
 function sameStringArray(a: string[], b: string[]) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
+
+function filterGeoJsonByCbgs(
+  geoJson: GeoJSONData | null | undefined,
+  cbgs: string[]
+) {
+  if (!geoJson?.features?.length) {
+    return null;
+  }
+
+  const cbgSet = new Set(
+    cbgs.map((cbg) => normalizeCbgId(cbg)).filter(Boolean)
+  );
+  const features = geoJson.features.filter((feature) =>
+    cbgSet.has(getFeatureCbgId(feature))
+  );
+
+  if (!features.length) {
+    return null;
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features
+  } satisfies GeoJSONData;
+}
+
+function getCbgIdsFromGeoJson(geoJson: GeoJSONData | null | undefined) {
+  return dedupeCbgList(
+    (geoJson?.features ?? []).map((feature) => getFeatureCbgId(feature))
+  );
+}
+
+const CBG_GEOJSON_REQUEST_CHUNK_SIZE = 75;
+const INITIAL_SEED_EDIT_NEIGHBOR_RINGS = 2;
 
 const GUIDED_REGION_PALETTE: GuidedSelectionStyle[] = [
   { fillColor: '#f59e0b', lineColor: '#b45309' },
@@ -588,9 +624,22 @@ export default function CZGeneration() {
   const [setupSeedCbg, setSetupSeedCbg] = useState('');
   const [setupSeedLabel, setSetupSeedLabel] = useState('');
   const [setupSeedCount, setSetupSeedCount] = useState(0);
+  const [setupSeedCbgs, setSetupSeedCbgs] = useState<string[]>([]);
+  const [resolvedSetupSeedCbgs, setResolvedSetupSeedCbgs] = useState<string[]>(
+    []
+  );
   const [setupSeedGeoJSON, setSetupSeedGeoJSON] = useState<GeoJSONData | null>(
     null
   );
+  const [seedEditGeoJSON, setSeedEditGeoJSON] = useState<GeoJSONData | null>(
+    null
+  );
+  const [seedEditMode, setSeedEditMode] = useState(false);
+  const [seedEditAction, setSeedEditAction] = useState<SeedEditAction>('add');
+  const [seedEditLoading, setSeedEditLoading] = useState(false);
+  const [seedEditError, setSeedEditError] = useState('');
+  const [seedEditStartCbgs, setSeedEditStartCbgs] = useState<string[]>([]);
+  const [seedEditNeighborRings, setSeedEditNeighborRings] = useState(0);
   const [setupResolvedCityName, setSetupResolvedCityName] = useState('');
   const [resolvedSeedLookup, setResolvedSeedLookup] =
     useState<ResolvedSeedLookup | null>(null);
@@ -660,6 +709,25 @@ export default function CZGeneration() {
     String(location ?? '')
       .trim()
       .toUpperCase() === 'TEST';
+  const seedAdjustmentSummary = useMemo(() => {
+    const resolvedSet = new Set(resolvedSetupSeedCbgs);
+    const currentSet = new Set(setupSeedCbgs);
+    const addedCount = setupSeedCbgs.filter(
+      (cbg) => !resolvedSet.has(cbg)
+    ).length;
+    const removedCount = resolvedSetupSeedCbgs.filter(
+      (cbg) => !currentSet.has(cbg)
+    ).length;
+
+    return {
+      addedCount,
+      removedCount,
+      hasChanges: addedCount > 0 || removedCount > 0
+    };
+  }, [resolvedSetupSeedCbgs, setupSeedCbgs]);
+  const activeSetupSeedGeoJSON = seedEditMode
+    ? seedEditGeoJSON || setupSeedGeoJSON
+    : setupSeedGeoJSON;
   const traceSteps = growthTrace?.steps ?? [];
   const mobilityPruneMetadata =
     hasGenerated &&
@@ -981,13 +1049,23 @@ export default function CZGeneration() {
     setSetupSeedCbg('');
     setSetupSeedLabel('');
     setSetupSeedCount(0);
+    setSetupSeedCbgs([]);
+    setResolvedSetupSeedCbgs([]);
     setSetupSeedGeoJSON(null);
+    setSeedEditGeoJSON(null);
+    setSeedEditMode(false);
+    setSeedEditAction('add');
+    setSeedEditLoading(false);
+    setSeedEditError('');
+    setSeedEditStartCbgs([]);
+    setSeedEditNeighborRings(0);
     setSetupResolvedCityName('');
     setResolvedSeedLookup(null);
     setSeedResolveError('');
   }, []);
 
-  const seedStateCbg = setupSeedCbg || seedCBG || selectedCBGs[0] || '';
+  const seedStateCbg =
+    setupSeedCbg || setupSeedCbgs[0] || seedCBG || selectedCBGs[0] || '';
   const detectedStateAbbr = getStateFromCBG(
     seedStateCbg ? [seedStateCbg] : null
   );
@@ -1617,6 +1695,298 @@ export default function CZGeneration() {
     [algUrl]
   );
 
+  const loadSeedGeoJson = useCallback(
+    async (seedCbgs: string[], includeNeighbors: boolean) => {
+      const normalizedSeedCbgs = dedupeCbgList(seedCbgs);
+      if (!normalizedSeedCbgs.length) {
+        throw new Error('Select at least one seed CBG.');
+      }
+
+      let mergedGeoJson: GeoJSONData | null = null;
+      for (
+        let index = 0;
+        index < normalizedSeedCbgs.length;
+        index += CBG_GEOJSON_REQUEST_CHUNK_SIZE
+      ) {
+        const chunk = normalizedSeedCbgs.slice(
+          index,
+          index + CBG_GEOJSON_REQUEST_CHUNK_SIZE
+        );
+        const resp = await fetch(
+          `${algUrl('cbg-geojson')}?cbgs=${encodeURIComponent(
+            chunk.join(',')
+          )}&include_neighbors=${includeNeighbors ? 'true' : 'false'}`
+        );
+        const seedGeoJson = await resp.json().catch(() => null);
+        if (!resp.ok || !seedGeoJson?.features?.length) {
+          throw new Error(
+            seedGeoJson?.message ||
+              'Resolved the seed CBGs, but could not load their map boundary.'
+          );
+        }
+
+        mergedGeoJson = mergeGeoJsonFeatures(
+          mergedGeoJson,
+          seedGeoJson as GeoJSONData
+        );
+      }
+
+      if (!mergedGeoJson?.features?.length) {
+        throw new Error(
+          'Resolved the seed CBGs, but could not load their map boundary.'
+        );
+      }
+
+      return mergedGeoJson;
+    },
+    [algUrl]
+  );
+
+  const loadSeedEditGeoJson = useCallback(
+    async (seedCbgs: string[], neighborRings: number) => {
+      const rings = Math.max(1, Math.floor(neighborRings));
+      let queryCbgs = dedupeCbgList(seedCbgs);
+      let mergedGeoJson: GeoJSONData | null = null;
+
+      for (let ringIndex = 0; ringIndex < rings; ringIndex += 1) {
+        const ringGeoJson = await loadSeedGeoJson(queryCbgs, true);
+        const nextMergedGeoJson = mergeGeoJsonFeatures(
+          mergedGeoJson,
+          ringGeoJson
+        );
+        const nextQueryCbgs = getCbgIdsFromGeoJson(nextMergedGeoJson);
+
+        mergedGeoJson = nextMergedGeoJson;
+        if (sameStringArray(nextQueryCbgs, queryCbgs)) {
+          break;
+        }
+        queryCbgs = nextQueryCbgs;
+      }
+
+      return mergeGeoJsonFeatures(setupSeedGeoJSON, mergedGeoJson);
+    },
+    [loadSeedGeoJson, setupSeedGeoJSON]
+  );
+
+  const refreshSeedEditGeoJson = useCallback(
+    async (seedCbgs: string[], neighborRings: number) => {
+      const editGeoJson = await loadSeedEditGeoJson(seedCbgs, neighborRings);
+      setSeedEditGeoJSON(editGeoJson);
+      setSeedEditNeighborRings(
+        Math.max(
+          1,
+          Math.floor(neighborRings || INITIAL_SEED_EDIT_NEIGHBOR_RINGS)
+        )
+      );
+    },
+    [loadSeedEditGeoJson]
+  );
+
+  const commitSetupSeedCbgs = useCallback(
+    (nextSeedCbgs: string[]) => {
+      const normalizedSeedCbgs = dedupeCbgList(nextSeedCbgs);
+      if (!normalizedSeedCbgs.length) {
+        setSeedEditError('Keep at least one CBG in the seed area.');
+        return null;
+      }
+
+      const currentAnchor = normalizeCbgId(setupSeedCbg);
+      const nextAnchor = normalizedSeedCbgs.includes(currentAnchor)
+        ? currentAnchor
+        : normalizedSeedCbgs[0];
+      const sourceGeoJson = seedEditGeoJSON || setupSeedGeoJSON;
+      const selectedGeoJson = filterGeoJsonByCbgs(
+        sourceGeoJson,
+        normalizedSeedCbgs
+      );
+
+      setSetupSeedCbgs(normalizedSeedCbgs);
+      setSetupSeedCount(normalizedSeedCbgs.length);
+      setSetupSeedCbg(nextAnchor);
+      setSeedEditError('');
+      if (selectedGeoJson) {
+        setSetupSeedGeoJSON(selectedGeoJson);
+      }
+      setResolvedSeedLookup((prev) =>
+        prev
+          ? {
+              ...prev,
+              cbg: nextAnchor,
+              seedCbgs: normalizedSeedCbgs
+            }
+          : prev
+      );
+
+      return normalizedSeedCbgs;
+    },
+    [seedEditGeoJSON, setupSeedCbg, setupSeedGeoJSON]
+  );
+
+  const beginSeedEdit = useCallback(async () => {
+    if (!setupSeedCbgs.length) {
+      return;
+    }
+
+    setSeedEditMode(true);
+    setSeedEditAction('add');
+    setSeedEditStartCbgs(setupSeedCbgs);
+    setSeedEditError('');
+    setSeedEditLoading(true);
+    try {
+      await refreshSeedEditGeoJson(
+        setupSeedCbgs,
+        INITIAL_SEED_EDIT_NEIGHBOR_RINGS
+      );
+    } catch (err) {
+      setSeedEditError(
+        err instanceof Error
+          ? err.message
+          : 'Could not load nearby CBGs for seed adjustment.'
+      );
+    } finally {
+      setSeedEditLoading(false);
+    }
+  }, [refreshSeedEditGeoJson, setupSeedCbgs]);
+
+  const updateEditableSeedSelection = useCallback(
+    async (cbgIds: string[]) => {
+      const normalizedClickedCbgs = dedupeCbgList(cbgIds);
+      if (!normalizedClickedCbgs.length) {
+        return;
+      }
+
+      const clickedSet = new Set(normalizedClickedCbgs);
+      const currentSet = new Set(setupSeedCbgs);
+      const nextSeedCbgs =
+        seedEditAction === 'add'
+          ? dedupeCbgList([...setupSeedCbgs, ...normalizedClickedCbgs])
+          : setupSeedCbgs.filter((cbg) => !clickedSet.has(cbg));
+
+      if (seedEditAction === 'add' && nextSeedCbgs.length === currentSet.size) {
+        return;
+      }
+
+      if (seedEditAction === 'remove' && nextSeedCbgs.length === 0) {
+        setSeedEditError('Keep at least one CBG in the seed area.');
+        return;
+      }
+
+      const committedSeedCbgs = commitSetupSeedCbgs(nextSeedCbgs);
+      if (
+        !committedSeedCbgs ||
+        sameStringArray(committedSeedCbgs, setupSeedCbgs)
+      ) {
+        return;
+      }
+
+      setSeedEditLoading(true);
+      try {
+        await refreshSeedEditGeoJson(
+          committedSeedCbgs,
+          seedEditNeighborRings || INITIAL_SEED_EDIT_NEIGHBOR_RINGS
+        );
+      } catch (err) {
+        setSeedEditError(
+          err instanceof Error
+            ? err.message
+            : 'Could not refresh nearby CBGs after updating the seed area.'
+        );
+      } finally {
+        setSeedEditLoading(false);
+      }
+    },
+    [
+      commitSetupSeedCbgs,
+      refreshSeedEditGeoJson,
+      seedEditAction,
+      seedEditNeighborRings,
+      setupSeedCbgs
+    ]
+  );
+
+  const finishSeedEdit = useCallback(() => {
+    setSeedEditMode(false);
+    setSeedEditGeoJSON(null);
+    setSeedEditStartCbgs([]);
+    setSeedEditError('');
+  }, []);
+
+  const cancelSeedEdit = useCallback(() => {
+    const committedSeedCbgs = commitSetupSeedCbgs(seedEditStartCbgs);
+    if (committedSeedCbgs) {
+      setSeedEditMode(false);
+      setSeedEditGeoJSON(null);
+      setSeedEditStartCbgs([]);
+      setSeedEditError('');
+    }
+  }, [commitSetupSeedCbgs, seedEditStartCbgs]);
+
+  const resetAdjustedSeed = useCallback(async () => {
+    const committedSeedCbgs = commitSetupSeedCbgs(resolvedSetupSeedCbgs);
+    if (!committedSeedCbgs) {
+      return;
+    }
+
+    setSeedEditLoading(true);
+    try {
+      if (seedEditMode) {
+        await refreshSeedEditGeoJson(
+          committedSeedCbgs,
+          seedEditNeighborRings || INITIAL_SEED_EDIT_NEIGHBOR_RINGS
+        );
+      } else {
+        const seedGeoJson = await loadSeedGeoJson(committedSeedCbgs, false);
+        setSetupSeedGeoJSON(seedGeoJson);
+      }
+      setSeedEditError('');
+    } catch (err) {
+      setSeedEditError(
+        err instanceof Error
+          ? err.message
+          : 'Could not reset the seed area boundary.'
+      );
+    } finally {
+      setSeedEditLoading(false);
+    }
+  }, [
+    commitSetupSeedCbgs,
+    loadSeedGeoJson,
+    refreshSeedEditGeoJson,
+    resolvedSetupSeedCbgs,
+    seedEditNeighborRings,
+    seedEditMode
+  ]);
+
+  const showMoreSeedEditNeighbors = useCallback(async () => {
+    if (!seedEditMode || !setupSeedCbgs.length) {
+      return;
+    }
+
+    const nextNeighborRings = Math.max(
+      seedEditNeighborRings + 1,
+      INITIAL_SEED_EDIT_NEIGHBOR_RINGS + 1
+    );
+
+    setSeedEditLoading(true);
+    setSeedEditError('');
+    try {
+      await refreshSeedEditGeoJson(setupSeedCbgs, nextNeighborRings);
+    } catch (err) {
+      setSeedEditError(
+        err instanceof Error
+          ? err.message
+          : 'Could not load a wider nearby area.'
+      );
+    } finally {
+      setSeedEditLoading(false);
+    }
+  }, [
+    refreshSeedEditGeoJson,
+    seedEditMode,
+    seedEditNeighborRings,
+    setupSeedCbgs
+  ]);
+
   const resolveSeedPreview = async () => {
     const rawLocationInput = String(location ?? '').trim();
     if (!rawLocationInput) {
@@ -1641,29 +2011,29 @@ export default function CZGeneration() {
         : coreCbg
           ? [coreCbg]
           : [];
+      const normalizedSeedCbgs = dedupeCbgList(
+        seedCbgs.length ? seedCbgs : coreCbg ? [coreCbg] : []
+      );
       if (!coreCbg) {
         throw new Error(
           'Could not resolve a seed CBG. Try a 5-digit ZIP code such as 21201.'
         );
       }
 
-      const resp = await fetch(
-        `${algUrl('cbg-geojson')}?cbgs=${encodeURIComponent(
-          seedCbgs.join(',')
-        )}&include_neighbors=false`
-      );
-      const seedGeoJson = await resp.json();
-      if (!resp.ok || !seedGeoJson?.features?.length) {
-        throw new Error(
-          seedGeoJson?.message ||
-            'Resolved the seed CBG, but could not load its map boundary.'
-        );
-      }
+      const seedGeoJson = await loadSeedGeoJson(normalizedSeedCbgs, false);
 
       setSetupSeedCbg(coreCbg);
       setSetupSeedLabel(locationData?.seed_name || coreCbg);
-      setSetupSeedCount(seedCbgs.length);
+      setSetupSeedCount(normalizedSeedCbgs.length);
+      setSetupSeedCbgs(normalizedSeedCbgs);
+      setResolvedSetupSeedCbgs(normalizedSeedCbgs);
       setSetupSeedGeoJSON(seedGeoJson);
+      setSeedEditGeoJSON(null);
+      setSeedEditMode(false);
+      setSeedEditAction('add');
+      setSeedEditError('');
+      setSeedEditStartCbgs([]);
+      setSeedEditNeighborRings(0);
       const cityName =
         locationData?.city && locationData?.state
           ? `${locationData.city}, ${locationData.state}`
@@ -1674,14 +2044,22 @@ export default function CZGeneration() {
         cbg: coreCbg,
         cityName,
         seedName: locationData?.seed_name || coreCbg,
-        seedCbgs,
+        seedCbgs: normalizedSeedCbgs,
         seedZip: locationData?.zip
       });
     } catch (err) {
       setSetupSeedCbg('');
       setSetupSeedLabel('');
       setSetupSeedCount(0);
+      setSetupSeedCbgs([]);
+      setResolvedSetupSeedCbgs([]);
       setSetupSeedGeoJSON(null);
+      setSeedEditGeoJSON(null);
+      setSeedEditMode(false);
+      setSeedEditAction('add');
+      setSeedEditError('');
+      setSeedEditStartCbgs([]);
+      setSeedEditNeighborRings(0);
       setSetupResolvedCityName('');
       setResolvedSeedLookup(null);
       setSeedResolveError(
@@ -1803,6 +2181,7 @@ export default function CZGeneration() {
     const rawLocationInput = String(location ?? '').trim();
     const isTestMode = rawLocationInput.toUpperCase() === 'TEST';
     setUseTestData(isTestMode);
+    setSeedEditMode(false);
 
     const cachedSeedLookup =
       resolvedSeedLookup?.query === rawLocationInput
@@ -1810,8 +2189,10 @@ export default function CZGeneration() {
         : null;
     let coreCbg = setupSeedCbg || cachedSeedLookup?.cbg || null;
     let resolvedSeedCbgs =
-      cachedSeedLookup?.seedCbgs ||
-      (setupSeedCbg ? [setupSeedCbg] : ([] as string[]));
+      setupSeedCbgs.length > 0
+        ? setupSeedCbgs
+        : cachedSeedLookup?.seedCbgs ||
+          (setupSeedCbg ? [setupSeedCbg] : ([] as string[]));
     let resolvedCityName =
       setupResolvedCityName ||
       cachedSeedLookup?.cityName ||
@@ -3643,13 +4024,18 @@ coupling =
                   resetSeedPreview();
                   setLocation(coords);
                 }}
-                disabled={loading || resolvingSeed}
-                seedGeoJSON={setupSeedGeoJSON}
+                disabled={loading || resolvingSeed || seedEditLoading}
+                seedGeoJSON={activeSetupSeedGeoJSON}
                 seedCbgId={setupSeedCbg}
+                seedCbgIds={setupSeedCbgs}
+                originalSeedCbgIds={resolvedSetupSeedCbgs}
                 seedGuardRadiusKm={seedGuardDistanceKm}
                 showSeedGuardCircle={
                   clusterAlgorithm === 'greedy_weight_seed_guard'
                 }
+                seedEditMode={seedEditMode}
+                seedEditAction={seedEditAction}
+                onSeedCbgSelect={updateEditableSeedSelection}
               />
             </div>
 
@@ -3826,15 +4212,131 @@ coupling =
                   <div className="flex flex-col gap-2 text-sm">
                     {setupSeedCbg && (
                       <div className="rounded-lg border border-[#70B4D4] bg-[#eff6ff] px-3 py-2 text-[#1e3a8a]">
-                        <span className="font-semibold">Resolved Seed:</span>{' '}
-                        {setupSeedLabel || setupSeedCbg}
-                        {setupSeedCount > 0 ? ` (${setupSeedCount} CBGs)` : ''}
-                        {setupResolvedCityName
-                          ? ` for ${setupResolvedCityName}`
-                          : ''}
-                        {clusterAlgorithm === 'greedy_weight_seed_guard'
-                          ? ` | Blue ring radius: ${seedGuardDistanceKm} km`
-                          : ''}
+                        <div>
+                          <span className="font-semibold">Resolved Seed:</span>{' '}
+                          {setupSeedLabel || setupSeedCbg}
+                          {setupSeedCount > 0
+                            ? ` (${setupSeedCount} CBGs)`
+                            : ''}
+                          {setupResolvedCityName
+                            ? ` for ${setupResolvedCityName}`
+                            : ''}
+                          {clusterAlgorithm === 'greedy_weight_seed_guard'
+                            ? ` | Blue ring radius: ${seedGuardDistanceKm} km`
+                            : ''}
+                        </div>
+                        {seedAdjustmentSummary.hasChanges && (
+                          <div className="mt-1 text-xs">
+                            {seedAdjustmentSummary.addedCount > 0
+                              ? `+${seedAdjustmentSummary.addedCount} added`
+                              : ''}
+                            {seedAdjustmentSummary.addedCount > 0 &&
+                            seedAdjustmentSummary.removedCount > 0
+                              ? ' | '
+                              : ''}
+                            {seedAdjustmentSummary.removedCount > 0
+                              ? `-${seedAdjustmentSummary.removedCount} removed`
+                              : ''}
+                          </div>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {seedEditMode ? (
+                            <>
+                              <div className="flex overflow-hidden rounded-lg border border-[#70B4D4] bg-white">
+                                <button
+                                  type="button"
+                                  onClick={() => setSeedEditAction('add')}
+                                  disabled={loading || seedEditLoading}
+                                  className={`px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                                    seedEditAction === 'add'
+                                      ? 'bg-[#dcfce7] text-[#166534]'
+                                      : 'text-[#1f2937]'
+                                  }`}
+                                >
+                                  Add
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSeedEditAction('remove')}
+                                  disabled={loading || seedEditLoading}
+                                  className={`border-l border-[#70B4D4] px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                                    seedEditAction === 'remove'
+                                      ? 'bg-[#fee2e2] text-[#991b1b]'
+                                      : 'text-[#1f2937]'
+                                  }`}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={finishSeedEdit}
+                                disabled={loading || seedEditLoading}
+                                className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                              >
+                                Done
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelSeedEdit}
+                                disabled={loading || seedEditLoading}
+                                className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void showMoreSeedEditNeighbors();
+                                }}
+                                disabled={loading || seedEditLoading}
+                                className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                              >
+                                Show More Nearby
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void beginSeedEdit();
+                              }}
+                              disabled={loading || seedEditLoading}
+                              className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                            >
+                              {seedEditLoading
+                                ? 'Loading Area...'
+                                : 'Adjust Seed Area'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void resetAdjustedSeed();
+                            }}
+                            disabled={
+                              loading ||
+                              seedEditLoading ||
+                              !seedAdjustmentSummary.hasChanges
+                            }
+                            className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                        {seedEditMode && (
+                          <div className="mt-2 text-xs text-[#1e3a8a]">
+                            {seedEditAction === 'add'
+                              ? 'Add mode active'
+                              : 'Remove mode active'}
+                            {seedEditLoading ? ' | Updating map...' : ''}
+                          </div>
+                        )}
+                        {seedEditError && (
+                          <div className="mt-2 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700">
+                            {seedEditError}
+                          </div>
+                        )}
                       </div>
                     )}
                     {!setupSeedCbg && isTestLocationInput && (
@@ -3913,6 +4415,7 @@ coupling =
                     disabled={
                       loading ||
                       resolvingSeed ||
+                      seedEditLoading ||
                       (seedGuardNeedsResolvedSeed && !setupSeedCbg)
                     }
                     className="w-full px-4 py-2 rounded-lg border border-[#70B4D4] bg-[#e0f2fe] text-[#1f2937] font-semibold disabled:opacity-40"
