@@ -1,10 +1,12 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import useSimSettings, { type Interventions } from '@/stores/simsettings';
+import useSimSettings, {
+  type Interventions as InterventionSettings
+} from '@/stores/simsettings';
 import { SimParameter } from './settings-components';
 
-type DisplayValues = Omit<Interventions, 'time'>;
+type DisplayValues = Omit<InterventionSettings, 'time'>;
 
 const ANIM_KEYS: (keyof DisplayValues)[] = [
   'mask',
@@ -17,7 +19,7 @@ const ANIM_KEYS: (keyof DisplayValues)[] = [
 const DURATION = 280;
 
 function easeOutCubic(t: number) {
-  return 1 - Math.pow(1 - t, 3);
+  return 1 - (1 - t) ** 3;
 }
 
 export default function Interventions({ time }: { time: number }) {
@@ -46,7 +48,9 @@ export default function Interventions({ time }: { time: number }) {
 
     // Pin display to FROM values immediately — this re-renders synchronously
     // before the browser paints, preventing any flash of the destination values.
-    setAnimValues(Object.fromEntries(ANIM_KEYS.map((k) => [k, from[k]])) as DisplayValues);
+    setAnimValues(
+      Object.fromEntries(ANIM_KEYS.map((k) => [k, from[k]])) as DisplayValues
+    );
 
     const startTs = performance.now();
 
@@ -103,6 +107,7 @@ export default function Interventions({ time }: { time: number }) {
         label={'Lockdown Probability'}
         value={display.lockdown}
         callback={(lockdown) => setInterventions(time, { lockdown })}
+        disabled
       />
       <SimParameter
         label={'Self-Isolation Percent'}
