@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useSimSettings from '@/stores/simsettings';
 
 import '@/styles/intervention-timeline.css';
@@ -9,7 +9,7 @@ import Interventions from './interventions';
 export default function InterventionTimeline() {
   const hours = useSimSettings((state) => state.hours);
   const zone = useSimSettings((state) => state.zone);
-  const _interventions = useSimSettings((state) => state.interventions);
+  const interventions = useSimSettings((state) => state.interventions);
 
   const addInterventions = useSimSettings((state) => state.addInterventions);
   const setInterventions = useSimSettings((state) => state.setInterventions);
@@ -17,34 +17,53 @@ export default function InterventionTimeline() {
     (state) => state.deleteInterventions
   );
 
-  const [values, setValues] = useState([0]);
   const [curtime, setCurtime] = useState(0);
+  const values = useMemo(
+    () =>
+      Array.from(new Set(interventions.map((intervention) => intervention.time))).sort(
+        (a, b) => a - b
+      ),
+    [interventions]
+  );
+  const timelineValues = values.filter((value) => value > 0);
+  const dragTimeRef = useRef<number | null>(null);
+  const pointerDragRef = useRef(false);
+  const valuesRef = useRef(values);
 
-  const getTrackTime = (clientX: number, track: HTMLDivElement) => {
+  useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
+
+  const getTrackTime = (clientX: number, track: HTMLElement) => {
     const rect = track.getBoundingClientRect();
     if (rect.width <= 0) return curtime;
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    return Math.round(ratio * hours);
+    return Math.min(hours, Math.max(1, Math.round(ratio * hours)));
   };
 
-  const isTimelineThumb = (target: EventTarget | null) =>
-    target instanceof HTMLInputElement &&
-    target.classList.contains('iv_timeline');
-
   const moveIntervention = (fromTime: number, toTime: number) => {
-    if (fromTime === toTime) return;
-    if (values.includes(toTime)) {
-      setCurtime(toTime);
+    const nextTime = Math.min(hours, Math.max(1, toTime));
+    if (fromTime === 0 || fromTime === nextTime) return;
+    if (values.includes(nextTime)) {
+      setCurtime(nextTime);
       return;
     }
 
-    setInterventions(fromTime, { time: toTime });
-    setValues((cur) =>
-      cur
-        .map((value) => (value === fromTime ? toTime : value))
-        .sort((a, b) => a - b)
-    );
-    setCurtime(toTime);
+    setInterventions(fromTime, { time: nextTime });
+    setCurtime(nextTime);
+  };
+
+  const moveDraggedIntervention = (fromTime: number, toTime: number) => {
+    const nextTime = Math.min(hours, Math.max(1, toTime));
+    if (fromTime === 0 || fromTime === nextTime) return fromTime;
+    if (valuesRef.current.includes(nextTime)) return fromTime;
+
+    setInterventions(fromTime, { time: nextTime });
+    valuesRef.current = valuesRef.current
+      .map((value) => (value === fromTime ? nextTime : value))
+      .sort((a, b) => a - b);
+    setCurtime(nextTime);
+    return nextTime;
   };
 
   useEffect(() => {
@@ -57,77 +76,218 @@ export default function InterventionTimeline() {
         const newtime = unused.pop();
         if (newtime !== undefined) {
           setInterventions(values[i], { time: newtime });
-          setValues((cur) => [...cur].with(i, newtime));
           if (curtime === values[i]) setCurtime(newtime);
         }
       }
     }
   }, [curtime, setInterventions, hours, values]);
 
-  const moveSelectedThumb = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isTimelineThumb(e.target)) return;
-    if (curtime === values[0]) return; // seed is locked
-    moveIntervention(curtime, getTrackTime(e.clientX, e.currentTarget));
+  useEffect(() => {
+    if (values.includes(curtime)) return;
+    setCurtime(values[0] ?? 0);
+  }, [curtime, values]);
+
+  const beginTimelineDrag = (clientX: number, track: HTMLElement) => {
+    const nextTime = getTrackTime(clientX, track);
+    let dragTime = curtime;
+
+    if (curtime === 0) {
+      if (values.includes(nextTime)) {
+        setCurtime(nextTime);
+        dragTime = nextTime;
+      } else if (values.length < 10) {
+        addInterventions(nextTime);
+        valuesRef.current = [...valuesRef.current, nextTime].sort((a, b) => a - b);
+        setCurtime(nextTime);
+        dragTime = nextTime;
+      }
+    } else {
+      dragTime = moveDraggedIntervention(curtime, nextTime);
+    }
+
+    dragTimeRef.current = dragTime;
   };
 
-  const deleteThumb = (i: number) => {
-    if (i === 0 || values.length === 1) return; // index 0 is the locked seed
-    const next = [...values].filter((_, idx) => idx !== i);
-    deleteInterventions(values[i]);
-    setValues(next);
-    setCurtime(next[next.length - 1]);
+  const startTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
+    if (e.button !== 0) return;
+
+    pointerDragRef.current = true;
+    beginTimelineDrag(e.clientX, e.currentTarget);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+
+  const continueTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const dragTime = dragTimeRef.current;
+    if (dragTime === null) return;
+
+    dragTimeRef.current = moveDraggedIntervention(
+      dragTime,
+      getTrackTime(e.clientX, e.currentTarget)
+    );
+  };
+
+  const stopTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
+    dragTimeRef.current = null;
+    pointerDragRef.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const startTimelineMouseDrag = (e: React.MouseEvent<HTMLFieldSetElement>) => {
+    if (pointerDragRef.current || e.button !== 0) return;
+
+    beginTimelineDrag(e.clientX, e.currentTarget);
+    e.preventDefault();
+  };
+
+  const continueTimelineMouseDrag = (e: React.MouseEvent<HTMLFieldSetElement>) => {
+    const dragTime = dragTimeRef.current;
+    if (dragTime === null) return;
+
+    dragTimeRef.current = moveDraggedIntervention(
+      dragTime,
+      getTrackTime(e.clientX, e.currentTarget)
+    );
+  };
+
+  const stopTimelineMouseDrag = () => {
+    pointerDragRef.current = false;
+    dragTimeRef.current = null;
+  };
+
+  const deleteThumb = (time: number) => {
+    if (time === 0 || values.length === 1) return;
+    const index = values.indexOf(time);
+    const next = values.filter((value) => value !== time);
+    deleteInterventions(time);
+    setCurtime(next[Math.min(index, next.length - 1)] ?? 0);
   };
 
   const moveLeft = () => {
     const sorted = [...values].sort((a, b) => a - b);
+    const currentIndex = sorted.indexOf(curtime);
+    if (currentIndex === -1) {
+      setCurtime(sorted[0] ?? 0);
+      return;
+    }
     if (curtime === sorted[0]) setCurtime(sorted[sorted.length - 1]);
-    else setCurtime(sorted[sorted.indexOf(curtime) - 1]);
+    else setCurtime(sorted[currentIndex - 1]);
   };
 
   const moveRight = () => {
     const sorted = [...values].sort((a, b) => a - b);
+    const currentIndex = sorted.indexOf(curtime);
+    if (currentIndex === -1) {
+      setCurtime(sorted[0] ?? 0);
+      return;
+    }
     if (curtime === sorted[sorted.length - 1]) setCurtime(sorted[0]);
-    else setCurtime(sorted[sorted.indexOf(curtime) + 1]);
+    else setCurtime(sorted[currentIndex + 1]);
   };
 
-  const nextAddTime = Array.from({ length: hours }, (_, i) => i + 1).find(
-    (value) => !values.includes(value)
-  );
+  const handleThumbKeyDown = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    value: number
+  ) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      deleteThumb(value);
+      return;
+    }
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveIntervention(value, value - 1);
+      return;
+    }
+
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveIntervention(value, value + 1);
+      return;
+    }
+
+    if (e.key === 'Home') {
+      e.preventDefault();
+      moveIntervention(value, 1);
+      return;
+    }
+
+    if (e.key === 'End') {
+      e.preventDefault();
+      moveIntervention(value, hours);
+    }
+  };
+
+  const nextAddTime = (() => {
+    const anchorTime = Math.min(hours, Math.max(1, curtime || 1));
+
+    for (let offset = 0; offset <= hours; offset++) {
+      const laterTime = anchorTime + offset;
+      if (laterTime <= hours && !values.includes(laterTime)) return laterTime;
+
+      const earlierTime = anchorTime - offset;
+      if (offset > 0 && earlierTime >= 1 && !values.includes(earlierTime)) {
+        return earlierTime;
+      }
+    }
+  })();
 
   return (
     <div className="flex flex-col w-full max-w-250 gap-4">
-      <div
-        className="relative flex items-center w-full h-8 select-none cursor-pointer"
-        onPointerDown={moveSelectedThumb}
+      <fieldset
+        className="iv_timeline_track"
+        onPointerDown={startTimelineDrag}
+        onPointerMove={continueTimelineDrag}
+        onPointerUp={stopTimelineDrag}
+        onPointerCancel={stopTimelineDrag}
+        onMouseDown={startTimelineMouseDrag}
+        onMouseMove={continueTimelineMouseDrag}
+        onMouseUp={stopTimelineMouseDrag}
+        onMouseLeave={stopTimelineMouseDrag}
       >
-        <div className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-1.5 bg-(--color-border-subtle) rounded-full outline-0" />
-        {values.map((value, i) => (
-          <input
-            key={i}
-            className={`iv_timeline absolute top-1/2 -translate-y-1/2 left-0 w-full ${curtime === value ? 'current ' : ''}${i === 0 ? 'locked' : ''}`}
-            type="range"
-            min={0}
-            max={hours}
-            value={value}
-            aria-label={i === 0 ? 'Seed intervention (locked at hour 1)' : `Intervention ${i + 1} hour`}
-            onChange={(e) => {
-              if (i === 0) return; // seed is locked
-              const nextTime = +e.target.value;
-              if (values.includes(nextTime) && nextTime !== value) return;
-              setInterventions(values[i], { time: nextTime });
-              setValues((cur) => cur.with(i, nextTime).sort((a, b) => a - b));
-              setCurtime(nextTime);
+        <legend className="iv_timeline_legend">Intervention timeline</legend>
+        <div className="iv_timeline_track_line" />
+        {curtime === 0 && (
+          <button
+            type="button"
+            className="iv_timeline_thumb iv_timeline_thumb--baseline current"
+            style={{ left: '0%' }}
+            aria-label="Baseline intervention hour 0"
+            onClick={() => setCurtime(0)}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setCurtime(0);
             }}
-            onMouseDownCapture={(e) =>
-              setCurtime(+(e.target as HTMLInputElement).value)
-            }
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setCurtime(0);
+            }}
+          />
+        )}
+        {timelineValues.map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="slider"
+            className={`iv_timeline_thumb${curtime === value ? ' current' : ''}`}
+            style={{ left: `${(value / hours) * 100}%` }}
+            aria-valuemin={1}
+            aria-valuemax={hours}
+            aria-valuenow={value}
+            aria-label={`Intervention ${values.indexOf(value) + 1} hour`}
+            onFocus={() => setCurtime(value)}
+            onKeyDown={(e) => handleThumbKeyDown(e, value)}
             onContextMenu={(e) => {
               e.preventDefault();
-              if (i !== 0) deleteThumb(i);
+              deleteThumb(value);
             }}
           />
         ))}
-      </div>
+      </fieldset>
 
       <div className="flex w-full items-center justify-center">
         <div className="iv_controls">
@@ -143,7 +303,7 @@ export default function InterventionTimeline() {
           <button
             type="button"
             className="iv_control_btn iv_control_btn--danger"
-            onClick={() => deleteThumb(values.indexOf(curtime))}
+            onClick={() => deleteThumb(curtime)}
             disabled={values.length <= 1 || values.indexOf(curtime) === 0}
           >
             Delete
@@ -154,7 +314,6 @@ export default function InterventionTimeline() {
             onClick={() => {
               if (nextAddTime === undefined) return;
               addInterventions(nextAddTime);
-              setValues((cur) => [...cur, nextAddTime].sort((a, b) => a - b));
               setCurtime(nextAddTime);
             }}
             disabled={values.length >= 10 || nextAddTime === undefined}
@@ -175,7 +334,7 @@ export default function InterventionTimeline() {
 
       <div className="iv_intervention_label">
         <span className="iv_intervention_index">
-          {values.indexOf(curtime) === 0 ? 'Seed Intervention' : `Intervention #${values.indexOf(curtime) + 1}`}
+          {curtime === 0 ? 'Baseline Intervention' : `Intervention #${values.indexOf(curtime) + 1}`}
         </span>
         <span className="iv_intervention_hour">
           Hour {curtime.toString().padStart(3, '0')}
