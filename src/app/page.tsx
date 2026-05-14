@@ -13,7 +13,8 @@ export default function Home() {
         <DiseaseGraph />
         <div className="left relative">
           <h1 className="title">
-            Model how disease moves through a <span className="accent">community</span>.
+            Model how disease moves through a{' '}
+            <span className="accent">community</span>.
           </h1>
           <h2 className="title">
             Delineo simulates community-level infectious disease spread using
@@ -22,18 +23,38 @@ export default function Home() {
           </h2>
           <div className="hero-ctas">
             <Link href="/simulator">
-              <Button variant="primary" className="px-5! py-2.5! text-sm font-medium">
+              <Button
+                variant="primary"
+                className="px-5! py-2.5! text-sm font-medium"
+              >
                 Launch simulator
               </Button>
             </Link>
+            <Link href="/cz-generation">
+              <Button
+                variant="secondary"
+                className="px-5! py-2.5! text-sm font-medium"
+              >
+                Generate zones
+              </Button>
+            </Link>
             <Link href="/about">
-              <Button variant="secondary" className="px-5! py-2.5! text-sm font-medium">
+              <Button
+                variant="secondary"
+                className="px-5! py-2.5! text-sm font-medium"
+              >
                 How it works
               </Button>
             </Link>
           </div>
         </div>
-        <Image className="logo" src="/images/logo.png" alt="logo" width={400} height={400} />
+        <Image
+          className="logo"
+          src="/images/logo.png"
+          alt="logo"
+          width={400}
+          height={400}
+        />
       </div>
       <div className="featurelist">
         <div className="feature" data-aos="fade-up">

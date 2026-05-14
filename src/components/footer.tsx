@@ -10,7 +10,12 @@ export default function Footer() {
       <div className="footer-inner">
         <div className="footer-brand">
           <div className="footer-brand-row">
-            <Image src="/images/logo.png" alt="Delineo" width={24} height={24} />
+            <Image
+              src="/images/logo.png"
+              alt="Delineo"
+              width={24}
+              height={24}
+            />
             <span className="footer-brand-name">Delineo</span>
           </div>
           <p className="footer-tagline">
@@ -21,9 +26,18 @@ export default function Footer() {
         <div className="footer-cols">
           <div className="footer-col">
             <h4 className="footer-col-title">Pages</h4>
-            <Link href="/simulator" className="footer-link">Simulator</Link>
-            <Link href="/about" className="footer-link">About</Link>
-            <Link href="/team" className="footer-link">Team</Link>
+            <Link href="/simulator" className="footer-link">
+              Simulator
+            </Link>
+            <Link href="/cz-generation" className="footer-link">
+              CZ Generator
+            </Link>
+            <Link href="/about" className="footer-link">
+              About
+            </Link>
+            <Link href="/team" className="footer-link">
+              Team
+            </Link>
           </div>
           <div className="footer-col">
             <h4 className="footer-col-title">Resources</h4>
@@ -48,7 +62,9 @@ export default function Footer() {
       </div>
 
       <div className="footer-bottom">
-        <span className="footer-copy">© {new Date().getFullYear()} Delineo Disease Modeling</span>
+        <span className="footer-copy">
+          © {new Date().getFullYear()} Delineo Disease Modeling
+        </span>
         <a
           href="https://github.com/Delineo-Disease-Modeling/"
           target="_blank"

@@ -12,7 +12,11 @@ import LoginModal from './login-modal';
 import '@/styles/navbar.css';
 import Button from './ui/button';
 
-export default function Navbar({ initialUser }: { initialUser: CachedUser | null }) {
+export default function Navbar({
+  initialUser
+}: {
+  initialUser: CachedUser | null;
+}) {
   const [modalOpen, setModalOpen] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -20,7 +24,10 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     }
@@ -53,24 +60,35 @@ export default function Navbar({ initialUser }: { initialUser: CachedUser | null
         </Link>
         <ul>
           <li>{navLink('/simulator', 'Simulator')}</li>
+          <li>{navLink('/cz-generation', 'CZ Generator')}</li>
           <li>{navLink('/about', 'About')}</li>
           <li>{navLink('/team', 'Team')}</li>
           <li>
             {!user ? (
-              <button type="button" className="link" onClick={() => setModalOpen('login')}>
+              <button
+                type="button"
+                className="link"
+                onClick={() => setModalOpen('login')}
+              >
                 Login
               </button>
             ) : (
               <div className="user-dropdown-container" ref={dropdownRef}>
-                <button type="button" className="link" onClick={() => setDropdownOpen((v) => !v)}>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => setDropdownOpen((v) => !v)}
+                >
                   Hi, {user.name}!
                 </button>
                 {dropdownOpen && (
                   <div className="user-dropdown">
                     <p className="user-dropdown-name">{user.name}</p>
-                    <p className="user-dropdown-org italic">{user.organization}</p>
+                    <p className="user-dropdown-org italic">
+                      {user.organization}
+                    </p>
                     <Button
-                      className='py-1.5! text-xs mt-2'
+                      className="py-1.5! text-xs mt-2"
                       variant="dark-destructive"
                       onClick={() => {
                         signOut();
