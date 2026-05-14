@@ -22,16 +22,42 @@ const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
 const CBGMap = dynamic(() => import('@/components/cbg-map'), { ssr: false });
 
 const CLUSTER_ALGORITHM_OPTIONS = [
+  { value: 'mobility_prune', label: 'Mobility Prune (Recommended)' },
   {
     value: 'guided_second_order_regions',
     label: 'Guided Connected Cities'
   },
   { value: 'greedy_fast', label: 'Greedy Fast' },
-  { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' },
-  { value: 'mobility_prune', label: 'Mobility Prune' }
+  { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' }
 ] as const;
 
 type ClusterAlgorithm = (typeof CLUSTER_ALGORITHM_OPTIONS)[number]['value'];
+
+const CLUSTER_ALGORITHM_MANUAL: Record<
+  ClusterAlgorithm,
+  {
+    summary: string;
+    recommended?: boolean;
+  }
+> = {
+  mobility_prune: {
+    summary:
+      'Recommended default. Builds a broad mobility zone from the seed, then prunes lower-value CBGs while keeping seed movement capture.',
+    recommended: true
+  },
+  guided_second_order_regions: {
+    summary:
+      'Useful for smaller cities or towns surrounded by other cities. It ranks connected cities and lets you choose which linked CBGs stay explicit.'
+  },
+  greedy_fast: {
+    summary:
+      'Quick automatic baseline with trace view. Greedily adds high-scoring CBGs until the population target is met.'
+  },
+  greedy_weight_seed_guard: {
+    summary:
+      'Advanced diagnostic mode. Uses a seed-distance guard and trace view to inspect how individual CBGs are chosen.'
+  }
+};
 
 type TraceCandidate = {
   cbg?: string;
@@ -615,7 +641,7 @@ export default function CZGeneration() {
   const [location, setLocation] = useState('');
   const [minPop, setMinPop] = useState(5000);
   const [clusterAlgorithm, setClusterAlgorithm] = useState<ClusterAlgorithm>(
-    'guided_second_order_regions'
+    'mobility_prune'
   );
   const [showAdvancedClustering, setShowAdvancedClustering] = useState(false);
   const [seedGuardDistanceKm, setSeedGuardDistanceKm] = useState(20);
@@ -674,6 +700,7 @@ export default function CZGeneration() {
   const [guidedDestinationLoading, setGuidedDestinationLoading] =
     useState(false);
   const [guidedDestinationError, setGuidedDestinationError] = useState('');
+  const [showAlgorithmGuide, setShowAlgorithmGuide] = useState(false);
   const [showGuidedTermsHelp, setShowGuidedTermsHelp] = useState(false);
   const [showGuidedSummaryPanel, setShowGuidedSummaryPanel] = useState(false);
   const [traceEnabled, setTraceEnabled] = useState(false);
@@ -2797,6 +2824,73 @@ export default function CZGeneration() {
           </div>
         </div>
       )}
+      {showAlgorithmGuide && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="algorithm-guide-title"
+          tabIndex={-1}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowAlgorithmGuide(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setShowAlgorithmGuide(false);
+            }
+          }}
+        >
+          <div
+            className="rounded-lg border border-[#70B4D4] bg-white px-5 py-5 shadow-2xl"
+            style={{ width: 'min(34rem, 92vw)' }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div
+                  id="algorithm-guide-title"
+                  className="text-lg font-semibold text-[#1f2937]"
+                >
+                  Algorithm Guide
+                </div>
+                <div className="mt-1 text-sm text-gray-600">
+                  Start with Mobility Prune unless the zone needs manual city
+                  selection or diagnostic tracing.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAlgorithmGuide(false)}
+                className="rounded border border-[#d1d5db] px-3 py-1 text-sm font-semibold text-[#1f2937] hover:border-[#70B4D4]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+              {CLUSTER_ALGORITHM_OPTIONS.map((option) => {
+                const manual = CLUSTER_ALGORITHM_MANUAL[option.value];
+                return (
+                  <div
+                    key={option.value}
+                    className="border-l-4 border-[#70B4D4] bg-[#f8fafc] px-3 py-2 text-sm text-gray-700"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 font-semibold text-[#1f2937]">
+                      <span>{option.label}</span>
+                      {manual.recommended && (
+                        <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                          default
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1">{manual.summary}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
       {showGuidedTermsHelp && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm"
@@ -4074,8 +4168,37 @@ coupling =
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="w-full sm:col-span-2">
+                    <div className="mb-0.5 flex items-center justify-between gap-3">
+                      <label htmlFor="algorithm">Clustering Algorithm</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAlgorithmGuide(true)}
+                        className="rounded border border-[#70B4D4] bg-white px-2 py-1 text-xs font-semibold text-[#1f2937] hover:bg-[#eff6ff]"
+                      >
+                        Algorithm Guide
+                      </button>
+                    </div>
+                    <select
+                      className="formfield w-full"
+                      name="algorithm"
+                      id="algorithm"
+                      disabled={loading}
+                      value={clusterAlgorithm}
+                      onChange={(e) =>
+                        setClusterAlgorithm(e.target.value as ClusterAlgorithm)
+                      }
+                      required={true}
+                    >
+                      {CLUSTER_ALGORITHM_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   {clusterAlgorithm === 'mobility_prune' ? (
-                    <div className="w-full">
+                    <div className="w-full sm:col-span-2">
                       <FormField
                         label="Minimum Seed Movement Captured (%)"
                         name="mobility_prune_min_seed_capture"
@@ -4096,7 +4219,7 @@ coupling =
                       </div>
                     </div>
                   ) : !isGuidedSecondOrderAlgorithm ? (
-                    <div className="w-full">
+                    <div className="w-full sm:col-span-2">
                       <FormField
                         label="Minimum Population"
                         name="min_pop"
@@ -4109,22 +4232,6 @@ coupling =
                       />
                     </div>
                   ) : null}
-                  <div className="w-full sm:col-span-2">
-                    <FormField
-                      label="Clustering Algorithm"
-                      name="algorithm"
-                      type="select"
-                      value={clusterAlgorithm}
-                      options={CLUSTER_ALGORITHM_OPTIONS.map((option) => ({
-                        value: option.value,
-                        label: option.label
-                      }))}
-                      onChange={(e) =>
-                        setClusterAlgorithm(e.target.value as ClusterAlgorithm)
-                      }
-                      disabled={loading}
-                    />
-                  </div>
                   {(() => {
                     const monthsReady = monthOptions.length > 0;
                     const placeholderLabel = availableMonthsLoading
