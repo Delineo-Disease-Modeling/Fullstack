@@ -27,7 +27,7 @@ const CLUSTER_ALGORITHM_OPTIONS = [
     value: 'guided_second_order_regions',
     label: 'Guided Connected Cities'
   },
-  { value: 'greedy_fast', label: 'Greedy Fast' },
+  { value: 'greedy_fast', label: 'Greedy Weight' },
   { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' }
 ] as const;
 
@@ -51,7 +51,7 @@ const CLUSTER_ALGORITHM_MANUAL: Record<
   },
   greedy_fast: {
     summary:
-      'Quick automatic baseline with trace view. Greedily adds high-scoring CBGs until the population target is met.'
+      'Greedy Weight is a quick automatic baseline with trace view. It adds high-scoring CBGs until the population target is met.'
   },
   greedy_weight_seed_guard: {
     summary:
@@ -4232,6 +4232,10 @@ coupling =
                       />
                     </div>
                   ) : null}
+                  <div className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-2">
+                    Keep zones under 50,000 people for faster generation and
+                    review.
+                  </div>
                   {(() => {
                     const monthsReady = monthOptions.length > 0;
                     const placeholderLabel = availableMonthsLoading
