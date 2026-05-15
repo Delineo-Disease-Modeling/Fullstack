@@ -268,11 +268,6 @@ export default function SimSettings({
           />
         </div>
       </div>
-      <div className="sim_section_divider">
-        <div className="sim_section_divider_line" />
-        <span className="sim_section_divider_text">or customize and run a new simulation</span>
-        <div className="sim_section_divider_line" />
-      </div>
 
       <ZoneActions
         zone={zone}
@@ -280,6 +275,12 @@ export default function SimSettings({
         locations={locations}
         setLocations={setLocations}
       />
+
+      <div className="sim_section_divider">
+        <div className="sim_section_divider_line" />
+        <span className="sim_section_divider_text">or customize and run a new simulation</span>
+        <div className="sim_section_divider_line" />
+      </div>
 
       {(zone?.start_date || patternStatus) && (
         <div className="flex flex-col items-center gap-2">
@@ -361,8 +362,8 @@ export default function SimSettings({
             : zone?.ready === false
               ? 'Generating…'
               : sim_id
-                ? 'Open run →'
-                : 'Simulate →'}
+                ? 'Visit Run'
+                : 'Simulate'}
         </Button>
         {loading && (
           <div className="sim_progress">

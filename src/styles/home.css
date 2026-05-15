@@ -187,26 +187,26 @@ div.feature:hover {
   border-color: rgba(61, 136, 173, 0.25);
 }
 
-i.feature {
+svg.feature {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
-  font-size: 20px;
   border-radius: 12px;
   background: linear-gradient(135deg, rgba(112, 180, 212, 0.18), rgba(108, 190, 196, 0.18));
   color: var(--color-primary-blue);
-  padding: 0;
+  padding: 10px;
   margin: 0;
+  box-sizing: border-box;
 }
 
-div.feature:nth-child(2) i.feature {
+div.feature:nth-child(2) svg.feature {
   background: linear-gradient(135deg, rgba(108, 190, 196, 0.18), rgba(232, 72, 90, 0.14));
   color: var(--color-accent-teal);
 }
 
-div.feature:nth-child(3) i.feature {
+div.feature:nth-child(3) svg.feature {
   background: linear-gradient(135deg, rgba(232, 72, 90, 0.16), rgba(112, 180, 212, 0.16));
   color: var(--color-accent-red);
 }

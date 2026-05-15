@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { SiGithub } from '@icons-pack/react-simple-icons';
 import '@/styles/footer.css';
 
 export default function Footer() {
@@ -72,7 +73,7 @@ export default function Footer() {
           className="footer-icon-link"
           aria-label="GitHub"
         >
-          <i className="bi-github"></i>
+          <SiGithub size={18} />
         </a>
       </div>
     </footer>

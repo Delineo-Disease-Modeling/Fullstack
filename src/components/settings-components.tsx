@@ -1,8 +1,51 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
 import '@/styles/settings-components.css';
 import Slider from './ui/slider';
+
+function InfoPopover({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (btnRef.current && !btnRef.current.closest('.simset_info')?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  return (
+    <span className="simset_info">
+      <button
+        ref={btnRef}
+        type="button"
+        className={`simset_info_btn${open ? ' is-open' : ''}`}
+        aria-label="More information"
+        aria-expanded={open}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+      >
+        <Info size={14} aria-hidden="true" />
+      </button>
+      {open && (
+        <span role="tooltip" className="simset_info_popover">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 interface SimParameterProps {
   label: string;
@@ -14,6 +57,7 @@ interface SimParameterProps {
   units?: string;
   disabled?: boolean;
   disabledLabel?: string;
+  info?: string;
 }
 
 export function SimParameter({
@@ -25,7 +69,8 @@ export function SimParameter({
   percent = true,
   units = '',
   disabled = false,
-  disabledLabel = 'Currently unavailable'
+  disabledLabel = 'Currently unavailable',
+  info
 }: SimParameterProps) {
   const displayValue = percent ? Math.ceil(value * 100) : value;
   return (
@@ -34,7 +79,10 @@ export function SimParameter({
       aria-disabled={disabled}
     >
       <div className="simset_slider_label">
-        <span className="simset_slider_label_text">{label}</span>
+        <span className="simset_slider_label_text">
+          {label}
+          {info && <InfoPopover text={info} />}
+        </span>
         <span className="simset_slider_label_value">
           {disabled ? (
             disabledLabel

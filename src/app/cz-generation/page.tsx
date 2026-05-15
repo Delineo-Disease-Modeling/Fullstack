@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CBG_GEOJSON_REQUEST_CHUNK_SIZE,
@@ -3770,14 +3771,15 @@ coupling =
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="w-full sm:col-span-2">
-                    <div className="mb-0.5 flex items-center justify-between gap-3">
+                  <div className="w-full sm:col-span-2 flex flex-col gap-0.5">
+                    <div className="flex items-center justify-between">
                       <label htmlFor="algorithm">Clustering Algorithm</label>
                       <button
                         type="button"
                         onClick={() => setShowAlgorithmGuide(true)}
-                        className="rounded border border-[#70B4D4] bg-white px-2 py-1 text-xs font-semibold text-[#1f2937] hover:bg-[#eff6ff]"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded border border-transparent bg-transparent px-2 py-1 text-xs font-semibold text-[#6b7280] hover:border-[#70B4D4] hover:bg-[#eff6ff] hover:text-[#1f2937] transition-colors"
                       >
+                        <Info size={12} />
                         Algorithm Guide
                       </button>
                     </div>

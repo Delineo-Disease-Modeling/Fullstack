@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ChevronRight, Upload } from 'lucide-react';
 import '@/styles/dmp-selector.css';
 import useSimSettings from '@/stores/simsettings';
 import useAuthStore from '@/stores/useAuthStore';
@@ -250,20 +251,11 @@ export default function DmpSelector() {
         className="dmps_toggle"
         onClick={() => setExpanded((e) => !e)}
       >
-        <svg
+        <ChevronRight
           className={`dmps_chevron${expanded ? ' is-open' : ''}`}
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          size={12}
           aria-hidden="true"
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
+        />
         <span className="dmps_title">Custom DMP Matrices</span>
         {!expanded && (
           <span className="dmps_hint_inline">— for advanced users</span>
@@ -354,11 +346,7 @@ export default function DmpSelector() {
                   className="dmps_upload_btn"
                   onClick={openUpload}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
+                  <Upload size={11} aria-hidden="true" />
                   Upload
                 </button>
               )}

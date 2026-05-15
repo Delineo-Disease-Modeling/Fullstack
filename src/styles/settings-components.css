@@ -60,6 +60,88 @@ div.simset_slider_label {
   filter: grayscale(1);
 }
 
+/* ---------- Info popover ---------- */
+.simset_info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.simset_info_btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: opacity 140ms ease, color 140ms ease;
+  flex-shrink: 0;
+}
+
+.simset_info_btn:hover,
+.simset_info_btn.is-open {
+  opacity: 1;
+  color: var(--color-primary-blue);
+}
+
+.simset_info_btn:focus-visible {
+  outline: 2px solid var(--color-primary-blue-soft);
+  outline-offset: 2px;
+}
+
+.simset_info_popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: 220px;
+  padding: 9px 11px;
+  background: var(--color-bg-dark);
+  color: var(--color-text-light);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* Arrow pointing down */
+.simset_info_popover::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--color-bg-dark);
+}
+
+/* On narrow screens, anchor left edge to avoid viewport overflow */
+@media (max-width: 480px) {
+  .simset_info_popover {
+    left: auto;
+    right: -4px;
+    transform: none;
+    width: 200px;
+  }
+
+  .simset_info_popover::after {
+    left: auto;
+    right: 10px;
+    transform: none;
+  }
+}
+
 /* ---------- Boolean toggle ---------- */
 .simset_checkbox {
   display: flex;

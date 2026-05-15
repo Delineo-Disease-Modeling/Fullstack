@@ -17,6 +17,7 @@
     "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+    "@icons-pack/react-simple-icons": "^13.13.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "animate.css": "^4.1.1",
@@ -25,6 +26,7 @@
     "better-auth": "1.5.4",
     "cytoscape": "^3.33.1",
     "dotenv": "^17.3.1",
+    "lucide-react": "^1.16.0",
     "maplibre-gl": "^5.19.0",
     "next": "^16.1.6",
     "pg": "^8.20.0",
@@ -34,6 +36,7 @@
     "react-map-gl": "^8.1.0",
     "react-modal": "^3.16.3",
     "recharts": "^3.8.0",
+    "simple-icons": "^16.19.0",
     "stream-chain": "^3.4.0",
     "stream-json": "^1.9.1",
     "zod": "^4.3.6",

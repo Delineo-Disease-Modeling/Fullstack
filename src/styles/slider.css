@@ -20,7 +20,7 @@
 .ui-slider--default::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  background: linear-gradient(180deg, var(--color-primary-blue-soft), var(--color-primary-blue));
+  background: var(--color-primary-blue);
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -41,7 +41,7 @@
 
 .ui-slider--default::-moz-range-thumb {
   appearance: none;
-  background: linear-gradient(180deg, var(--color-primary-blue-soft), var(--color-primary-blue));
+  background: var(--color-primary-blue);
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -68,7 +68,7 @@
 .ui-slider--dark::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  background: linear-gradient(180deg, var(--color-accent-teal), var(--color-primary-blue));
+  background: var(--color-primary-blue);
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -89,7 +89,7 @@
 
 .ui-slider--dark::-moz-range-thumb {
   appearance: none;
-  background: linear-gradient(180deg, var(--color-accent-teal), var(--color-primary-blue));
+  background: var(--color-primary-blue);
   width: 18px;
   height: 18px;
   border-radius: 50%;

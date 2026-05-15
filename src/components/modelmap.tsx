@@ -10,6 +10,7 @@ import '@/styles/modelmap.css';
 import MapLegend from './maplegend';
 import Slider from '@/components/ui/slider';
 import Button from '@/components/ui/button';
+import { Pause, Play } from 'lucide-react';
 import {
   iconLookup,
   makeGeoJSON,
@@ -747,9 +748,9 @@ export default function ModelMap({
           onClick={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
-            <i className="bi bi-pause-fill" />
+            <Pause size={14} fill="currentColor" />
           ) : (
-            <i className="bi bi-play-fill" />
+            <Play size={14} fill="currentColor" />
           )}
         </Button>
         <Slider
