@@ -6,7 +6,8 @@ import { prisma } from '@/lib/prisma';
 const TWO_MB = 2 * 1024 * 1024;
 
 function validateMatrixCsv(content: string): string | null {
-  if (content.length > TWO_MB) return 'Matrix file exceeds the 2 MB size limit.';
+  if (content.length > TWO_MB)
+    return 'Matrix file exceeds the 2 MB size limit.';
 
   const dataLines = content.split('\n').filter((line) => {
     const t = line.trim();
@@ -15,14 +16,23 @@ function validateMatrixCsv(content: string): string | null {
 
   if (dataLines.length === 0) return 'CSV file has no data rows.';
 
-  const numStates = dataLines[0].split(',').map((v) => v.trim()).filter(Boolean).length;
-  if (numStates < 2) return `First data row has only ${numStates} column(s); expected at least 2 states.`;
+  const numStates = dataLines[0]
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean).length;
+  if (numStates < 2)
+    return `First data row has only ${numStates} column(s); expected at least 2 states.`;
 
   for (let i = 0; i < dataLines.length; i++) {
-    const values = dataLines[i].split(',').map((v) => v.trim()).filter(Boolean);
-    if (values.length !== numStates) return `Row ${i + 1} has ${values.length} column(s) but expected ${numStates}.`;
+    const values = dataLines[i]
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (values.length !== numStates)
+      return `Row ${i + 1} has ${values.length} column(s) but expected ${numStates}.`;
     for (const val of values) {
-      if (isNaN(Number(val))) return `Row ${i + 1} contains a non-numeric value: "${val}".`;
+      if (Number.isNaN(Number(val)))
+        return `Row ${i + 1} contains a non-numeric value: "${val}".`;
     }
   }
 
@@ -68,7 +78,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) {
-      return Response.json({ message: 'Authentication required.' }, { status: 401 });
+      return Response.json(
+        { message: 'Authentication required.' },
+        { status: 401 }
+      );
     }
 
     const { id } = await params;
@@ -77,15 +90,23 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return Response.json({ message: 'Invalid matrix ID.' }, { status: 400 });
     }
 
-    const matrix = await prisma.dmpMatrix.findUnique({ where: { id: matrixId } });
+    const matrix = await prisma.dmpMatrix.findUnique({
+      where: { id: matrixId }
+    });
     if (!matrix) {
       return Response.json({ message: 'Matrix not found.' }, { status: 404 });
     }
     if (matrix.is_default) {
-      return Response.json({ message: 'Built-in matrices cannot be edited.' }, { status: 403 });
+      return Response.json(
+        { message: 'Built-in matrices cannot be edited.' },
+        { status: 403 }
+      );
     }
     if (matrix.user_id !== session.user.id) {
-      return Response.json({ message: 'Only the owner can edit this matrix.' }, { status: 403 });
+      return Response.json(
+        { message: 'Only the owner can edit this matrix.' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -116,7 +137,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) {
-      return Response.json({ message: 'Authentication required.' }, { status: 401 });
+      return Response.json(
+        { message: 'Authentication required.' },
+        { status: 401 }
+      );
     }
 
     const { id } = await params;
@@ -125,15 +149,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return Response.json({ message: 'Invalid matrix ID.' }, { status: 400 });
     }
 
-    const matrix = await prisma.dmpMatrix.findUnique({ where: { id: matrixId } });
+    const matrix = await prisma.dmpMatrix.findUnique({
+      where: { id: matrixId }
+    });
     if (!matrix) {
       return Response.json({ message: 'Matrix not found.' }, { status: 404 });
     }
     if (matrix.is_default) {
-      return Response.json({ message: 'Built-in matrices cannot be deleted.' }, { status: 403 });
+      return Response.json(
+        { message: 'Built-in matrices cannot be deleted.' },
+        { status: 403 }
+      );
     }
     if (matrix.user_id !== session.user.id) {
-      return Response.json({ message: 'Only the owner can delete this matrix.' }, { status: 403 });
+      return Response.json(
+        { message: 'Only the owner can delete this matrix.' },
+        { status: 403 }
+      );
     }
 
     await prisma.dmpMatrix.delete({ where: { id: matrixId } });
