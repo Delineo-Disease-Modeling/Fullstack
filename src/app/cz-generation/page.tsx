@@ -5,6 +5,20 @@ import { useRouter } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  exportCzMapHtml,
+  fetchCandidatePois,
+  fetchCbgAtPoint,
+  fetchCbgGeoJson,
+  fetchCzMetrics,
+  fetchFrontierCandidates,
+  fetchPatternAvailability,
+  fetchSecondOrderDestinations,
+  finalizeConvenienceZone,
+  getClusteringProgressUrl,
+  startClusteringPreview,
+  type FrontierCandidatesResponse
+} from '@/features/cz-generation/api';
+import {
   CBG_GEOJSON_REQUEST_CHUNK_SIZE,
   CLUSTER_ALGORITHM_MANUAL,
   CLUSTER_ALGORITHM_OPTIONS,
@@ -247,17 +261,10 @@ export default function CZGeneration() {
   const isResolvingMapClickRef = useRef(false);
   const attemptedTraceGeoJsonFetchRef = useRef(new Set<string>());
 
-  const ALG_URL = process.env.NEXT_PUBLIC_ALG_URL || 'http://localhost:1880/';
-  const algUrl = useCallback(
-    (path: string) => new URL(path, ALG_URL).toString(),
-    [ALG_URL]
-  );
-
   const [location, setLocation] = useState('');
   const [minPop, setMinPop] = useState(5000);
-  const [clusterAlgorithm, setClusterAlgorithm] = useState<ClusterAlgorithm>(
-    'mobility_prune'
-  );
+  const [clusterAlgorithm, setClusterAlgorithm] =
+    useState<ClusterAlgorithm>('mobility_prune');
   const [showAdvancedClustering, setShowAdvancedClustering] = useState(false);
   const [seedGuardDistanceKm, setSeedGuardDistanceKm] = useState(20);
   const [mobilityPruneMinSeedCapturePct, setMobilityPruneMinSeedCapturePct] =
@@ -722,22 +729,17 @@ export default function CZGeneration() {
     const controller = new AbortController();
     setAvailableMonthsLoading(true);
 
-    const params = new URLSearchParams({
-      state: detectedStateAbbr,
-      start_date: '2018-01-01',
-      end_date: '2025-12-31'
-    });
-
-    fetch(algUrl(`pattern-availability?${params.toString()}`), {
-      signal: controller.signal
-    })
+    fetchPatternAvailability(
+      {
+        state: detectedStateAbbr,
+        startDate: '2018-01-01',
+        endDate: '2025-12-31'
+      },
+      controller.signal
+    )
       .then(async (resp) => {
-        if (!resp.ok) {
-          throw new Error(`Pattern availability failed: ${resp.status}`);
-        }
-        const json = await resp.json();
-        const months = Array.isArray(json?.data?.available_months)
-          ? (json.data.available_months as unknown[]).filter(
+        const months = Array.isArray(resp?.data?.available_months)
+          ? resp.data.available_months.filter(
               (m): m is string => typeof m === 'string'
             )
           : [];
@@ -755,7 +757,7 @@ export default function CZGeneration() {
       });
 
     return () => controller.abort();
-  }, [algUrl, detectedStateAbbr]);
+  }, [detectedStateAbbr]);
 
   const monthOptions = useMemo(
     () => [...availableMonths].sort(),
@@ -812,17 +814,11 @@ export default function CZGeneration() {
     }
 
     let cancelled = false;
-    fetch(
-      `${algUrl('cbg-geojson')}?cbgs=${encodeURIComponent(
-        selectedCBGs.join(',')
-      )}&include_neighbors=false`
-    )
-      .then(async (resp) => {
-        const data = await resp.json().catch(() => null);
-        if (cancelled || !resp.ok || !data?.features?.length) {
+    fetchCbgGeoJson(selectedCBGs, false)
+      .then((geojson) => {
+        if (cancelled || !geojson?.features?.length) {
           return;
         }
-        const geojson = data as GeoJSONData;
         setCbgGeoJSON(geojson);
         const bounds = getBoundsForGeoJson(geojson);
         if (bounds) {
@@ -841,7 +837,7 @@ export default function CZGeneration() {
     return () => {
       cancelled = true;
     };
-  }, [algUrl, guidedSelectionMode, selectedCBGs]);
+  }, [guidedSelectionMode, selectedCBGs]);
 
   useEffect(() => {
     if (traceStepIndex > maxTraceStep) {
@@ -896,11 +892,10 @@ export default function CZGeneration() {
     }
 
     attemptedTraceGeoJsonFetchRef.current.add(normalized);
-    fetch(`${algUrl('cbg-geojson')}?cbgs=${normalized}&include_neighbors=false`)
-      .then((resp) => (resp.ok ? resp.json() : null))
-      .then((data) => {
-        if (data?.features?.length) {
-          setCbgGeoJSON((prev) => mergeGeoJsonFeatures(prev, data));
+    fetchCbgGeoJson([normalized], false)
+      .then((geojson) => {
+        if (geojson?.features?.length) {
+          setCbgGeoJSON((prev) => mergeGeoJsonFeatures(prev, geojson));
         }
       })
       .catch((err) => {
@@ -909,7 +904,7 @@ export default function CZGeneration() {
           err
         );
       });
-  }, [algUrl, cbgGeoJSON, focusedTraceCbg, showCandidatePanels]);
+  }, [cbgGeoJSON, focusedTraceCbg, showCandidatePanels]);
 
   useEffect(() => {
     if (!hasGenerated || !seedCBG || selectedCBGs.length === 0) {
@@ -922,19 +917,14 @@ export default function CZGeneration() {
     const timer = setTimeout(async () => {
       setCziLoading(true);
       try {
-        const resp = await fetch(algUrl('cz-metrics'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            seed_cbg: seedCBG,
-            cbg_list: selectedCBGs,
-            start_date: startDate,
-            use_test_data: useTestData
-          })
+        const data = await fetchCzMetrics({
+          seed_cbg: seedCBG,
+          cbg_list: selectedCBGs,
+          start_date: startDate,
+          use_test_data: useTestData
         });
-        const data = await resp.json();
         if (!cancelled) {
-          setCziMetrics(resp.ok ? data : null);
+          setCziMetrics(data);
         }
       } catch (err) {
         if (!cancelled) {
@@ -952,7 +942,7 @@ export default function CZGeneration() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [algUrl, hasGenerated, seedCBG, selectedCBGs, startDate, useTestData]);
+  }, [hasGenerated, seedCBG, selectedCBGs, startDate, useTestData]);
 
   useEffect(() => {
     if (!showCandidatePanels || !selectedTraceCandidateCbg) {
@@ -974,27 +964,17 @@ export default function CZGeneration() {
     setCandidatePoiLoading(true);
     setCandidatePoiError('');
 
-    fetch(algUrl('candidate-pois'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        seed_cbg: seedCBG,
-        candidate_cbg: selectedTraceCandidateCbg,
-        cluster_cbgs: poiCluster,
-        start_date: startDate,
-        use_test_data: useTestData,
-        limit: 8
-      })
+    fetchCandidatePois({
+      seed_cbg: seedCBG,
+      candidate_cbg: selectedTraceCandidateCbg,
+      cluster_cbgs: poiCluster,
+      start_date: startDate,
+      use_test_data: useTestData,
+      limit: 8
     })
-      .then(async (resp) => {
-        const data = await readJsonObject(resp);
+      .then((data) => {
         if (cancelled) {
           return;
-        }
-        if (!resp.ok) {
-          throw new Error(
-            getResponseErrorMessage(resp, data, 'Failed to load POI analysis.')
-          );
         }
         setCandidatePois(
           Array.isArray(data?.pois) ? (data.pois as PoiAnalysis[]) : []
@@ -1020,7 +1000,6 @@ export default function CZGeneration() {
     };
   }, [
     activeTraceStep,
-    algUrl,
     seedCBG,
     selectedCBGs,
     selectedTraceCandidateCbg,
@@ -1072,20 +1051,10 @@ export default function CZGeneration() {
       }
     }
 
-    fetch(algUrl('frontier-candidates'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req)
-    })
-      .then(async (resp) => {
-        const data = await resp.json();
+    fetchFrontierCandidates(req)
+      .then((data: FrontierCandidatesResponse) => {
         if (cancelled) {
           return;
-        }
-        if (!resp.ok) {
-          throw new Error(
-            data?.message || 'Failed to load frontier candidates.'
-          );
         }
         const nextCandidates = Array.isArray(data?.candidates)
           ? data.candidates
@@ -1132,7 +1101,6 @@ export default function CZGeneration() {
       cancelled = true;
     };
   }, [
-    algUrl,
     clusterAlgorithm,
     guidedSelectionMode,
     manualEditPanelsActive,
@@ -1163,23 +1131,15 @@ export default function CZGeneration() {
     setZoneMetricsLoading(true);
     setZoneMetricsError('');
 
-    fetch(algUrl('cz-metrics'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        seed_cbg: seedCBG,
-        cbg_list: selectedCBGs,
-        start_date: startDate,
-        use_test_data: useTestData
-      })
+    fetchCzMetrics({
+      seed_cbg: seedCBG,
+      cbg_list: selectedCBGs,
+      start_date: startDate,
+      use_test_data: useTestData
     })
-      .then(async (resp) => {
-        const data = await resp.json();
+      .then((data) => {
         if (cancelled) {
           return;
-        }
-        if (!resp.ok) {
-          throw new Error(data?.message || 'Failed to compute zone metrics.');
         }
         setZoneMetrics(data || null);
       })
@@ -1202,7 +1162,6 @@ export default function CZGeneration() {
       cancelled = true;
     };
   }, [
-    algUrl,
     guidedSelectionMode,
     manualEditPanelsActive,
     seedCBG,
@@ -1247,7 +1206,7 @@ export default function CZGeneration() {
       new Promise((resolve, reject) => {
         let settled = false;
         const eventSource = new EventSource(
-          algUrl(`clustering-progress/${clusteringId}`)
+          getClusteringProgressUrl(clusteringId)
         );
         const timeout = window.setTimeout(
           () => {
@@ -1334,7 +1293,7 @@ export default function CZGeneration() {
           );
         };
       }),
-    [algUrl]
+    []
   );
 
   const loadSeedGeoJson = useCallback(
@@ -1354,13 +1313,8 @@ export default function CZGeneration() {
           index,
           index + CBG_GEOJSON_REQUEST_CHUNK_SIZE
         );
-        const resp = await fetch(
-          `${algUrl('cbg-geojson')}?cbgs=${encodeURIComponent(
-            chunk.join(',')
-          )}&include_neighbors=${includeNeighbors ? 'true' : 'false'}`
-        );
-        const seedGeoJson = await resp.json().catch(() => null);
-        if (!resp.ok || !seedGeoJson?.features?.length) {
+        const seedGeoJson = await fetchCbgGeoJson(chunk, includeNeighbors);
+        if (!seedGeoJson?.features?.length) {
           throw new Error(
             seedGeoJson?.message ||
               'Resolved the seed CBGs, but could not load their map boundary.'
@@ -1381,7 +1335,7 @@ export default function CZGeneration() {
 
       return mergedGeoJson;
     },
-    [algUrl]
+    []
   );
 
   const loadSeedEditGeoJson = useCallback(
@@ -1733,10 +1687,7 @@ export default function CZGeneration() {
     }
 
     try {
-      const resp = await fetch(
-        `${algUrl('cbg-geojson')}?cbgs=${normalized}&include_neighbors=true`
-      );
-      const data = await resp.json();
+      const data = await fetchCbgGeoJson([normalized], true);
       if (data?.features) {
         setCbgGeoJSON((prev) => mergeGeoJsonFeatures(prev, data));
       }
@@ -1756,10 +1707,7 @@ export default function CZGeneration() {
 
     isResolvingMapClickRef.current = true;
     try {
-      const resp = await fetch(
-        `${algUrl('cbg-at-point')}?latitude=${latlng.lat}&longitude=${latlng.lng}&state_fips=${stateHint}`
-      );
-      const data = await resp.json();
+      const data = await fetchCbgAtPoint(latlng, stateHint);
       const clickedCbg = data?.cbg;
       if (!clickedCbg || selectedCBGs.includes(clickedCbg)) {
         return;
@@ -1899,40 +1847,18 @@ export default function CZGeneration() {
     try {
       if (isGuidedSecondOrderAlgorithm) {
         setGuidedDestinationLoading(true);
-        const resp = await fetch(algUrl('second-order-destinations'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cbg: coreCbg,
-            seed_cbgs: resolvedSeedCbgs,
-            start_date: startDate,
-            use_test_data: isTestMode,
-            limit: 12
-          })
+        const data = await fetchSecondOrderDestinations({
+          cbg: coreCbg,
+          seed_cbgs: resolvedSeedCbgs,
+          start_date: startDate,
+          use_test_data: isTestMode,
+          limit: 12
         });
-        const data = (await readJsonObject(resp)) as Record<
-          string,
-          unknown
-        > | null;
-        if (!resp.ok || !data) {
-          throw new Error(
-            getResponseErrorMessage(
-              resp,
-              data,
-              'Failed to load connected city destinations.'
-            )
-          );
-        }
 
         let seedGeoJson = setupSeedGeoJSON;
         if (!seedGeoJson?.features?.length) {
-          const seedGeoResp = await fetch(
-            `${algUrl('cbg-geojson')}?cbgs=${encodeURIComponent(
-              resolvedSeedCbgs.join(',')
-            )}&include_neighbors=false`
-          );
-          const seedGeoData = await seedGeoResp.json().catch(() => null);
-          if (!seedGeoResp.ok || !seedGeoData?.features?.length) {
+          const seedGeoData = await fetchCbgGeoJson(resolvedSeedCbgs, false);
+          if (!seedGeoData?.features?.length) {
             throw new Error(
               seedGeoData?.message ||
                 'Resolved the seed region, but could not load its map boundary.'
@@ -2053,23 +1979,7 @@ export default function CZGeneration() {
         clusterReq.seed_cbgs = resolvedSeedCbgs;
       }
 
-      const resp = await fetch(algUrl('cluster-cbgs'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clusterReq)
-      });
-      const kickoffData = (await readJsonObject(
-        resp
-      )) as ClusteringPreviewResponse | null;
-      if (!resp.ok) {
-        throw new Error(
-          getResponseErrorMessage(
-            resp,
-            kickoffData,
-            'Failed to cluster CBGs. Please try again.'
-          )
-        );
-      }
+      const kickoffData = await startClusteringPreview(clusterReq);
 
       let data = kickoffData;
       if (!Array.isArray(data?.cluster)) {
@@ -2302,13 +2212,8 @@ export default function CZGeneration() {
         ...(guestClaimToken ? { guest_claim_token: guestClaimToken } : {})
       };
 
-      const resp = await fetch(algUrl('finalize-cz'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalizePayload)
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data?.id) {
+      const data = await finalizeConvenienceZone(finalizePayload);
+      if (!data?.id) {
         throw new Error(
           data?.message ||
             'Failed to create convenience zone. Please try again.'
@@ -2367,36 +2272,15 @@ export default function CZGeneration() {
     try {
       const suggestedName =
         String(cityName || location || 'cz-map').trim() || 'cz-map';
-      const resp = await fetch(algUrl('export-cz-map-html'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cbg_list: selectedCBGs,
-          name: suggestedName
-        })
+      const exportedMap = await exportCzMapHtml({
+        cbg_list: selectedCBGs,
+        name: suggestedName
       });
-      if (!resp.ok) {
-        const errorData = await resp.json().catch(() => null);
-        throw new Error(
-          errorData?.message || 'Failed to export the CZ HTML map.'
-        );
-      }
 
-      const blob = await resp.blob();
-      const disposition = resp.headers.get('content-disposition') || '';
-      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
-      const filename =
-        filenameMatch?.[1] ||
-        `${
-          suggestedName
-            .replace(/[^A-Za-z0-9._-]+/g, '-')
-            .replace(/^-+|-+$/g, '') || 'cz-map'
-        }.html`;
-
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(exportedMap.blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = filename;
+      anchor.download = exportedMap.filename;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
