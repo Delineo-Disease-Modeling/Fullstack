@@ -37,8 +37,19 @@ export default function DiseaseGraph() {
     let transmissions: Transmission[] = [];
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const parent = canvas.parentElement;
+      const w = parent ? parent.offsetWidth : window.innerWidth;
+      const h = parent ? parent.offsetHeight : window.innerHeight;
+      const prevW = canvas.width;
+      const prevH = canvas.height;
+      canvas.width = w;
+      canvas.height = h;
+      if (prevW && prevH) {
+        nodes.forEach((node) => {
+          node.x = (node.x / prevW) * w;
+          node.y = (node.y / prevH) * h;
+        });
+      }
     };
 
     class Node {
@@ -212,12 +223,13 @@ export default function DiseaseGraph() {
       animationFrameId = requestAnimationFrame(animate);
     };
 
-    window.addEventListener('resize', resize);
+    const ro = new ResizeObserver(resize);
+    if (canvas.parentElement) ro.observe(canvas.parentElement);
     init();
     animate();
 
     return () => {
-      window.removeEventListener('resize', resize);
+      ro.disconnect();
       cancelAnimationFrame(animationFrameId);
     };
   }, []);

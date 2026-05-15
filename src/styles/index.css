@@ -52,16 +52,20 @@
 
 html {
   background-color: var(--color-bg-dark);
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 body {
-  background-color: var(--color-bg-cream);
+  background-color: var(--color-bg-dark);
   color: var(--color-text-main);
   font-family: "Poppins", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+main.page-content {
+  background-color: var(--color-bg-cream);
+  flex: 1;
 }
 
 body > footer.site_footer {

@@ -61,7 +61,9 @@ export default async function RootLayout({
         <AOSInit />
         <AuthProvider>
           <Navbar initialUser={initialUser} />
-          {children}
+          <main className="page-content">
+            {children}
+          </main>
           <Footer />
         </AuthProvider>
       </body>

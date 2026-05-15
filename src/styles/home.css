@@ -143,6 +143,9 @@ img.logo {
   h2.title {
     text-align: center;
   }
+  .hero-ctas {
+    justify-content: center;
+  }
   .hero-meta {
     justify-content: center;
   }
