@@ -251,23 +251,21 @@ export default function InterventionTimeline() {
       >
         <legend className="iv_timeline_legend">Intervention timeline</legend>
         <div className="iv_timeline_track_line" />
-        {curtime === 0 && (
-          <button
-            type="button"
-            className="iv_timeline_thumb iv_timeline_thumb--baseline current"
-            style={{ left: '0%' }}
-            aria-label="Baseline intervention hour 0"
-            onClick={() => setCurtime(0)}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setCurtime(0);
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              setCurtime(0);
-            }}
-          />
-        )}
+        <button
+          type="button"
+          className={`iv_timeline_thumb iv_timeline_thumb--baseline${curtime === 0 ? ' current' : ''}`}
+          style={{ left: '0%' }}
+          aria-label="Baseline intervention hour 0"
+          onClick={() => setCurtime(0)}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            setCurtime(0);
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            setCurtime(0);
+          }}
+        />
         {timelineValues.map((value) => (
           <button
             key={value}

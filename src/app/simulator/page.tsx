@@ -84,7 +84,7 @@ export default function Simulator() {
       }
     }
 
-    const request = buildSimulationRequest(settings);
+    const request = await buildSimulationRequest(settings);
     if (request.error) {
       setError(request.error);
       return false;

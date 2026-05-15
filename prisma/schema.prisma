@@ -20,6 +20,7 @@ model User {
   sessions        Session[]
   accounts        Account[]
   ConvenienceZone ConvenienceZone[]
+  dmpMatrices     DmpMatrix[]
 }
 
 model Session {
@@ -98,4 +99,16 @@ model POI {
   address     String
   cbg         String
   categories  String[]
+}
+
+model DmpMatrix {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  content     String
+  is_default  Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  user_id     String?
+  user        User?    @relation(references: [id], fields: [user_id], onDelete: SetNull)
 }

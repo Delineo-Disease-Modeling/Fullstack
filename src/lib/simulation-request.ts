@@ -21,6 +21,7 @@ export type SimulationRequestBody = SimSettings & {
   variants: string[];
   dmp_mode: DmpMode;
   model_path_by_variant: Record<string, string | null>;
+  matrix_csv_by_variant: Record<string, string>;
   interventions: Interventions[];
   randseed: boolean;
 };
@@ -29,9 +30,31 @@ type BuildSimulationRequestResult =
   | { body: SimulationRequestBody; error: null }
   | { body: null; error: string };
 
-export function buildSimulationRequest(
+async function fetchMatrixCsvByVariant(
+  matrixByVariant: Record<string, number | null>
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  await Promise.all(
+    Object.entries(matrixByVariant).map(async ([variant, matrixId]) => {
+      if (matrixId == null) return;
+      try {
+        const res = await fetch(`/api/dmp/matrices/${matrixId}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (typeof json.data?.content === 'string') {
+          result[variant] = json.data.content;
+        }
+      } catch {
+        // silently skip — simulation will fall back to DMP API or config defaults
+      }
+    })
+  );
+  return result;
+}
+
+export async function buildSimulationRequest(
   settings: SimSettings
-): BuildSimulationRequestResult {
+): Promise<BuildSimulationRequestResult> {
   const zone = settings.zone;
   if (!zone) {
     return { body: null, error: 'Please pick a convenience zone first.' };
@@ -54,6 +77,8 @@ export function buildSimulationRequest(
     .map((variant) => variant.trim())
     .filter(Boolean);
 
+  const matrixCsvByVariant = await fetchMatrixCsvByVariant(settings.matrix_by_variant);
+
   return {
     body: {
       ...settings,
@@ -68,6 +93,7 @@ export function buildSimulationRequest(
       variants: variants.length ? variants : [...DEFAULT_VARIANTS],
       dmp_mode: settings.dmp_mode,
       model_path_by_variant: settings.model_path_by_variant,
+      matrix_csv_by_variant: matrixCsvByVariant,
       interventions: settings.interventions,
       randseed: settings.randseed
     },

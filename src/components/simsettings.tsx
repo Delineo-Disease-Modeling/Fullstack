@@ -8,10 +8,10 @@ import CzDict from './czdict';
 import InterventionTimeline from './intervention-timeline';
 import {
   SimBoolean,
-  SimFile,
   SimParameter,
   SimRunSelector
 } from './settings-components';
+import DmpSelector from './dmp-selector';
 import Button from '@/components/ui/button';
 import ZoneActions from './zone-actions';
 import Modal from 'react-modal';
@@ -330,8 +330,8 @@ export default function SimSettings({
             percent={false}
             units=" people"
           />
-          <SimFile label={'Custom DMP Matrix Files'} callback={console.log} />
         </div>
+        <DmpSelector />
       </div>
 
       <div className="sim_section">

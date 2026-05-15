@@ -39,6 +39,7 @@ export type SimSettings = {
   variants: string[];
   dmp_mode: DmpMode;
   model_path_by_variant: Record<string, string | null>;
+  matrix_by_variant: Record<string, number | null>;
   interventions: Interventions[];
 };
 
@@ -76,6 +77,7 @@ const default_settings: SimSettings = {
   model_path_by_variant: {
     Delta: 'variant.Delta.general'
   },
+  matrix_by_variant: {},
   interventions: [{ ...default_interventions }]
 };
 
