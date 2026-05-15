@@ -4,20 +4,21 @@ import type { NextRequest } from 'next/server';
 import { resolveDbDataPath } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { getCachedPapdata } from '@/lib/papdata-cache';
+import { jsonMessage } from '@/server/api/responses';
+import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ czone_id: string }> }
 ) {
   const { czone_id: czone_id_raw } = await params;
-  const czone_id = Number(czone_id_raw);
-
-  if (Number.isNaN(czone_id) || czone_id < 0) {
-    return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
+  const czoneId = parseNonNegativeRouteNumber(czone_id_raw, 'czone_id');
+  if (!czoneId.ok) {
+    return jsonMessage(czoneId.message, czoneId.status);
   }
 
   const czone = await prisma.convenienceZone.findUnique({
-    where: { id: czone_id }
+    where: { id: czoneId.value }
   });
 
   if (!czone?.papdata_id || !czone?.patterns_id) {

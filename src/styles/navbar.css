@@ -27,6 +27,13 @@ nav {
   color: var(--color-text-light);
 }
 
+img {
+  display: inline-block;
+  vertical-align: middle;
+  width: 26px;
+  height: 26px;
+}
+
 .nav-brand img {
   width: 26px;
   height: 26px;
@@ -47,11 +54,14 @@ div.navbuffer {
   height: 60px;
 }
 
-img {
-  display: inline-block;
-  vertical-align: middle;
-  width: 26px;
-  height: 26px;
+@media screen and (max-width: 800px) {
+  nav {
+    padding: 0 16px;
+  }
+
+  .nav-brand-name {
+    display: none;
+  }
 }
 
 ul {
@@ -73,7 +83,9 @@ button.link {
   text-decoration: none;
   padding: 8px 14px;
   border-radius: 6px;
-  transition: color 160ms ease, background-color 160ms ease;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
   background: none;
   border: none;
   cursor: pointer;
@@ -125,7 +137,9 @@ a.link.active::after {
   height: 1.5px;
   background-color: rgba(245, 245, 240, 0.78);
   border-radius: 2px;
-  transition: transform 220ms ease, opacity 220ms ease;
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
 }
 
 .hamburger.open .hamburger-bar:nth-child(1) {
@@ -247,7 +261,9 @@ a.link.active::after {
   border-radius: 10px;
   padding: 6px;
   z-index: 10000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .user-dropdown-info {
@@ -286,7 +302,9 @@ a.link.active::after {
   padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
-  transition: color 160ms ease, background-color 160ms ease;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
 }
 
 .user-dropdown-logout:hover {

@@ -1,7 +1,36 @@
-Fullstack Next.JS refactor
+# Fullstack Refactor Workflow
 
-1. Switch to a new branch (next-js)
-2. Refactor the entire Vite codebase to use next-js (instead of separate client a server directories, have a main src directory with next js app router stuff)
-3. Port the front and backend over, organize everything to represent best coding practices (e.g. SSR, reusable code, consistent coloring and styling)
-4. Keep the overall website design as similar as possible
-5. Ensure everything works with the existing Algorithms/Simulation (front and backend), the Algos/Simulation engines are already running on their respective ports defined in client/.env
+`main` is production and autodeployed. Do not work directly on `main` unless the maintainer explicitly asks for it.
+
+## Working Branches
+
+- Start feature and fix work from the latest `main` on a short-lived branch.
+- Prefer branch names like `ryad/<feature-or-fix>`.
+- Use the foundation worktree and branch when coordinating refactor work: `Fullstack-refactor-foundation` on `ryad/fullstack-refactor-foundation`.
+- Treat unrelated dirty files as someone else's work. Do not revert, rewrite, or reformat outside the assigned ownership area.
+
+## Current App Shape
+
+- Fullstack is a Next.js App Router app under `src/app`.
+- Shared application code lives under `src/lib`, components under `src/components`, and generated Prisma client output under `src/generated/prisma`.
+- There is no active Vite `client` folder workflow for this app.
+- Local Fullstack runs on `http://localhost:3000`.
+- Algorithms runs on `http://localhost:1880`.
+- Simulation runs on `http://localhost:1870`.
+
+## Worker Handoff Checklist
+
+- Confirm the branch and worktree before editing.
+- Keep edits inside the assigned ownership scope.
+- Avoid package, lockfile, generated-code, and broad formatting churn unless explicitly owned.
+- Keep public env names aligned with `.env.example` and README.
+- Run the validation gates before handoff when the changed area warrants it:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+For database-affecting changes, also run the relevant Prisma command against a local database.

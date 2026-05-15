@@ -1,34 +1,22 @@
-import { createReadStream } from 'node:fs';
-import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
-import chain from 'stream-chain';
-import parser from 'stream-json';
-import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { resolveDbDataPath } from '@/lib/db-files';
-import { prisma } from '@/lib/prisma';
+import { streamJsonObjectEntries } from '@/lib/json-stream';
 import { getCachedPapdata } from '@/lib/papdata-cache';
-
-const age_ranges: [number, number][] = [
-  [0, 20],
-  [21, 40],
-  [41, 60],
-  [61, 80],
-  [81, 99]
-];
-const age_range_labels = age_ranges.map(([lo, hi]) => `${lo}-${hi}`);
-
-const bitmask_states: [string, number][] = [
-  ['Infected', 1],
-  ['Infectious', 2],
-  ['Symptomatic', 4],
-  ['Hospitalized', 8],
-  ['Recovered', 16],
-  ['Removed', 32]
-];
-const all_state_names = ['Susceptible', ...bitmask_states.map(([n]) => n)];
-
-type DataPoint = { time: number; [key: string]: number };
-type ChartData = { [type: string]: DataPoint[] };
+import { prisma } from '@/lib/prisma';
+import {
+  AGE_RANGE_LABELS,
+  ALL_STATE_NAMES,
+  BITMASK_STATES,
+  buildAgeIndex,
+  type ChartData,
+  type DataPoint,
+  getChartError,
+  type DiseaseStateTimestep,
+  type PapData,
+  type PatternTimestep
+} from '@/lib/simulation-data';
+import { jsonMessage } from '@/server/api/responses';
+import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
 
 const LOC_CACHE_MAX = 30;
 interface LocCacheEntry {
@@ -67,7 +55,7 @@ async function computeLocationStats(
   fileId: string,
   locId: string,
   locType: 'homes' | 'places',
-  papdata: any
+  papdata: PapData
 ): Promise<ChartData> {
   const cacheKey = `${fileId}:${locType}:${locId}`;
   const cached = getCachedLocationStats(cacheKey);
@@ -75,42 +63,21 @@ async function computeLocationStats(
     return cached;
   }
 
-  const [{ path: simPath, gzipped: simGzipped }, { path: patPath, gzipped: patGzipped }] =
-    await Promise.all([
-      resolveDbDataPath(fileId, '.sim'),
-      resolveDbDataPath(fileId, '.pat')
-    ]);
+  const [
+    { path: simPath, gzipped: simGzipped },
+    { path: patPath, gzipped: patGzipped }
+  ] = await Promise.all([
+    resolveDbDataPath(fileId, '.sim'),
+    resolveDbDataPath(fileId, '.pat')
+  ]);
 
-  const ageIndex = new Map<string, number>();
-  for (const [id, person] of Object.entries(papdata.people ?? {}) as [
-    string,
-    any
-  ][]) {
-    for (let i = 0; i < age_ranges.length; i++) {
-      if (person.age >= age_ranges[i][0] && person.age <= age_ranges[i][1]) {
-        ageIndex.set(id, i);
-        break;
-      }
-    }
-  }
+  const ageIndex = buildAgeIndex(papdata.people);
 
-  const simIter = (
-    chain([
-      createReadStream(simPath),
-      ...(simGzipped ? [createGunzip()] : []),
-      parser(),
-      StreamObject.streamObject()
-    ]) as any
-  )[Symbol.asyncIterator]();
-
-  const patIter = (
-    chain([
-      createReadStream(patPath),
-      ...(patGzipped ? [createGunzip()] : []),
-      parser(),
-      StreamObject.streamObject()
-    ]) as any
-  )[Symbol.asyncIterator]();
+  const simIter = streamJsonObjectEntries<DiseaseStateTimestep>(
+    simPath,
+    simGzipped
+  );
+  const patIter = streamJsonObjectEntries<PatternTimestep>(patPath, patGzipped);
 
   const chartData: ChartData = { iot: [], ages: [], sexes: [], states: [] };
 
@@ -143,8 +110,8 @@ async function computeLocationStats(
       const sexes_data: DataPoint = { time, Male: 0, Female: 0 };
       const states_data: DataPoint = { time };
 
-      for (const label of age_range_labels) ages_data[label] = 0;
-      for (const name of all_state_names) states_data[name] = 0;
+      for (const label of AGE_RANGE_LABELS) ages_data[label] = 0;
+      for (const name of ALL_STATE_NAMES) states_data[name] = 0;
 
       let totalInfected = 0;
 
@@ -161,15 +128,15 @@ async function computeLocationStats(
           }
 
           diseaseCount++;
-          for (const [stateName, bit] of bitmask_states) {
+          for (const [stateName, bit] of BITMASK_STATES) {
             if (stateBitmask & bit) states_data[stateName]++;
           }
-          const p = papdata.people[pid];
+          const p = papdata.people?.[pid];
           if (p) {
             sexes_data[p.sex === 0 ? 'Male' : 'Female']++;
             const ageIdx = ageIndex.get(pid);
             if (ageIdx !== undefined) {
-              ages_data[age_range_labels[ageIdx]]++;
+              ages_data[AGE_RANGE_LABELS[ageIdx]]++;
             }
           }
         }
@@ -199,17 +166,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
-  const id = Number(id_raw);
+  const id = parseNonNegativeRouteNumber(id_raw, 'id');
   const { searchParams } = new URL(request.url);
   const loc_type = searchParams.get('loc_type') as 'homes' | 'places' | null;
   const loc_id = searchParams.get('loc_id');
 
-  if (Number.isNaN(id) || id < 0) {
-    return Response.json({ message: 'Invalid id' }, { status: 400 });
+  if (!id.ok) {
+    return jsonMessage(id.message, id.status);
   }
 
   const simdata = await prisma.simData.findUnique({
-    where: { id },
+    where: { id: id.value },
     include: { czone: true }
   });
   if (!simdata) {
@@ -221,10 +188,11 @@ export async function GET(
 
   if (!loc_id || !loc_type) {
     if (simdata.global_stats) {
-      const stats = simdata.global_stats as any;
-      if (stats.error) {
+      const stats = simdata.global_stats;
+      const statsError = getChartError(stats);
+      if (statsError) {
         return Response.json(
-          { message: `Chart generation failed: ${stats.error}` },
+          { message: `Chart generation failed: ${statsError}` },
           { status: 500 }
         );
       }

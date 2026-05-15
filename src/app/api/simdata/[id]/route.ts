@@ -1,10 +1,12 @@
 import { readFile, stat, unlink } from 'node:fs/promises';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { auth } from '@/lib/auth';
 import { DB_FOLDER } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { processingProgress } from '@/lib/sim-processor';
+import { jsonMessage } from '@/server/api/responses';
+import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
+import { requireSessionUserId } from '@/server/api/session';
 
 const updateSchema = z.object({
   name: z.string().min(2).optional()
@@ -42,20 +44,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
-  const id = Number(id_raw);
+  const id = parseNonNegativeRouteNumber(id_raw, 'id');
 
-  if (Number.isNaN(id) || id < 0) {
-    return Response.json({ message: 'Invalid id' }, { status: 400 });
+  if (!id.ok) {
+    return jsonMessage(id.message, id.status);
   }
 
   const simdata = await prisma.simData.findUnique({
-    where: { id },
+    where: { id: id.value },
     include: { czone: true }
   });
 
   if (!simdata) {
     return Response.json(
-      { message: `Could not find simdata #${id}` },
+      { message: `Could not find simdata #${id.value}` },
       { status: 404 }
     );
   }
@@ -140,7 +142,7 @@ export async function GET(
 
   // Cache miss: return 202 with processing progress so the client can
   // show a progress bar while polling.
-  const progress = processingProgress.get(id) ?? 0;
+  const progress = processingProgress.get(id.value) ?? 0;
   return Response.json(
     {
       processing: true,
@@ -157,34 +159,31 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
-  const id = Number(id_raw);
+  const id = parseNonNegativeRouteNumber(id_raw, 'id');
 
-  if (Number.isNaN(id) || id < 0) {
-    return Response.json({ message: 'Invalid id' }, { status: 400 });
+  if (!id.ok) {
+    return jsonMessage(id.message, id.status);
   }
 
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user?.id) {
-    return Response.json(
-      { message: 'Authentication required' },
-      { status: 401 }
-    );
+  const session = await requireSessionUserId(request.headers);
+  if (!session.ok) {
+    return session.response;
   }
 
   try {
     const existing = await prisma.simData.findUnique({
-      where: { id },
+      where: { id: id.value },
       include: { czone: { select: { user_id: true } } }
     });
 
     if (!existing) {
       return Response.json(
-        { message: `Could not find simdata #${id}` },
+        { message: `Could not find simdata #${id.value}` },
         { status: 404 }
       );
     }
 
-    if (existing.czone.user_id !== session.user.id) {
+    if (existing.czone.user_id !== session.userId) {
       return Response.json({ message: 'Forbidden' }, { status: 403 });
     }
 
@@ -199,13 +198,13 @@ export async function PATCH(
 
     const { name } = parsed.data;
     const updated = await prisma.simData.update({
-      where: { id },
+      where: { id: id.value },
       data: { name }
     });
     return Response.json({ data: updated });
   } catch {
     return Response.json(
-      { message: `Could not find simdata #${id}` },
+      { message: `Could not find simdata #${id.value}` },
       { status: 404 }
     );
   }
@@ -216,38 +215,35 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
-  const id = Number(id_raw);
+  const id = parseNonNegativeRouteNumber(id_raw, 'id');
 
-  if (Number.isNaN(id) || id < 0) {
-    return Response.json({ message: 'Invalid id' }, { status: 400 });
+  if (!id.ok) {
+    return jsonMessage(id.message, id.status);
   }
 
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user?.id) {
-    return Response.json(
-      { message: 'Authentication required' },
-      { status: 401 }
-    );
+  const session = await requireSessionUserId(request.headers);
+  if (!session.ok) {
+    return session.response;
   }
 
   try {
     const existing = await prisma.simData.findUnique({
-      where: { id },
+      where: { id: id.value },
       include: { czone: { select: { user_id: true } } }
     });
 
     if (!existing) {
       return Response.json(
-        { message: `Could not find simdata #${id}` },
+        { message: `Could not find simdata #${id.value}` },
         { status: 404 }
       );
     }
 
-    if (existing.czone.user_id !== session.user.id) {
+    if (existing.czone.user_id !== session.userId) {
       return Response.json({ message: 'Forbidden' }, { status: 403 });
     }
 
-    const deleted = await prisma.simData.delete({ where: { id } });
+    const deleted = await prisma.simData.delete({ where: { id: id.value } });
 
     // Clean up all files associated with this run
     const base = DB_FOLDER + deleted.file_id;
@@ -262,7 +258,7 @@ export async function DELETE(
     return Response.json({ data: deleted });
   } catch {
     return Response.json(
-      { message: `Could not find simdata #${id}` },
+      { message: `Could not find simdata #${id.value}` },
       { status: 404 }
     );
   }

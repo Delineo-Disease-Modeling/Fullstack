@@ -54,10 +54,7 @@ export default function Navbar({
       ) {
         setDropdownOpen(false);
       }
-      if (
-        navRef.current &&
-        !navRef.current.contains(e.target as Node)
-      ) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
         closeMobileMenu();
       }
     }
@@ -66,6 +63,7 @@ export default function Navbar({
   }, [dropdownOpen, mobileMenuOpen, closeMobileMenu]);
 
   useEffect(() => {
+    if (!pathname) return;
     setMobileMenuOpen(false);
     setMobileMenuClosing(false);
   }, [pathname]);
@@ -176,10 +174,22 @@ export default function Navbar({
         {mobileMenuOpen && (
           <div className={`mobile-menu${mobileMenuClosing ? ' closing' : ''}`}>
             <ul className="mobile-menu-list">
-              <li>{navLink('/simulator', 'Simulator', () => setMobileMenuOpen(false))}</li>
-              <li>{navLink('/cz-generation', 'CZ Generator', () => setMobileMenuOpen(false))}</li>
-              <li>{navLink('/about', 'About', () => setMobileMenuOpen(false))}</li>
-              <li>{navLink('/team', 'Team', () => setMobileMenuOpen(false))}</li>
+              <li>
+                {navLink('/simulator', 'Simulator', () =>
+                  setMobileMenuOpen(false)
+                )}
+              </li>
+              <li>
+                {navLink('/cz-generation', 'CZ Generator', () =>
+                  setMobileMenuOpen(false)
+                )}
+              </li>
+              <li>
+                {navLink('/about', 'About', () => setMobileMenuOpen(false))}
+              </li>
+              <li>
+                {navLink('/team', 'Team', () => setMobileMenuOpen(false))}
+              </li>
               <li>
                 {!user ? (
                   <button

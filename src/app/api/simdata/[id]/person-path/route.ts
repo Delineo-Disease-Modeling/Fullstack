@@ -1,11 +1,14 @@
-import { createReadStream } from 'node:fs';
-import { createGunzip } from 'node:zlib';
 import type { NextRequest } from 'next/server';
-import chain from 'stream-chain';
-import parser from 'stream-json';
-import StreamObject from 'stream-json/streamers/StreamObject.js';
 import { readDbJson, resolveDbDataPath } from '@/lib/db-files';
+import { streamJsonObjectEntries } from '@/lib/json-stream';
 import { prisma } from '@/lib/prisma';
+import {
+  getPersonSexLabel,
+  type PapData,
+  type PatternTimestep
+} from '@/lib/simulation-data';
+import { jsonMessage } from '@/server/api/responses';
+import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
 const DAY_MINUTES = 24 * 60;
 
 type KnownLocation = {
@@ -29,8 +32,7 @@ type PathSegment = {
 
 function includesPersonId(values: unknown, personId: string) {
   return (
-    Array.isArray(values) &&
-    values.some((value) => String(value) === personId)
+    Array.isArray(values) && values.some((value) => String(value) === personId)
   );
 }
 
@@ -58,7 +60,7 @@ function inferStepMinutes(minutes: number[]) {
 function getLocationLabel(
   locationType: 'homes' | 'places' | 'unknown',
   locationId: string,
-  papdata: any
+  papdata: PapData
 ) {
   if (locationType === 'homes') {
     return `Home #${locationId}`;
@@ -70,7 +72,7 @@ function getLocationLabel(
 }
 
 function findPersonLocation(
-  movementAtTime: any,
+  movementAtTime: PatternTimestep,
   personId: string,
   previousLocation: KnownLocation | null
 ) {
@@ -88,7 +90,9 @@ function findPersonLocation(
     }
   }
 
-  for (const [placeId, people] of Object.entries(movementAtTime?.places ?? {})) {
+  for (const [placeId, people] of Object.entries(
+    movementAtTime?.places ?? {}
+  )) {
     if (includesPersonId(people, personId)) {
       return { type: 'places' as const, id: placeId };
     }
@@ -102,7 +106,7 @@ function toIsoTime(startDateMs: number, minute: number) {
 }
 
 async function loadPapData(papDataId: string) {
-  return readDbJson(papDataId);
+  return readDbJson<PapData>(papDataId);
 }
 
 async function resolvePatternsPath(fileId: string) {
@@ -113,18 +117,16 @@ async function buildPersonPath(
   fileId: string,
   personId: number,
   startDate: Date,
-  papdata: any
+  papdata: PapData
 ) {
   const { path: patternsPath, gzipped } = await resolvePatternsPath(fileId);
   const startDateMs = startDate.getTime();
   const personKey = String(personId);
 
-  const patChain: any[] = [createReadStream(patternsPath)];
-  if (gzipped) {
-    patChain.push(createGunzip());
-  }
-  patChain.push(parser(), StreamObject.streamObject());
-  const patternsIterator = (chain(patChain) as any)[Symbol.asyncIterator]();
+  const patternsIterator = streamJsonObjectEntries<PatternTimestep>(
+    patternsPath,
+    gzipped
+  );
 
   const points: TimelinePoint[] = [];
   let previousLocation: KnownLocation | null = null;
@@ -321,14 +323,8 @@ async function buildPersonPath(
   const person = personData
     ? {
         id: personId,
-        age:
-          typeof personData.age === 'number' ? personData.age : null,
-        sex:
-          personData.sex === 0
-            ? 'Male'
-            : personData.sex === 1
-              ? 'Female'
-              : 'Unknown',
+        age: typeof personData.age === 'number' ? personData.age : null,
+        sex: getPersonSexLabel(personData.sex),
         home:
           personData.home != null
             ? String(personData.home)
@@ -353,11 +349,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: id_raw } = await params;
-  const id = Number(id_raw);
+  const id = parseNonNegativeRouteNumber(id_raw, 'id');
   const personId = Number(request.nextUrl.searchParams.get('person_id'));
 
-  if (Number.isNaN(id) || id < 0) {
-    return Response.json({ message: 'Invalid id' }, { status: 400 });
+  if (!id.ok) {
+    return jsonMessage(id.message, id.status);
   }
 
   if (!Number.isInteger(personId) || personId < 0) {
@@ -365,7 +361,7 @@ export async function GET(
   }
 
   const simdata = await prisma.simData.findUnique({
-    where: { id },
+    where: { id: id.value },
     include: { czone: true }
   });
   if (!simdata) {
