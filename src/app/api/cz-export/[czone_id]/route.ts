@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server';
-import { auth } from '@/lib/auth';
 import { buildCzExportTar } from '@/lib/cz-export';
 import { prisma } from '@/lib/prisma';
+import { jsonMessage } from '@/server/api/responses';
+import { parsePositiveFiniteRouteNumber } from '@/server/api/route-params';
+import { requireSessionUserId } from '@/server/api/session';
 
 const DEFAULT_SIM_LIMIT = 3;
 const MAX_SIM_LIMIT = 20;
@@ -20,19 +22,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ czone_id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user?.id) {
-    return Response.json(
-      { message: 'Authentication required' },
-      { status: 401 }
-    );
+  const session = await requireSessionUserId(request.headers);
+  if (!session.ok) {
+    return session.response;
   }
 
   const { czone_id: rawId } = await params;
-  const czone_id = Number(rawId);
-  if (!Number.isFinite(czone_id) || czone_id <= 0) {
-    return Response.json({ message: 'Invalid czone_id' }, { status: 400 });
+  const czoneId = parsePositiveFiniteRouteNumber(rawId, 'czone_id');
+  if (!czoneId.ok) {
+    return jsonMessage(czoneId.message, czoneId.status);
   }
+  const czone_id = czoneId.value;
 
   const url = new URL(request.url);
   const simIdParam = url.searchParams.get('sim_id');
@@ -71,7 +71,7 @@ export async function GET(
   const stream = await buildCzExportTar({
     czone,
     simRuns,
-    exportedBy: session.user.id
+    exportedBy: session.userId
   });
   return new Response(stream as unknown as BodyInit, {
     headers: {

@@ -25,8 +25,11 @@ export async function resolveDbDataPath(
   return { path: basePath, gzipped: false };
 }
 
-export async function readDbJson(fileId: string, suffix = '') {
+export async function readDbJson<T = unknown>(
+  fileId: string,
+  suffix = ''
+): Promise<T> {
   const { path, gzipped } = await resolveDbDataPath(fileId, suffix);
   const raw = await readFile(path);
-  return JSON.parse((gzipped ? gunzipSync(raw) : raw).toString());
+  return JSON.parse((gzipped ? gunzipSync(raw) : raw).toString()) as T;
 }

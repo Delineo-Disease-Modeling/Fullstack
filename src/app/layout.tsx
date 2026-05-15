@@ -8,6 +8,13 @@ import { auth } from '@/lib/auth';
 import type { CachedUser } from '@/stores/useAuthStore';
 import './globals.css';
 
+type SessionUserWithOrganization = {
+  id: string;
+  name: string;
+  email: string;
+  organization?: string | null;
+};
+
 export const viewport = {
   viewportFit: 'cover'
 };
@@ -26,12 +33,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  const initialUser: CachedUser | null = session?.user
+  const sessionUser = session?.user as SessionUserWithOrganization | undefined;
+  const initialUser: CachedUser | null = sessionUser
     ? {
-        id: session.user.id,
-        name: session.user.name,
-        email: session.user.email,
-        organization: (session.user as any).organization ?? ''
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        organization: sessionUser.organization ?? ''
       }
     : null;
 

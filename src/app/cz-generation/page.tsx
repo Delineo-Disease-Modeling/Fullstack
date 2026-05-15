@@ -3,6 +3,51 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CBG_GEOJSON_REQUEST_CHUNK_SIZE,
+  CLUSTER_ALGORITHM_MANUAL,
+  CLUSTER_ALGORITHM_OPTIONS,
+  EMPTY_LIST,
+  GUIDED_HARD_EXPLICIT_POPULATION,
+  GUIDED_REGION_PALETTE,
+  GUIDED_SEED_STYLE,
+  GUIDED_SOFT_EXPLICIT_POPULATION,
+  INITIAL_SEED_EDIT_NEIGHBOR_RINGS,
+  type ClusterAlgorithm
+} from '@/features/cz-generation/constants';
+import {
+  clampIndex,
+  dedupeCbgList,
+  endDateFromMonth,
+  filterGeoJsonByCbgs,
+  formatMonthLabel,
+  getCbgIdsFromGeoJson,
+  getLengthHours,
+  getPayloadErrorMessage,
+  getResponseErrorMessage,
+  isClusterAlgorithm,
+  isRecord,
+  monthFromDate,
+  monthFromEndDate,
+  readJsonObject,
+  sameStringArray,
+  startDateFromMonth
+} from '@/features/cz-generation/helpers';
+import type {
+  ClusterAlgorithmMetadata,
+  ClusteringPreviewResponse,
+  GuidedDestinationCandidate,
+  GuidedSecondOrderMetadata,
+  GuidedSelectionStyle,
+  LookupLocationResult,
+  PoiAnalysis,
+  ResolvedSeedLookup,
+  SeedEditAction,
+  TraceCandidate,
+  TraceLayerData,
+  TracePayload,
+  ZoneMetrics
+} from '@/features/cz-generation/types';
 import { useSession } from '@/lib/auth-client';
 import {
   type GeoJSONData,
@@ -20,273 +65,6 @@ const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false
 });
 const CBGMap = dynamic(() => import('@/components/cbg-map'), { ssr: false });
-
-const CLUSTER_ALGORITHM_OPTIONS = [
-  { value: 'mobility_prune', label: 'Mobility Prune (Recommended)' },
-  {
-    value: 'guided_second_order_regions',
-    label: 'Guided Connected Cities'
-  },
-  { value: 'greedy_fast', label: 'Greedy Weight' },
-  { value: 'greedy_weight_seed_guard', label: 'Greedy Weight + Seed Guard' }
-] as const;
-
-type ClusterAlgorithm = (typeof CLUSTER_ALGORITHM_OPTIONS)[number]['value'];
-
-const CLUSTER_ALGORITHM_MANUAL: Record<
-  ClusterAlgorithm,
-  {
-    summary: string;
-    recommended?: boolean;
-  }
-> = {
-  mobility_prune: {
-    summary:
-      'Recommended default. Builds a broad mobility zone from the seed, then prunes lower-value CBGs while keeping seed movement capture.',
-    recommended: true
-  },
-  guided_second_order_regions: {
-    summary:
-      'Useful for smaller cities or towns surrounded by other cities. It ranks connected cities and lets you choose which linked CBGs stay explicit.'
-  },
-  greedy_fast: {
-    summary:
-      'Greedy Weight is a quick automatic baseline with trace view. It adds high-scoring CBGs until the population target is met.'
-  },
-  greedy_weight_seed_guard: {
-    summary:
-      'Advanced diagnostic mode. Uses a seed-distance guard and trace view to inspect how individual CBGs are chosen.'
-  }
-};
-
-type TraceCandidate = {
-  cbg?: string;
-  score?: number;
-  rank?: number;
-  selected?: boolean;
-  movement_to_cluster?: number;
-  movement_to_full_cluster?: number;
-  movement_to_outside?: number;
-  movement_contributes_after_selection?: boolean;
-  seed_distance_km?: number;
-  seed_movement_loss?: number;
-  seed_capture_after?: number;
-  czi_after?: number;
-  [key: string]: unknown;
-};
-
-const EMPTY_LIST: TraceCandidate[] = [];
-
-type TraceStep = {
-  cluster_before?: string[];
-  cluster_after?: string[];
-  selected_cbg?: string;
-  candidates?: TraceCandidate[];
-};
-
-type TracePayload = {
-  algorithm?: string;
-  algorithm_metadata?: ClusterAlgorithmMetadata | null;
-  supports_stepwise?: boolean;
-  steps?: TraceStep[];
-  note?: string;
-};
-
-type TraceLayerData = {
-  clusterSet: Set<string>;
-  candidateByCbg: Map<string, TraceCandidate>;
-  selectedCbg?: string;
-  minScore: number;
-  maxScore: number;
-};
-
-type PoiAnalysis = {
-  placekey?: string;
-  location_name?: string;
-  rank?: number;
-  cluster_flow?: number;
-  flow_share?: number;
-};
-
-type ZoneMetrics = {
-  movement_inside?: number;
-  movement_boundary?: number;
-  czi?: number;
-  cbg_count?: number;
-};
-
-type ResolvedSeedLookup = {
-  query: string;
-  cbg: string;
-  cityName: string;
-  seedName: string;
-  seedCbgs: string[];
-  seedZip?: string;
-};
-
-type LookupLocationResult = {
-  cbg: string;
-  city: string;
-  state: string;
-  zip?: string;
-  seed_type: 'zip' | 'cbg';
-  seed_name: string;
-  seed_cbgs: string[];
-};
-
-type HierarchicalSatellite = {
-  unit_id?: string;
-  label?: string;
-  population?: number;
-  coupling?: number;
-  shared_flow?: number;
-  cbg_count?: number;
-};
-
-type HierarchicalAlgorithmMetadata = {
-  seed_cbgs?: string[];
-  seed_zip_codes?: string[];
-  core_cluster?: string[];
-  core_population?: number;
-  core_containment?: {
-    origin?: number;
-    destination?: number;
-    zone?: number;
-  };
-  final_containment?: {
-    origin?: number;
-    destination?: number;
-    zone?: number;
-  };
-  selected_satellites?: HierarchicalSatellite[];
-  external_pressure_share?: number;
-  population_target_met?: boolean;
-};
-
-type MobilityPruneAlgorithmMetadata = {
-  seed_cbgs?: string[];
-  missing_seed_cbgs?: string[];
-  seed_population?: number;
-  bounded_envelope?: boolean;
-  envelope_population_target?: number;
-  envelope_population_multiplier?: number;
-  envelope_population_floor?: number;
-  envelope_max_cbgs?: number;
-  min_seed_capture?: number;
-  envelope_growth_iterations?: number;
-  envelope_limited_by_cbg_cap?: boolean;
-  stopped_by_seed_capture_floor?: boolean;
-  initial_cbg_count?: number;
-  initial_population?: number;
-  initial_movement_inside?: number;
-  initial_movement_boundary?: number;
-  initial_czi?: number;
-  seed_movement_total?: number;
-  initial_seed_movement_captured?: number;
-  initial_seed_capture_share?: number;
-  final_seed_movement_captured?: number;
-  final_seed_capture_share?: number;
-  final_movement_inside?: number;
-  final_movement_boundary?: number;
-  final_czi?: number;
-  population_target_met?: boolean;
-  population_reduced?: number;
-  removed_cbg_count?: number;
-};
-
-type ClusterAlgorithmMetadata = HierarchicalAlgorithmMetadata &
-  MobilityPruneAlgorithmMetadata;
-
-type GuidedLinkedCbgDetail = {
-  cbg?: string;
-  population?: number;
-  seed_outbound_flow?: number;
-  seed_inbound_flow?: number;
-  seed_bidirectional_flow?: number;
-  distance_km?: number;
-  gateway_score?: number;
-};
-
-type GuidedDestinationCandidate = {
-  unit_id: string;
-  label: string;
-  unit_type?: string;
-  cbgs: string[];
-  gateway_cbgs?: GuidedLinkedCbgDetail[];
-  cbg_count?: number;
-  city_cbg_count?: number;
-  zip_codes?: string[];
-  zip_count?: number;
-  population?: number;
-  city_population?: number;
-  outbound_flow?: number;
-  inbound_flow?: number;
-  bidirectional_flow?: number;
-  coupling?: number;
-  share_of_seed_external_bidirectional?: number;
-  share_of_seed_total_movement?: number;
-  share_of_seed_external_outbound?: number;
-  cumulative_external_bidirectional_share?: number;
-  cumulative_external_outbound_share?: number;
-  cumulative_seed_total_movement_share?: number;
-  captured_bidirectional_flow?: number;
-  captured_bidirectional_flow_share?: number;
-  distance_km?: number;
-  recommended?: boolean;
-};
-
-type GuidedSecondOrderMetadata = {
-  seed_cbg: string;
-  seed_cbgs: string[];
-  seed_zip_codes?: string[];
-  seed_city_labels?: string[];
-  missing_seed_cbgs?: string[];
-  seed_population?: number;
-  total_seed_movement?: number;
-  total_seed_internal_movement?: number;
-  total_seed_external_outbound_flow?: number;
-  total_seed_external_inbound_flow?: number;
-  total_seed_external_bidirectional_flow?: number;
-  unit_type?: string;
-  approximation_note?: string;
-  destination_count?: number;
-  destinations: GuidedDestinationCandidate[];
-  recommended_unit_ids?: string[];
-  recommended_captured_external_bidirectional_share?: number;
-  recommended_captured_external_outbound_share?: number;
-  recommended_captured_seed_total_movement_share?: number;
-  recommended_explicit_population?: number;
-  recommended_explicit_population_cap?: number;
-};
-
-type GuidedSelectionStyle = {
-  fillColor: string;
-  lineColor: string;
-};
-
-type SeedEditAction = 'add' | 'remove';
-
-type ClusteringPreviewResponse = {
-  cluster?: string[];
-  clustering_id?: number | string;
-  seed_cbg?: string;
-  center?: [number, number] | null;
-  size?: number | string;
-  use_test_data?: boolean;
-  algorithm_metadata?: ClusterAlgorithmMetadata | null;
-  trace?: TracePayload | null;
-  algorithm?: string;
-  clustering_params?: {
-    seed_guard_distance_km?: number | string;
-    min_seed_capture?: number | string;
-  } | null;
-  geojson?: GeoJSONData | null;
-  trace_geojson?: GeoJSONData | null;
-};
-
-function isClusterAlgorithm(value: unknown): value is ClusterAlgorithm {
-  return CLUSTER_ALGORITHM_OPTIONS.some((option) => option.value === value);
-}
 
 type FormFieldProps = {
   label: string;
@@ -374,182 +152,6 @@ function FormField({
       )}
     </div>
   );
-}
-
-function clampIndex(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function dedupeCbgList(values: string[]) {
-  return Array.from(
-    new Set(values.map((value) => normalizeCbgId(value)).filter(Boolean))
-  );
-}
-
-function sameStringArray(a: string[], b: string[]) {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-function filterGeoJsonByCbgs(
-  geoJson: GeoJSONData | null | undefined,
-  cbgs: string[]
-) {
-  if (!geoJson?.features?.length) {
-    return null;
-  }
-
-  const cbgSet = new Set(
-    cbgs.map((cbg) => normalizeCbgId(cbg)).filter(Boolean)
-  );
-  const features = geoJson.features.filter((feature) =>
-    cbgSet.has(getFeatureCbgId(feature))
-  );
-
-  if (!features.length) {
-    return null;
-  }
-
-  return {
-    type: 'FeatureCollection',
-    features
-  } satisfies GeoJSONData;
-}
-
-function getCbgIdsFromGeoJson(geoJson: GeoJSONData | null | undefined) {
-  return dedupeCbgList(
-    (geoJson?.features ?? []).map((feature) => getFeatureCbgId(feature))
-  );
-}
-
-const CBG_GEOJSON_REQUEST_CHUNK_SIZE = 75;
-const INITIAL_SEED_EDIT_NEIGHBOR_RINGS = 2;
-
-const GUIDED_REGION_PALETTE: GuidedSelectionStyle[] = [
-  { fillColor: '#f59e0b', lineColor: '#b45309' },
-  { fillColor: '#10b981', lineColor: '#047857' },
-  { fillColor: '#ef4444', lineColor: '#b91c1c' },
-  { fillColor: '#06b6d4', lineColor: '#0e7490' },
-  { fillColor: '#eab308', lineColor: '#a16207' },
-  { fillColor: '#f97316', lineColor: '#c2410c' }
-];
-
-const GUIDED_SEED_STYLE: GuidedSelectionStyle = {
-  fillColor: '#2563eb',
-  lineColor: '#1d4ed8'
-};
-
-const GUIDED_SOFT_EXPLICIT_POPULATION = 25000;
-const GUIDED_HARD_EXPLICIT_POPULATION = 50000;
-
-function monthFromDate(dateStr: string): string {
-  return String(dateStr || '').slice(0, 7);
-}
-
-function startDateFromMonth(month: string): string {
-  return `${month}-01`;
-}
-
-function endDateFromMonth(month: string): string {
-  const [yStr, mStr] = month.split('-');
-  const y = Number(yStr);
-  const m = Number(mStr);
-  if (!Number.isFinite(y) || !Number.isFinite(m)) {
-    return `${month}-28`;
-  }
-  const nextMonth = m === 12 ? 1 : m + 1;
-  const nextYear = m === 12 ? y + 1 : y;
-  return `${nextYear.toString().padStart(4, '0')}-${nextMonth
-    .toString()
-    .padStart(2, '0')}-01`;
-}
-
-function monthFromEndDate(endDate: string): string {
-  const [yStr, mStr] = endDate.split('-');
-  const y = Number(yStr);
-  const m = Number(mStr);
-  if (!Number.isFinite(y) || !Number.isFinite(m)) {
-    return monthFromDate(endDate);
-  }
-  const prevMonth = m === 1 ? 12 : m - 1;
-  const prevYear = m === 1 ? y - 1 : y;
-  return `${prevYear.toString().padStart(4, '0')}-${prevMonth
-    .toString()
-    .padStart(2, '0')}`;
-}
-
-function formatMonthLabel(month: string): string {
-  const [yStr, mStr] = month.split('-');
-  const y = Number(yStr);
-  const m = Number(mStr);
-  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
-    return month;
-  }
-  const date = new Date(Date.UTC(y, m - 1, 1));
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  });
-}
-
-function getLengthHours(startDate: string, endDate: string) {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return null;
-  }
-  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
-async function readJsonObject(
-  response: Response
-): Promise<Record<string, unknown> | null> {
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.toLowerCase().includes('application/json')) {
-    return null;
-  }
-
-  const payload = await response.json().catch(() => null);
-  return isRecord(payload) ? payload : null;
-}
-
-function getResponseErrorMessage(
-  response: Response,
-  payload: Record<string, unknown> | null,
-  fallback: string
-) {
-  if (typeof payload?.message === 'string' && payload.message.trim()) {
-    return payload.message;
-  }
-
-  if (typeof payload?.error === 'string' && payload.error.trim()) {
-    return payload.error;
-  }
-
-  if (response.status === 404) {
-    return 'The clustering endpoint was not found on the deployed Algorithms service.';
-  }
-
-  return fallback;
-}
-
-function getPayloadErrorMessage(
-  payload: Record<string, unknown> | null,
-  fallback: string
-) {
-  if (typeof payload?.message === 'string' && payload.message.trim()) {
-    return payload.message;
-  }
-
-  if (typeof payload?.error === 'string' && payload.error.trim()) {
-    return payload.error;
-  }
-
-  return fallback;
 }
 
 async function fetchZoneById(zoneId: number): Promise<ConvenienceZone | null> {

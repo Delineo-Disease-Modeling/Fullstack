@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { resolveDbDataPath } from './db-files';
+import type { PapData } from './simulation-data';
 
 const MAX_CACHE_SIZE = 5;
 
 interface CacheEntry {
-  data: any;
+  data: PapData;
   lastAccess: number;
 }
 
@@ -18,7 +19,7 @@ const cache = new Map<string, CacheEntry>();
  * This LRU cache ensures it's only read from disk and gunzipped once,
  * then served from memory for subsequent accesses.
  */
-export async function getCachedPapdata(papdataId: string): Promise<any> {
+export async function getCachedPapdata(papdataId: string): Promise<PapData> {
   const cached = cache.get(papdataId);
   if (cached) {
     cached.lastAccess = Date.now();
@@ -27,7 +28,9 @@ export async function getCachedPapdata(papdataId: string): Promise<any> {
 
   const { path, gzipped } = await resolveDbDataPath(papdataId);
   const raw = await readFile(path);
-  const data = JSON.parse((gzipped ? gunzipSync(raw) : raw).toString());
+  const data = JSON.parse(
+    (gzipped ? gunzipSync(raw) : raw).toString()
+  ) as PapData;
 
   // Evict least-recently-used entry if at capacity
   if (cache.size >= MAX_CACHE_SIZE) {

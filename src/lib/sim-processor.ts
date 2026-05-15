@@ -1,41 +1,16 @@
-import { createReadStream } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
-import { createGunzip } from 'node:zlib';
-import chain from 'stream-chain';
-import parser from 'stream-json';
-import StreamObject from 'stream-json/streamers/StreamObject.js';
+import { streamJsonObjectEntries } from './json-stream';
 import { getCachedPapdata } from './papdata-cache';
-
-const age_ranges: [number, number][] = [
-  [0, 20],
-  [21, 40],
-  [41, 60],
-  [61, 80],
-  [81, 99]
-];
-
-const age_range_labels = age_ranges.map(([lo, hi]) => `${lo}-${hi}`);
-
-const bitmask_states: [string, number][] = [
-  ['Infected', 1],
-  ['Infectious', 2],
-  ['Symptomatic', 4],
-  ['Hospitalized', 8],
-  ['Recovered', 16],
-  ['Removed', 32]
-];
-
-const all_state_names = ['Susceptible', ...bitmask_states.map(([n]) => n)];
-
-type DataPoint = { time: number; [key: string]: number };
-type ChartData = {
-  iot: DataPoint[];
-  ages: DataPoint[];
-  sexes: DataPoint[];
-  states: DataPoint[];
-  metadata?: unknown;
-  [type: string]: DataPoint[] | unknown;
-};
+import {
+  AGE_RANGE_LABELS,
+  ALL_STATE_NAMES,
+  BITMASK_STATES,
+  buildAgeIndex,
+  type ChartData,
+  type DataPoint,
+  type DiseaseStateTimestep,
+  type PatternTimestep
+} from './simulation-data';
 
 interface ProcessOpts {
   simDataId: number;
@@ -58,7 +33,14 @@ export const processingProgress = new Map<number, number>();
  * Returns the global stats object to be stored in SimData.global_stats.
  */
 export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
-  const { simDataId, simdataPath, patternsPath, papdataId, mapCachePath, totalLength } = opts;
+  const {
+    simDataId,
+    simdataPath,
+    patternsPath,
+    papdataId,
+    mapCachePath,
+    totalLength
+  } = opts;
   processingProgress.set(simDataId, 0);
 
   // Load papdata from shared cache (avoids redundant gunzip)
@@ -85,7 +67,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       cbg: papdata.homes[id].cbg,
       members: papdata.homes[id].members,
       latitude: toCoord(papdata.homes[id].latitude),
-      longitude: toCoord(papdata.homes[id].longitude),
+      longitude: toCoord(papdata.homes[id].longitude)
     })),
     places: placeIds.map((id) => ({
       id,
@@ -100,29 +82,17 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
 
   // Population count and age index for global stats
   const popCount = Object.keys(papdata.people ?? {}).length;
-  const ageIndex = new Map<string, number>();
-  for (const [id, person] of Object.entries(papdata.people ?? {}) as [
-    string,
-    any
-  ][]) {
-    for (let i = 0; i < age_ranges.length; i++) {
-      if (person.age >= age_ranges[i][0] && person.age <= age_ranges[i][1]) {
-        ageIndex.set(id, i);
-        break;
-      }
-    }
-  }
+  const ageIndex = buildAgeIndex(papdata.people);
 
   // Set up streams
-  const simChain: any[] = [createReadStream(simdataPath)];
-  if (simdataPath.endsWith('.gz')) simChain.push(createGunzip());
-  simChain.push(parser(), StreamObject.streamObject());
-  const simIter = chain(simChain)[Symbol.asyncIterator]();
-
-  const patChain: any[] = [createReadStream(patternsPath)];
-  if (patternsPath.endsWith('.gz')) patChain.push(createGunzip());
-  patChain.push(parser(), StreamObject.streamObject());
-  const patIter = chain(patChain)[Symbol.asyncIterator]();
+  const simIter = streamJsonObjectEntries<DiseaseStateTimestep>(
+    simdataPath,
+    simdataPath.endsWith('.gz')
+  );
+  const patIter = streamJsonObjectEntries<PatternTimestep>(
+    patternsPath,
+    patternsPath.endsWith('.gz')
+  );
 
   // Accumulate map cache parts
   const cacheParts: string[] = [
@@ -176,7 +146,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
 
     const homesArray: number[] = [];
     for (const id of homeIds) {
-      const pop: string[] | undefined = pvalue.homes[id];
+      const pop: string[] | undefined = pvalue.homes?.[id];
       if (pop) {
         let inf = 0;
         for (const v of pop) {
@@ -190,7 +160,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
 
     const placesArray: number[] = [];
     for (const id of placeIds) {
-      const pop: string[] | undefined = pvalue.places[id];
+      const pop: string[] | undefined = pvalue.places?.[id];
       if (pop) {
         let inf = 0;
         for (const v of pop) {
@@ -220,8 +190,8 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     const ages_data: DataPoint = { time };
     const sexes_data: DataPoint = { time, Male: 0, Female: 0 };
     const states_data: DataPoint = { time };
-    for (const label of age_range_labels) ages_data[label] = 0;
-    for (const name of all_state_names) states_data[name] = 0;
+    for (const label of AGE_RANGE_LABELS) ages_data[label] = 0;
+    for (const name of ALL_STATE_NAMES) states_data[name] = 0;
 
     let totalInfected = 0;
 
@@ -234,15 +204,15 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       totalInfected += entries.length;
 
       for (const [id, stateBitmask] of entries) {
-        for (const [stateName, bit] of bitmask_states) {
+        for (const [stateName, bit] of BITMASK_STATES) {
           if (stateBitmask & bit) states_data[stateName]++;
         }
 
-        const person = papdata.people[id];
+        const person = papdata.people?.[id];
         if (person) {
           sexes_data[person.sex === 0 ? 'Male' : 'Female']++;
           const ageIdx = ageIndex.get(id);
-          if (ageIdx !== undefined) ages_data[age_range_labels[ageIdx]]++;
+          if (ageIdx !== undefined) ages_data[AGE_RANGE_LABELS[ageIdx]]++;
         }
       }
     }
@@ -255,7 +225,10 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     globalStats.states.push(states_data);
 
     if (totalLength > 0) {
-      processingProgress.set(simDataId, Math.min(99, Math.round((+skey / totalLength) * 100)));
+      processingProgress.set(
+        simDataId,
+        Math.min(99, Math.round((+skey / totalLength) * 100))
+      );
     }
 
     spl = await simIter.next();

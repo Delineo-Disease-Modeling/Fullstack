@@ -1,124 +1,36 @@
 import type { NextRequest } from 'next/server';
-import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
-import { broadcast } from '@/lib/sse-broadcast';
-
-const postSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1),
-  latitude: z.number(),
-  longitude: z.number(),
-  cbg_list: z.array(z.string()),
-  start_date: z.string().datetime(),
-  length: z.number().nonnegative(),
-  size: z.number().nonnegative(),
-  user_id: z.string().min(1).nullable().optional()
-});
-
-const ANONYMOUS_ZONE_USER_EMAIL = 'anonymous-zones@delineo.local';
-
-async function getAnonymousZoneUserId() {
-  const user = await prisma.user.upsert({
-    where: { email: ANONYMOUS_ZONE_USER_EMAIL },
-    update: {},
-    create: {
-      name: 'Anonymous Zone User',
-      email: ANONYMOUS_ZONE_USER_EMAIL,
-      organization: 'Delineo'
-    },
-    select: { id: true }
-  });
-
-  return user.id;
-}
+import {
+  badRequest,
+  jsonData,
+  jsonMessage,
+  serviceResult
+} from '@/server/api/responses';
+import { getSessionUserId } from '@/server/api/session';
+import {
+  createConvenienceZone,
+  createConvenienceZoneSchema,
+  listConvenienceZones
+} from '@/server/services/convenience-zones';
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  const user_id = session?.user?.id;
-
-  const zones = await prisma.convenienceZone.findMany(
-    user_id ? { where: { user_id } } : undefined
-  );
-
-  return Response.json({
-    data: zones.map((zone) => ({
-      ...zone,
-      ready: !!zone.papdata_id
-    }))
-  });
+  const userId = await getSessionUserId(request.headers);
+  const zones = await listConvenienceZones(userId);
+  return jsonData(zones);
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const parsed = postSchema.safeParse(body);
+    const parsed = createConvenienceZoneSchema.safeParse(body);
 
     if (!parsed.success) {
-      return Response.json({ message: parsed.error.message }, { status: 400 });
+      return badRequest(parsed.error.message);
     }
 
-    const {
-      name,
-      description,
-      latitude,
-      longitude,
-      cbg_list,
-      start_date,
-      length,
-      size,
-      user_id: bodyUserId
-    } = parsed.data;
-
-    const session = await auth.api.getSession({ headers: request.headers });
-    const sessionUserId = session?.user?.id;
-
-    if (sessionUserId && bodyUserId && bodyUserId !== sessionUserId) {
-      return Response.json(
-        { message: 'Authenticated user does not match request user_id.' },
-        { status: 403 }
-      );
-    }
-
-    const requestedUserId = sessionUserId ?? bodyUserId ?? null;
-
-    if (requestedUserId && !sessionUserId) {
-      const existingUser = await prisma.user.findUnique({
-        where: { id: requestedUserId },
-        select: { id: true }
-      });
-
-      if (!existingUser) {
-        return Response.json(
-          {
-            message:
-              'Authentication required. Please log in again before creating a convenience zone.'
-          },
-          { status: 401 }
-        );
-      }
-    }
-
-    const user_id = requestedUserId ?? (await getAnonymousZoneUserId());
-
-    const zone = await prisma.convenienceZone.create({
-      data: {
-        name,
-        description,
-        latitude,
-        longitude,
-        cbg_list,
-        start_date,
-        length,
-        size,
-        user_id
-      }
-    });
-
-    broadcast({ type: 'zone-created', zone_id: zone.id });
-
-    return Response.json({ data: zone });
+    const sessionUserId = await getSessionUserId(request.headers);
+    const result = await createConvenienceZone(parsed.data, sessionUserId);
+    return serviceResult(result);
   } catch {
-    return Response.json({ message: 'Internal server error' }, { status: 500 });
+    return jsonMessage('Internal server error', 500);
   }
 }

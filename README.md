@@ -1,108 +1,106 @@
-# Delineo Fullstack (UI & Database)
+# Delineo Fullstack
 
-Delineo website developed & ported to [React.JS](https://github.com/facebook/react).
+Next.js App Router app for the Delineo UI, auth, database-backed API routes, and file-backed simulation data storage.
 
-Try it out: <https://delineo.me>
+Production is deployed from `main`, so do normal feature and fix work on a short-lived branch or worktree.
+
+## Prerequisites
+
+- Node.js and pnpm. The project pins `pnpm@10.29.1` in `package.json`.
+- PostgreSQL for Prisma and Better Auth data.
+- The sibling Delineo Algorithms service on `http://localhost:1880`.
+- The sibling Delineo Simulation service on `http://localhost:1870`.
 
 ## Setup
 
-You'll need to install [node](https://nodejs.org/) and [pnpm](https://pnpm.io/) first.
-
-You want to install and run the Delineo [Simulator](https://github.com/Delineo-Disease-Modeling/Simulation) and [Database](https://github.com/Delineo-Disease-Modeling/Database) next.
-
-Then, clone this repository locally and navigate to the `client` folder and create a `.env` file with the following schema:
-
-```text
-# Simulator server IP
-VITE_API_URL=http://127.0.0.1:1880/
-
-# Database server IP 
-VITE_DB_URL=http://127.0.0.1:1890/
-
-# Simulator server IP 
-VITE_SIM_URL=http://127.0.0.1:1870/
-```
-
-Then, while still in the `client` folder, run the following commands:
+From this directory:
 
 ```bash
 pnpm install
+cp .env.example .env
+pnpm db:generate
+pnpm db:migrate
 pnpm dev
 ```
 
-talk about the data structures and how we store stuff in the database, uses postgresql to communicate with the database. We use postman as an endpoint api to test that our front end properly can properly fetch the convience zones by calling an api. Talk about the patterns.json and infectivity.json data structures and how we represent it with the key/value and the json format
+`pnpm install` runs `prisma generate` through `postinstall`. Run `pnpm db:generate` again after Prisma schema changes.
 
+The dev app runs at `http://localhost:3000`.
 
-## Data Structures
-Delineo utilizes multiple JSON files to store and manage simulation data. These JSON structures define population movement, housing arrangements, and disease infectivity across various timesteps. The key files involved are patterns.json, papdata.json, and infectivity.json.
+## Environment
 
-### patterns.json ###
-This file captures the movement patterns within the simulation at specific timesteps. Each entry represents a timestep key mapped to homes and places pattern values, detailing which individuals are present at various locations. 
+Create `.env` from `.env.example`. Prisma CLI commands load `.env` directly.
 
-Structure:
-```json
-{
-    "60": {             // Timestep in minutes or simulation time unit
-        "homes": {      // Home patterns
-            "1": [      // Home ID
-                "4", 
-                "5"     // List of person IDs present at this home
-            ]
-        },
-        "places": {
-            "3": [      // Place ID
-                "24", 
-                "25"    // List of person IDs present at this place
-            ]
-        },
-    }
-}
-```
-- Each timestep (e.g., 60, 120, 180) is represented as a key.
-- The homes key maps home IDs to lists of person IDs residing there.
-- The places key maps place IDs to lists of person IDs visiting these locations.
-
-### papdata.json ###
-The papdata.json file contains demographic details for individuals in the simulation, including age, sex, and home location.
-
-Structure:
-```json
-{
-    "people": {
-        "0": {
-            "sex": 0,       // 0: Male, 1: Female
-            "age": 21,      // Age of person
-            "home": "0"     // Home ID where the person resides
-        },
-        "1": {
-            "sex": 1,
-            "age": 21,
-            "home": "0"
-        }
-    }
-}
-```
-- The people key maps person IDs to their demographic information.
-- Each person entry contains sex, age, and home details.
-- This file is used to reference individuals in patterns.json.
-
-### infectivitity.json ###
-The infectivity.json file tracks the disease spread by recording the infectivity levels at various timesteps for different virus variants.
-
-Structure:
-```json
-{
-    "60": {             // Timestep
-        "delta": {      // Variant name
-            "22": 3     // Person ID and infection state
-        },
-        "omicron": {
-            "27": 3
-        }
-    }
-}
+```text
+PRISMA_DB_URL=postgresql://<user>:<password>@localhost:5432/<database>
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=<generated-secret>
+DB_FOLDER=./db/
+NEXT_PUBLIC_ALG_URL=http://localhost:1880/
+NEXT_PUBLIC_SIM_URL=http://localhost:1870/
+ALG_URL=http://localhost:1880/
 ```
 
-- Each timestep (e.g., 0, 60, 120, 180) is a key.
-- The keys under each timestep represent different virus variants (delta, omicron, etc.).
-- Each variant maps person IDs to infection states, 
+- `PRISMA_DB_URL` is used by Prisma and the Postgres client.
+- `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` configure Better Auth. Generate a local secret with `openssl rand -base64 32`.
+- `DB_FOLDER` must point to a writable directory for generated PAP, movement pattern, simulation, and map-cache files.
+- `NEXT_PUBLIC_ALG_URL` is used by client-side Algorithms calls.
+- `NEXT_PUBLIC_SIM_URL` is used by client-side Simulation calls.
+- `ALG_URL` is an optional server-only override used by the lookup-location API route; it falls back to `NEXT_PUBLIC_ALG_URL`.
+
+## Algorithms And Simulation
+
+The Fullstack app expects both sibling services to be running for the full create-zone and simulation workflows.
+
+Algorithms:
+
+```bash
+cd ../Algorithms
+python -m pip install -r requirements.txt
+cd server
+python server.py
+```
+
+Defaults to `http://localhost:1880`. The Algorithms service uses `FULLSTACK_URL=http://localhost:3000` by default when it needs to call back into Fullstack.
+
+Simulation:
+
+```bash
+cd ../Simulation
+python -m pip install -r requirements.txt
+python app.py
+```
+
+Defaults to `http://localhost:1870`. The Simulation service uses `DELINEO_DB_URL=http://localhost:3000/api/` by default for Fullstack API access.
+
+## Common Commands
+
+```bash
+pnpm dev          # Next.js dev server
+pnpm build        # Production build
+pnpm start        # Serve a production build
+pnpm lint         # Biome lint over src
+pnpm typecheck    # TypeScript no-emit check
+pnpm test         # Node test runner for src/**/*.test.mjs
+pnpm db:generate  # Generate Prisma client into src/generated/prisma
+pnpm db:migrate   # Run local Prisma migrations
+```
+
+Use `pnpm db:reset` or `pnpm db:push` only for disposable local databases; both can replace local database state.
+
+## Data Storage
+
+Postgres stores users, auth records, convenience-zone metadata, and simulation run metadata. Larger generated payloads live under `DB_FOLDER`, with IDs referenced from Postgres records. These include PAP data, movement patterns, simulation output, pattern output, and map caches.
+
+## Validation Gates
+
+Before handing off a refactor change, run:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+If the change touches Prisma schema or database behavior, also run the relevant Prisma command, usually `pnpm db:generate` and `pnpm db:migrate` against a local database.

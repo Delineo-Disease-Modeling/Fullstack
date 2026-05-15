@@ -9,8 +9,10 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
-  YAxis
+  YAxis,
+  type LegendPayload
 } from 'recharts';
+import type { ChartData } from '@/lib/simulation-data';
 import useSimSettings from '@/stores/simsettings';
 import { CustomTooltip } from './customtooltip';
 
@@ -26,6 +28,15 @@ const COLORS = [
   '#4fd0ff'
 ];
 
+const CHART_TYPE_OPTIONS = [
+  { value: 'iot', label: 'Infectiousness Over Time' },
+  { value: 'ages', label: 'Age Of Infected' },
+  { value: 'sexes', label: 'Infection Gender' },
+  { value: 'states', label: 'Diseases Info' }
+] as const;
+
+type ChartType = (typeof CHART_TYPE_OPTIONS)[number]['value'];
+
 interface OutputGraphsProps {
   selected_loc: { id: string; label: string; type: string } | null;
   onReset: () => void;
@@ -36,14 +47,17 @@ export default function OutputGraphs({
   onReset
 }: OutputGraphsProps) {
   const sim_id = useSimSettings((state) => state.sim_id);
-  const [chartType, setChartType] = useState('iot');
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartType, setChartType] = useState<ChartType>('iot');
+  const [chartData, setChartData] = useState<ChartData | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
 
-  const handleLegendClick = useCallback((entry: any) => {
-    const key = entry.dataKey ?? entry.value;
+  const handleLegendClick = useCallback((entry: LegendPayload) => {
+    const key = String(entry.dataKey ?? entry.value ?? '');
+    if (!key) {
+      return;
+    }
     setHiddenLines((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -78,7 +92,10 @@ export default function OutputGraphs({
             return null;
           }
           const json = await res.json();
-          if (!res.ok) throw new Error(json.message || `Failed to fetch chart data (${res.status})`);
+          if (!res.ok)
+            throw new Error(
+              json.message || `Failed to fetch chart data (${res.status})`
+            );
           return json;
         })
         .then((json) => {
@@ -100,6 +117,11 @@ export default function OutputGraphs({
     return () => abortController.abort();
   }, [sim_id, selected_loc]);
 
+  const selectedChartData = chartData?.[chartType] ?? [];
+  const chartKeys = Object.keys(selectedChartData[0] ?? {}).filter(
+    (key) => key !== 'time'
+  );
+
   return (
     <div className="outputgraphs_container">
       <div className="p-2.5">
@@ -109,14 +131,15 @@ export default function OutputGraphs({
           className="px-1 outline-2 outline-solid bg-(--color-bg-ivory) outline-(--color-primary-blue)"
           value={chartType}
           onChange={(e) => {
-            setChartType(e.target.value);
+            setChartType(e.target.value as ChartType);
             setHiddenLines(new Set());
           }}
         >
-          <option value="iot">Infectiousness Over Time</option>
-          <option value="ages">Age Of Infected</option>
-          <option value="sexes">Infection Gender</option>
-          <option value="states">Diseases Info</option>
+          {CHART_TYPE_OPTIONS.map((option) => (
+            <option value={option.value} key={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
       <div className="relative outputgraph_chart">
@@ -130,12 +153,18 @@ export default function OutputGraphs({
           </div>
         ) : !chartData ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center gap-2">
-            <p className="text-md">{processing ? 'Processing simulation chart data' : 'Loading...'}</p>
-            {processing && <p className="text-sm italic">this may take a few minutes for large simulations...</p>}
+            <p className="text-md">
+              {processing ? 'Processing simulation chart data' : 'Loading...'}
+            </p>
+            {processing && (
+              <p className="text-sm italic">
+                this may take a few minutes for large simulations...
+              </p>
+            )}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData[chartType]}>
+            <LineChart data={selectedChartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 label={{ value: 'Time (h)', position: 'bottom' }}
@@ -147,28 +176,31 @@ export default function OutputGraphs({
               <YAxis
                 label={{ value: 'Total', angle: -90, position: 'insideLeft' }}
               />
-              <Tooltip content={CustomTooltip as any} />
+              <Tooltip content={CustomTooltip} />
               <Legend
                 wrapperStyle={{ paddingTop: '30px', paddingBottom: '20px' }}
                 onClick={handleLegendClick}
                 formatter={(value: string) => (
-                  <span style={{ color: hiddenLines.has(value) ? '#ccc' : undefined, cursor: 'pointer' }}>
+                  <span
+                    style={{
+                      color: hiddenLines.has(value) ? '#ccc' : undefined,
+                      cursor: 'pointer'
+                    }}
+                  >
                     {value}
                   </span>
                 )}
               />
-              {Object.keys(chartData[chartType][0])
-                .filter((key) => key !== 'time')
-                .map((key, index) => (
-                  <Line
-                    type="monotone"
-                    key={key}
-                    dataKey={key}
-                    stroke={COLORS[index % COLORS.length]}
-                    dot={false}
-                    hide={hiddenLines.has(key)}
-                  />
-                ))}
+              {chartKeys.map((key, index) => (
+                <Line
+                  type="monotone"
+                  key={key}
+                  dataKey={key}
+                  stroke={COLORS[index % COLORS.length]}
+                  dot={false}
+                  hide={hiddenLines.has(key)}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         )}

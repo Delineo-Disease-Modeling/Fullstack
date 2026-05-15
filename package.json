@@ -9,6 +9,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "biome lint ./src",
+    "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"src/**/*.test.mjs\"",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push --force-reset",
