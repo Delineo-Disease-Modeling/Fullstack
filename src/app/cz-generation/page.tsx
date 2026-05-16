@@ -99,8 +99,8 @@ function FormField({
   required = true
 }: FormFieldProps) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <label htmlFor={name}>{label}</label>
+    <div className="flex flex-col gap-1">
+      <label className="czgen_field_label" htmlFor={name}>{label}</label>
       {type === 'textarea' ? (
         <textarea
           className="formfield"
@@ -2390,46 +2390,50 @@ export default function CZGeneration() {
   };
 
   if (isPending) {
-    return <div className="text-white text-center mt-20">Loading...</div>;
+    return (
+      <div className="czgen_page">
+        <p className="czgen_lede" style={{ textAlign: 'center', paddingTop: '60px' }}>
+          Loading...
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="w-full flex justify-center px-2 py-2">
+    <div className="czgen_page">
       {isFinalizing && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="czgen_modal_overlay"
           role="dialog"
           aria-modal="true"
           aria-live="polite"
         >
-          <div className="w-[min(32rem,90vw)] rounded-2xl border border-[#70B4D4] bg-white px-6 py-6 shadow-2xl">
-            <div className="text-lg font-semibold text-[#1f2937]">
-              Generating convenience zone
-            </div>
-            <div className="mt-1 text-sm text-gray-600">
+          <div className="czgen_modal">
+            <p className="czgen_modal_title">Generating convenience zone</p>
+            <p className="czgen_modal_subtitle">
               {finalizeStatusMessage || 'Preparing movement patterns...'}
-            </div>
-            <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-[#e5e7eb]">
+            </p>
+            <div className="czgen_progress_track">
               <div
-                className="h-full rounded-full bg-[#70B4D4] transition-all duration-300"
+                className="czgen_progress_fill"
                 style={{
                   width: `${Math.max(2, Math.min(100, finalizeProgress))}%`
                 }}
               />
             </div>
-            <div className="mt-2 text-right text-xs font-medium text-gray-600">
+            <div className="mt-2 text-right text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
               {finalizeProgress}%
             </div>
-            <div className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
               This can take a few minutes. You&apos;ll be taken to the simulator
               automatically once generation is complete.
-            </div>
+            </p>
           </div>
         </div>
       )}
       {showAlgorithmGuide && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm"
+          className="czgen_modal_overlay"
           role="dialog"
           aria-modal="true"
           aria-labelledby="algorithm-guide-title"
@@ -2445,27 +2449,22 @@ export default function CZGeneration() {
             }
           }}
         >
-          <div
-            className="rounded-lg border border-[#70B4D4] bg-white px-5 py-5 shadow-2xl"
-            style={{ width: 'min(34rem, 92vw)' }}
-          >
+          <div className="czgen_modal" style={{ width: 'min(34rem, 92vw)' }}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div
-                  id="algorithm-guide-title"
-                  className="text-lg font-semibold text-[#1f2937]"
-                >
+                <p id="algorithm-guide-title" className="czgen_modal_title">
                   Algorithm Guide
-                </div>
-                <div className="mt-1 text-sm text-gray-600">
+                </p>
+                <p className="czgen_modal_subtitle">
                   Start with Mobility Prune unless the zone needs manual city
                   selection or diagnostic tracing.
-                </div>
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAlgorithmGuide(false)}
-                className="rounded border border-[#d1d5db] px-3 py-1 text-sm font-semibold text-[#1f2937] hover:border-[#70B4D4]"
+                className="czgen_btn czgen_btn--sm"
+                style={{ flexShrink: 0 }}
               >
                 Close
               </button>
@@ -2476,12 +2475,18 @@ export default function CZGeneration() {
                 return (
                   <div
                     key={option.value}
-                    className="border-l-4 border-[#70B4D4] bg-[#f8fafc] px-3 py-2 text-sm text-gray-700"
+                    className="border-l-4 px-3 py-2 text-sm"
+                    style={{
+                      borderColor: 'var(--color-primary-blue-soft)',
+                      background: 'var(--color-bg-surface)',
+                      color: 'var(--color-text-muted)',
+                      borderRadius: '0 8px 8px 0'
+                    }}
                   >
-                    <div className="flex flex-wrap items-center gap-2 font-semibold text-[#1f2937]">
+                    <div className="flex flex-wrap items-center gap-2 font-semibold" style={{ color: 'var(--color-text-main)' }}>
                       <span>{option.label}</span>
                       {manual.recommended && (
-                        <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                        <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'rgba(22,163,74,0.1)', color: '#166534' }}>
                           default
                         </span>
                       )}
@@ -2496,7 +2501,7 @@ export default function CZGeneration() {
       )}
       {showGuidedTermsHelp && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm"
+          className="czgen_modal_overlay"
           role="dialog"
           aria-modal="true"
           aria-labelledby="guided-terms-title"
@@ -2512,25 +2517,23 @@ export default function CZGeneration() {
             }
           }}
         >
-          <div className="max-h-[88vh] w-[min(42rem,92vw)] overflow-y-auto rounded-2xl border border-[#70B4D4] bg-white px-6 py-5 shadow-2xl">
+          <div className="czgen_modal czgen_modal--wide">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div
-                  id="guided-terms-title"
-                  className="text-lg font-semibold text-[#1f2937]"
-                >
+                <p id="guided-terms-title" className="czgen_modal_title">
                   How Guided Ranking Works
-                </div>
-                <div className="mt-1 text-sm text-gray-600">
+                </p>
+                <p className="czgen_modal_subtitle">
                   The city cards use plain-language labels. This panel maps
                   those labels back to the ranking terms and explains which
                   values drive ordering versus selection context.
-                </div>
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowGuidedTermsHelp(false)}
-                className="rounded border border-[#d1d5db] px-3 py-1 text-sm font-semibold text-[#1f2937] hover:border-[#70B4D4]"
+                className="czgen_btn czgen_btn--sm"
+                style={{ flexShrink: 0 }}
               >
                 Close
               </button>
@@ -2647,7 +2650,7 @@ coupling =
                   city-level two-way travel between the seed and that city.
                 </div>
               </div>
-              <div className="rounded-lg bg-[#eff6ff] px-3 py-2 text-xs text-[#1e3a8a]">
+              <div className="czgen_info text-xs">
                 The list is ranked by <code>coupling</code>, shown as{' '}
                 <span className="font-semibold">Connection</span>. The other
                 values help decide whether that city is worth keeping in the
@@ -2663,14 +2666,22 @@ coupling =
           </div>
         </div>
       )}
+      {!hasGenerated && (
+        <div className="czgen_header">
+          <h1 className="czgen_title">Generate a Convenience Zone</h1>
+          <p className="czgen_lede">
+            Define your simulation&apos;s geographic area by selecting a location and clustering nearby Census Block Groups.
+          </p>
+        </div>
+      )}
       <form
         onSubmit={handleGenerateSubmit}
-        className="w-full max-w-[2200px] flex flex-col gap-4 items-center"
+        className="czgen_form"
       >
         {hasGenerated ? (
           <div className="w-full flex flex-col gap-4">
             <div className="flex gap-4 w-full flex-wrap 2xl:flex-nowrap">
-              <div className="h-[50vh] min-h-80 max-h-140 lg:h-[calc(100vh-13rem)] lg:min-h-136 lg:max-h-192 relative flex-1 min-w-0 w-full lg:min-w-176 rounded-lg border border-[#70B4D4] overflow-hidden">
+              <div className="czgen_map h-[50vh] min-h-80 max-h-140 lg:h-[calc(100vh-13rem)] lg:min-h-136 lg:max-h-192 relative flex-1 min-w-0 w-full lg:min-w-176">
                 {cbgGeoJSON ? (
                   <CBGMap
                     cbgData={cbgGeoJSON}
@@ -2709,48 +2720,44 @@ coupling =
               </div>
 
               {guidedSelectionMode && (
-                <div className="relative h-[calc(100vh-13rem)] min-h-[34rem] max-h-[48rem] w-[25rem] max-w-[25rem] bg-[#fffff2] border border-[#70B4D4] rounded-lg flex flex-col overflow-hidden">
-                  <div className="px-4 py-4 border-b border-[#70B4D4]">
+                <div className="czgen_subpanel relative h-[calc(100vh-13rem)] min-h-[34rem] max-h-[48rem] w-[25rem] max-w-[25rem]">
+                  <div className="czgen_subpanel_header">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-lg font-semibold leading-tight">
-                          Connected Cities
-                        </div>
-                        <div className="mt-1 text-sm text-gray-600">
+                        <p className="czgen_subpanel_title">Connected Cities</p>
+                        <p className="czgen_subpanel_subtitle">
                           Choose the connected cities whose linked CBGs should
                           stay explicit in the simulation.
-                        </div>
+                        </p>
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => setShowGuidedSummaryPanel(true)}
-                        className="rounded border border-[#70B4D4] bg-white px-3 py-1 text-xs font-semibold text-[#1f2937] hover:bg-[#eff6ff]"
+                        className="czgen_btn czgen_btn--sm"
                       >
                         Selection Summary
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowGuidedTermsHelp(true)}
-                        className="shrink-0 rounded border border-[#70B4D4] bg-white px-3 py-1 text-xs font-semibold text-[#1f2937] hover:bg-[#eff6ff]"
+                        className="czgen_btn czgen_btn--sm shrink-0"
                       >
                         How Ranking Works
                       </button>
                     </div>
-                    <div className="mt-3 text-xs text-gray-600">
-                      <span className="font-semibold text-[#1f2937]">
-                        Seed:
-                      </span>{' '}
+                    <div className="mt-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="font-semibold" style={{ color: 'var(--color-text-main)' }}>Seed:</span>{' '}
                       {guidedSeedLabel}
                     </div>
                   </div>
-                  <div className="px-4 py-3 border-b border-[#d1d5db] flex flex-wrap gap-2">
+                  <div className="czgen_subpanel_divider">
                     <button
                       type="button"
                       onClick={selectRecommendedGuidedDestinations}
                       disabled={guidedDestinationLoading || isFinalizing}
-                      className="px-3 py-2 rounded border border-[#70B4D4] bg-white text-sm font-semibold disabled:opacity-40"
+                      className="czgen_btn czgen_btn--sm czgen_btn--primary"
                     >
                       Use Recommended
                     </button>
@@ -2758,16 +2765,16 @@ coupling =
                       type="button"
                       onClick={() => setSelectedGuidedDestinationIds([])}
                       disabled={guidedDestinationLoading || isFinalizing}
-                      className="px-3 py-2 rounded border border-[#d1d5db] bg-white text-sm font-semibold disabled:opacity-40"
+                      className="czgen_btn czgen_btn--sm"
                     >
                       Seed Only
                     </button>
-                    <div className="w-full text-xs text-gray-600">
+                    <div className="w-full text-xs" style={{ color: 'var(--color-text-muted)' }}>
                       {guidedDestinations.length} ranked cities. Click a city to
                       include or remove its linked CBGs.
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+                  <div className="czgen_subpanel_body">
                     {guidedDestinationLoading ? (
                       <div className="text-sm text-gray-500 px-2 py-2">
                         Loading connected cities and linked CBGs...
@@ -2876,28 +2883,26 @@ coupling =
                     )}
                   </div>
                   <div
-                    className={`absolute inset-0 z-20 bg-[#fffff2] transition-transform duration-200 ease-out ${
+                    className={`absolute inset-0 z-20 transition-transform duration-200 ease-out ${
                       showGuidedSummaryPanel
                         ? 'translate-x-0'
                         : 'translate-x-full pointer-events-none'
                     }`}
+                    style={{ background: 'var(--color-bg-ivory)' }}
                     aria-hidden={!showGuidedSummaryPanel}
                   >
                     <div className="flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3 border-b border-[#70B4D4] px-4 py-4">
+                      <div className="czgen_subpanel_header flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-lg font-semibold text-[#1f2937]">
-                            Selection Summary
-                          </div>
-                          <div className="mt-1 text-sm text-gray-600">
-                            Guided metrics and the current explicit-zone
-                            summary.
-                          </div>
+                          <p className="czgen_subpanel_title">Selection Summary</p>
+                          <p className="czgen_subpanel_subtitle">
+                            Guided metrics and the current explicit-zone summary.
+                          </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => setShowGuidedSummaryPanel(false)}
-                          className="shrink-0 rounded border border-[#d1d5db] bg-white px-3 py-1 text-xs font-semibold text-[#1f2937] hover:border-[#70B4D4]"
+                          className="czgen_btn czgen_btn--sm shrink-0"
                         >
                           Close
                         </button>
@@ -3025,11 +3030,11 @@ coupling =
               )}
 
               {showCandidatePanels && (
-                <div className="h-[calc(100vh-13rem)] min-h-[34rem] max-h-[48rem] w-[22rem] max-w-[22rem] bg-[#fffff2] border border-[#70B4D4] rounded-lg flex flex-col overflow-hidden">
-                  <div className="px-4 py-3 border-b border-[#70B4D4] text-lg font-semibold">
-                    Frontier Candidates ({displayCandidates.length})
+                <div className="czgen_subpanel h-[calc(100vh-13rem)] min-h-136 max-h-192 w-88 max-w-88">
+                  <div className="czgen_subpanel_header">
+                    <p className="czgen_subpanel_title">Frontier Candidates ({displayCandidates.length})</p>
                   </div>
-                  <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+                  <div className="czgen_subpanel_body">
                     {!traceLayer && manualFrontierLoading ? (
                       <div className="text-sm text-gray-500 px-2 py-2">
                         Loading frontier candidates...
@@ -3087,11 +3092,11 @@ coupling =
               )}
 
               {showCandidatePanels && (
-                <div className="h-[calc(100vh-13rem)] min-h-[34rem] max-h-[48rem] w-[22rem] max-w-[22rem] bg-[#fffff2] border border-[#70B4D4] rounded-lg flex flex-col overflow-hidden">
-                  <div className="px-4 py-3 border-b border-[#70B4D4] text-lg font-semibold">
-                    CBG Analysis
+                <div className="czgen_subpanel h-[calc(100vh-13rem)] min-h-136 max-h-192 w-88 max-w-88">
+                  <div className="czgen_subpanel_header">
+                    <p className="czgen_subpanel_title">CBG Analysis</p>
                   </div>
-                  <div className="px-4 py-3 border-b border-[#d1d5db] text-sm space-y-1">
+                  <div className="px-4 py-3 border-b text-sm space-y-1" style={{ borderColor: 'var(--color-border-subtle)' }}>
                     <div>
                       <span className="font-semibold">CBG:</span>{' '}
                       {selectedTraceCandidateCbg || 'N/A'}
@@ -3212,10 +3217,10 @@ coupling =
                       </>
                     )}
                   </div>
-                  <div className="px-4 py-3 border-b border-[#70B4D4] text-sm font-semibold">
-                    Top POIs From Current Cluster
+                  <div className="czgen_subpanel_header">
+                    <p className="czgen_subpanel_title" style={{ fontSize: '13px' }}>Top POIs From Current Cluster</p>
                   </div>
-                  <div className="flex-1 overflow-y-auto px-4 py-3">
+                  <div className="czgen_subpanel_body" style={{ padding: '12px 16px' }}>
                     {candidatePoiLoading ? (
                       <div className="text-sm text-gray-500">
                         Loading POI analysis...
@@ -3259,10 +3264,10 @@ coupling =
             </div>
 
             <div
-              className={`w-full rounded-lg bg-[#fffff2] outline outline-2 outline-[#70B4D4] ${
+              className={`czgen_actionbar ${
                 guidedSelectionMode
-                  ? 'p-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'
-                  : 'p-2.5 flex flex-wrap items-start justify-between gap-3'
+                  ? 'flex-col xl:flex-row xl:items-start xl:justify-between'
+                  : 'items-start justify-between'
               }`}
             >
               {guidedSelectionMode ? (
@@ -3417,7 +3422,7 @@ coupling =
                                   <div className="mt-2 flex gap-2">
                                     <button
                                       type="button"
-                                      className="px-2 py-1 text-xs rounded border border-[#70B4D4] disabled:opacity-40"
+                                      className="czgen_btn czgen_btn--sm"
                                       disabled={traceStepIndex <= 0}
                                       onClick={() =>
                                         jumpToTraceStep(traceStepIndex - 1)
@@ -3427,7 +3432,7 @@ coupling =
                                     </button>
                                     <button
                                       type="button"
-                                      className="px-2 py-1 text-xs rounded border border-[#70B4D4] disabled:opacity-40"
+                                      className="czgen_btn czgen_btn--sm"
                                       disabled={traceStepIndex >= maxTraceStep}
                                       onClick={() =>
                                         jumpToTraceStep(traceStepIndex + 1)
@@ -3466,7 +3471,7 @@ coupling =
                             <div className="mt-2 flex gap-2">
                               <button
                                 type="button"
-                                className="px-2 py-1 text-xs rounded border border-[#70B4D4] disabled:opacity-40"
+                                className="czgen_btn czgen_btn--sm"
                                 disabled={!traceEnabled || traceStepIndex <= 0}
                                 onClick={() =>
                                   jumpToTraceStep(traceStepIndex - 1)
@@ -3476,7 +3481,7 @@ coupling =
                               </button>
                               <button
                                 type="button"
-                                className="px-2 py-1 text-xs rounded border border-[#70B4D4] disabled:opacity-40"
+                                className="czgen_btn czgen_btn--sm"
                                 disabled={
                                   !traceEnabled ||
                                   traceStepIndex >= maxTraceStep
@@ -3668,7 +3673,7 @@ coupling =
                       setTraceEnabled(false);
                     }}
                     disabled={loading || isFinalizing}
-                    className="px-4 py-2 rounded-lg border border-[#70B4D4] bg-white text-[#1f2937] font-semibold disabled:opacity-40"
+                    className="czgen_btn"
                   >
                     Edit Zone
                   </button>
@@ -3681,7 +3686,7 @@ coupling =
                       setTraceEnabled(Boolean(growthTrace?.steps?.length));
                     }}
                     disabled={loading || isFinalizing}
-                    className="px-4 py-2 rounded-lg border border-[#70B4D4] bg-white text-[#1f2937] font-semibold disabled:opacity-40"
+                    className="czgen_btn"
                   >
                     Trace View
                   </button>
@@ -3690,7 +3695,7 @@ coupling =
                   type="button"
                   onClick={saveCZHtmlMap}
                   disabled={loading || isFinalizing || savingHtmlMap}
-                  className="px-4 py-2 rounded-lg border border-[#70B4D4] bg-white text-[#1f2937] font-semibold disabled:opacity-40"
+                  className="czgen_btn"
                 >
                   {savingHtmlMap ? 'Saving HTML Map...' : 'Save HTML Map'}
                 </button>
@@ -3704,7 +3709,7 @@ coupling =
                       guidedSelectionSummary.selectedPopulation >
                         GUIDED_HARD_EXPLICIT_POPULATION)
                   }
-                  className="px-4 py-2 rounded-lg border border-[#70B4D4] bg-[#e0f2fe] text-[#1f2937] font-semibold disabled:opacity-40"
+                  className="czgen_btn czgen_btn--primary"
                 >
                   {isFinalizing
                     ? 'Generating Patterns...'
@@ -3715,7 +3720,7 @@ coupling =
           </div>
         ) : (
           <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-stretch">
-            <div className="h-[50vh] min-h-80 max-h-112 lg:h-[calc(100vh-6rem)] lg:min-h-168 lg:max-h-none w-full lg:min-w-0 lg:flex-1 rounded-lg border border-[#70B4D4] overflow-hidden">
+            <div className="czgen_map h-[50vh] min-h-80 max-h-112 lg:h-[calc(100vh-6rem)] lg:min-h-168 lg:max-h-none w-full lg:min-w-0 lg:flex-1">
               <InteractiveMap
                 onLocationSelect={(coords) => {
                   resetSeedPreview();
@@ -3736,7 +3741,7 @@ coupling =
               />
             </div>
 
-            <div className="w-full rounded-lg border border-[#70B4D4] bg-[#fffff2] p-4 lg:w-[30rem] xl:w-[32rem] lg:flex-none lg:h-[calc(100vh-6rem)] lg:overflow-y-auto">
+            <div className="czgen_panel lg:w-[30rem] xl:w-[32rem] lg:flex-none lg:h-[calc(100vh-6rem)] lg:overflow-y-auto">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col xl:flex-row xl:items-end">
                   <div className="flex-1 min-w-0">
@@ -3763,7 +3768,7 @@ coupling =
                         !location.trim() ||
                         isTestLocationInput
                       }
-                      className="w-full px-4 py-2 rounded-lg border border-[#70B4D4] bg-white text-[#1f2937] font-semibold disabled:opacity-40"
+                      className="czgen_btn czgen_btn--full"
                     >
                       {resolvingSeed ? 'Resolving Seed...' : 'Resolve Seed'}
                     </button>
@@ -3777,10 +3782,10 @@ coupling =
                       <button
                         type="button"
                         onClick={() => setShowAlgorithmGuide(true)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded border border-transparent bg-transparent px-2 py-1 text-xs font-semibold text-[#6b7280] hover:border-[#70B4D4] hover:bg-[#eff6ff] hover:text-[#1f2937] transition-colors"
+                        className="czgen_btn czgen_btn--sm"
                       >
                         <Info size={12} />
-                        Algorithm Guide
+                        <span style={{ marginLeft: '5px' }}>Algorithm Guide</span>
                       </button>
                     </div>
                     <select
@@ -3836,7 +3841,7 @@ coupling =
                       />
                     </div>
                   ) : null}
-                  <div className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-2">
+                  <div className="czgen_warning text-xs sm:col-span-2">
                     Keep zones under 50,000 people for faster generation and
                     review.
                   </div>
@@ -3926,7 +3931,7 @@ coupling =
                 {(setupSeedCbg || seedResolveError || isTestLocationInput) && (
                   <div className="flex flex-col gap-2 text-sm">
                     {setupSeedCbg && (
-                      <div className="rounded-lg border border-[#70B4D4] bg-[#eff6ff] px-3 py-2 text-[#1e3a8a]">
+                      <div className="czgen_info text-sm">
                         <div>
                           <span className="font-semibold">Resolved Seed:</span>{' '}
                           {setupSeedLabel || setupSeedCbg}
@@ -3957,16 +3962,17 @@ coupling =
                         <div className="mt-2 flex flex-wrap gap-2">
                           {seedEditMode ? (
                             <>
-                              <div className="flex overflow-hidden rounded-lg border border-[#70B4D4] bg-white">
+                              <div className="flex overflow-hidden rounded-lg" style={{ border: '1px solid rgba(61,136,173,0.3)' }}>
                                 <button
                                   type="button"
                                   onClick={() => setSeedEditAction('add')}
                                   disabled={loading || seedEditLoading}
-                                  className={`px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                                  className={`px-3 py-1.5 text-xs font-semibold font-[inherit] cursor-pointer disabled:opacity-40 ${
                                     seedEditAction === 'add'
                                       ? 'bg-[#dcfce7] text-[#166534]'
-                                      : 'text-[#1f2937]'
+                                      : ''
                                   }`}
+                                  style={seedEditAction !== 'add' ? { color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' } : undefined}
                                 >
                                   Add
                                 </button>
@@ -3974,11 +3980,15 @@ coupling =
                                   type="button"
                                   onClick={() => setSeedEditAction('remove')}
                                   disabled={loading || seedEditLoading}
-                                  className={`border-l border-[#70B4D4] px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                                  className={`px-3 py-1.5 text-xs font-semibold font-[inherit] cursor-pointer disabled:opacity-40 ${
                                     seedEditAction === 'remove'
                                       ? 'bg-[#fee2e2] text-[#991b1b]'
-                                      : 'text-[#1f2937]'
+                                      : ''
                                   }`}
+                                  style={{
+                                    borderLeft: '1px solid rgba(61,136,173,0.3)',
+                                    ...(seedEditAction !== 'remove' ? { color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' } : {})
+                                  }}
                                 >
                                   Remove
                                 </button>
@@ -3987,7 +3997,7 @@ coupling =
                                 type="button"
                                 onClick={finishSeedEdit}
                                 disabled={loading || seedEditLoading}
-                                className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                                className="czgen_btn czgen_btn--sm"
                               >
                                 Done
                               </button>
@@ -3995,7 +4005,7 @@ coupling =
                                 type="button"
                                 onClick={cancelSeedEdit}
                                 disabled={loading || seedEditLoading}
-                                className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                                className="czgen_btn czgen_btn--sm"
                               >
                                 Cancel
                               </button>
@@ -4005,7 +4015,7 @@ coupling =
                                   void showMoreSeedEditNeighbors();
                                 }}
                                 disabled={loading || seedEditLoading}
-                                className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                                className="czgen_btn czgen_btn--sm"
                               >
                                 Show More Nearby
                               </button>
@@ -4017,7 +4027,7 @@ coupling =
                                 void beginSeedEdit();
                               }}
                               disabled={loading || seedEditLoading}
-                              className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                              className="czgen_btn czgen_btn--sm"
                             >
                               {seedEditLoading
                                 ? 'Loading Area...'
@@ -4034,13 +4044,13 @@ coupling =
                               seedEditLoading ||
                               !seedAdjustmentSummary.hasChanges
                             }
-                            className="rounded-lg border border-[#70B4D4] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-40"
+                            className="czgen_btn czgen_btn--sm"
                           >
                             Reset
                           </button>
                         </div>
                         {seedEditMode && (
-                          <div className="mt-2 text-xs text-[#1e3a8a]">
+                          <div className="mt-2 text-xs czgen_info" style={{ padding: '4px 8px' }}>
                             {seedEditAction === 'add'
                               ? 'Add mode active'
                               : 'Remove mode active'}
@@ -4048,19 +4058,19 @@ coupling =
                           </div>
                         )}
                         {seedEditError && (
-                          <div className="mt-2 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700">
+                          <div className="mt-2 czgen_error text-xs" style={{ textAlign: 'left', maxWidth: '100%', padding: '6px 10px' }}>
                             {seedEditError}
                           </div>
                         )}
                       </div>
                     )}
                     {!setupSeedCbg && isTestLocationInput && (
-                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+                      <div className="czgen_warning text-sm">
                         Seed preview is unavailable in TEST mode.
                       </div>
                     )}
                     {seedResolveError && (
-                      <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-red-700">
+                      <div className="czgen_error text-sm" style={{ textAlign: 'left', maxWidth: '100%' }}>
                         {seedResolveError}
                       </div>
                     )}
@@ -4075,7 +4085,7 @@ coupling =
                 )}
 
                 {isGuidedSecondOrderAlgorithm && (
-                  <div className="rounded-lg border border-[#70B4D4] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e3a8a]">
+                  <div className="czgen_info text-xs">
                     This mode starts with the full seed region, ranks nearby
                     connected cities by how much travel they share with it, and
                     asks you which connected cities should contribute linked
@@ -4084,7 +4094,7 @@ coupling =
                 )}
 
                 {clusterAlgorithm === 'mobility_prune' && (
-                  <div className="rounded-lg border border-[#70B4D4] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e3a8a]">
+                  <div className="czgen_info text-xs">
                     This mode grows a large mobility envelope, then prunes low
                     seed-capture CBGs while preserving the seed CBGs' movement
                     field.
@@ -4092,7 +4102,7 @@ coupling =
                 )}
 
                 {clusterAlgorithm === 'greedy_weight_seed_guard' && (
-                  <div className="rounded-lg border border-[#70B4D4] p-3 bg-[#fffff2] w-full">
+                  <div className="czgen_panel w-full" style={{ padding: '12px 14px' }}>
                     <button
                       type="button"
                       className="text-sm font-semibold text-left w-full"
@@ -4133,7 +4143,7 @@ coupling =
                       seedEditLoading ||
                       (seedGuardNeedsResolvedSeed && !setupSeedCbg)
                     }
-                    className="w-full px-4 py-2 rounded-lg border border-[#70B4D4] bg-[#e0f2fe] text-[#1f2937] font-semibold disabled:opacity-40"
+                    className="czgen_btn czgen_btn--primary czgen_btn--full"
                   >
                     {loading
                       ? isGuidedSecondOrderAlgorithm
@@ -4150,7 +4160,7 @@ coupling =
         )}
 
         {error && (
-          <div className="text-red-500 text-center mx-4 max-w-100">{error}</div>
+          <div className="czgen_error">{error}</div>
         )}
       </form>
     </div>

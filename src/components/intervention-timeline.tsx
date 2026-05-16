@@ -29,6 +29,7 @@ export default function InterventionTimeline() {
   const dragTimeRef = useRef<number | null>(null);
   const pointerDragRef = useRef(false);
   const valuesRef = useRef(values);
+  const thumbPointerValueRef = useRef<number | null>(null);
 
   useEffect(() => {
     valuesRef.current = values;
@@ -88,24 +89,26 @@ export default function InterventionTimeline() {
   }, [curtime, values]);
 
   const beginTimelineDrag = (clientX: number, track: HTMLElement) => {
-    const nextTime = getTrackTime(clientX, track);
-    let dragTime = curtime;
+    const thumbValue = thumbPointerValueRef.current;
+    thumbPointerValueRef.current = null;
 
-    if (curtime === 0) {
-      if (values.includes(nextTime)) {
-        setCurtime(nextTime);
-        dragTime = nextTime;
-      } else if (values.length < 10) {
-        addInterventions(nextTime);
-        valuesRef.current = [...valuesRef.current, nextTime].sort((a, b) => a - b);
-        setCurtime(nextTime);
-        dragTime = nextTime;
-      }
-    } else {
-      dragTime = moveDraggedIntervention(curtime, nextTime);
+    if (thumbValue !== null) {
+      setCurtime(thumbValue);
+      dragTimeRef.current = thumbValue;
+      return;
     }
 
-    dragTimeRef.current = dragTime;
+    const nextTime = getTrackTime(clientX, track);
+
+    if (values.includes(nextTime)) {
+      setCurtime(nextTime);
+      dragTimeRef.current = nextTime;
+    } else if (curtime === 0 && values.length < 10) {
+      addInterventions(nextTime);
+      valuesRef.current = [...valuesRef.current, nextTime].sort((a, b) => a - b);
+      setCurtime(nextTime);
+      dragTimeRef.current = nextTime;
+    }
   };
 
   const startTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
@@ -277,6 +280,8 @@ export default function InterventionTimeline() {
             aria-valuemax={hours}
             aria-valuenow={value}
             aria-label={`Intervention ${values.indexOf(value) + 1} hour`}
+            onPointerDown={() => { thumbPointerValueRef.current = value; }}
+            onMouseDown={() => { thumbPointerValueRef.current = value; }}
             onFocus={() => setCurtime(value)}
             onKeyDown={(e) => handleThumbKeyDown(e, value)}
             onContextMenu={(e) => {

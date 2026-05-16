@@ -1,11 +1,344 @@
+/* ============================================================
+   CZ Generation Page Styles
+   ============================================================ */
+
+/* ---------- Page container ---------- */
+.czgen_page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 20px 64px;
+  min-height: calc(100vh - 60px);
+}
+
+@media (max-width: 640px) {
+  .czgen_page {
+    padding: 20px 12px 48px;
+  }
+}
+
+/* ---------- Header ---------- */
+.czgen_header {
+  width: 100%;
+  max-width: 1400px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+h1.czgen_title {
+  font-size: clamp(24px, 2.8vw, 38px);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.czgen_lede {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  max-width: 580px;
+  margin: 0;
+}
+
+/* ---------- Main form ---------- */
+.czgen_form {
+  width: 100%;
+  max-width: 2200px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+/* ---------- Map containers ---------- */
+.czgen_map {
+  border: 1px solid rgba(61, 136, 173, 0.32);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- Form panel (input-phase sidebar) ---------- */
+.czgen_panel {
+  background: var(--color-bg-ivory);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- Sub-panels (edit-phase sidebars) ---------- */
+.czgen_subpanel {
+  background: var(--color-bg-ivory);
+  border: 1px solid rgba(61, 136, 173, 0.28);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+}
+
+/* On mobile the subpanels should fill the row */
+@media (max-width: 1024px) {
+  .czgen_subpanel {
+    min-height: 320px;
+    max-height: 480px;
+  }
+}
+
+.czgen_subpanel_header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  flex-shrink: 0;
+}
+
+.czgen_subpanel_title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.czgen_subpanel_subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.czgen_subpanel_divider {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.czgen_subpanel_body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.czgen_subpanel_body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.czgen_subpanel_body::-webkit-scrollbar-thumb {
+  background: rgba(47, 53, 64, 0.15);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ---------- Bottom action bar (edit phase) ---------- */
+.czgen_actionbar {
+  width: 100%;
+  background: var(--color-bg-ivory);
+  border: 1px solid rgba(61, 136, 173, 0.28);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .czgen_actionbar {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+}
+
+/* ---------- Buttons ---------- */
+.czgen_btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(61, 136, 173, 0.28);
+  background: var(--color-bg-surface);
+  color: var(--color-text-main);
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.czgen_btn:hover:not(:disabled) {
+  background: rgba(112, 180, 212, 0.08);
+  border-color: rgba(61, 136, 173, 0.48);
+}
+
+.czgen_btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.czgen_btn--primary {
+  background: rgba(112, 180, 212, 0.14);
+  border-color: rgba(61, 136, 173, 0.42);
+  color: var(--color-primary-blue);
+}
+
+.czgen_btn--primary:hover:not(:disabled) {
+  background: rgba(112, 180, 212, 0.24);
+  border-color: rgba(61, 136, 173, 0.6);
+}
+
+.czgen_btn--sm {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.czgen_btn--full {
+  width: 100%;
+}
+
+/* ---------- Info / warning / error boxes ---------- */
+.czgen_info {
+  background: rgba(112, 180, 212, 0.08);
+  border: 1px solid rgba(61, 136, 173, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--color-primary-blue);
+  line-height: 1.5;
+}
+
+.czgen_warning {
+  background: rgba(217, 119, 6, 0.07);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.czgen_error {
+  color: var(--color-accent-red);
+  font-size: 13.5px;
+  text-align: center;
+  padding: 10px 16px;
+  background: rgba(232, 72, 90, 0.08);
+  border: 1px solid rgba(232, 72, 90, 0.2);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 560px;
+}
+
+/* ---------- Modals ---------- */
+.czgen_modal_overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(27, 31, 34, 0.65);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+}
+
+.czgen_modal {
+  background: var(--color-bg-ivory);
+  border: 1px solid rgba(61, 136, 173, 0.3);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: var(--shadow-card-hover);
+  width: min(32rem, 92vw);
+}
+
+.czgen_modal--wide {
+  width: min(42rem, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.czgen_modal_title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.czgen_modal_subtitle {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+/* ---------- Progress bar (in finalize modal) ---------- */
+.czgen_progress_track {
+  width: 100%;
+  height: 10px;
+  background: rgba(47, 53, 64, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.czgen_progress_fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary-blue-soft), var(--color-primary-blue));
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+
+/* ---------- Form fields ---------- */
 .formfield {
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-ivory);
-  outline: 2px solid var(--color-primary-blue);
+  padding: 7px 12px;
+  border-radius: 10px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text-main);
+  width: 100%;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+  outline: none;
+}
+
+.formfield:focus {
+  border-color: rgba(61, 136, 173, 0.5);
+  box-shadow: 0 0 0 3px rgba(112, 180, 212, 0.15);
 }
 
 .formfield:disabled {
   cursor: not-allowed;
-  filter: brightness(0.75);
+  opacity: 0.6;
+  filter: none;
+}
+
+/* ---------- Field labels ---------- */
+.czgen_field_label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 5px;
+  display: block;
 }
