@@ -3,9 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import InstructionBanner from '@/components/instruction-banner';
-import LoginModal from '@/components/login-modal';
 import SimSettings from '@/components/simsettings';
-import { useSession } from '@/lib/auth-client';
 import { buildSimulationRequest } from '@/lib/simulation-request';
 import useMapData from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
@@ -52,10 +50,6 @@ export default function Simulator() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
-  const [loginOpen, setLoginOpen] = useState(false);
-
-  const { data: session } = useSession();
-  const user = session?.user;
 
   useEffect(() => {
     setSettings({ sim_id: null });
@@ -219,24 +213,8 @@ export default function Simulator() {
       </div>
       <div className="sim_settings px-4">
         <InstructionBanner>
-          {user ? (
-            <>
-              Generate a Convenience Zone or pick one that&apos;s already
-              generated, then click &lsquo;Simulate&rsquo; to begin.
-            </>
-          ) : (
-            <>
-              Pick a Convenience Zone and click &lsquo;Simulate&rsquo; to begin.{' '}
-              <button
-                type="button"
-                className="instruction-banner-link"
-                onClick={() => setLoginOpen(true)}
-              >
-                Login
-              </button>{' '}
-              to generate your own zone.
-            </>
-          )}
+          Generate a Convenience Zone or pick one that&apos;s already generated,
+          then click &lsquo;Simulate&rsquo; to begin.
         </InstructionBanner>
         <SimSettings
           sendData={sendSimulatorData}
@@ -246,10 +224,6 @@ export default function Simulator() {
           progressMessage={progressMessage}
         />
       </div>
-      <LoginModal
-        isOpen={loginOpen}
-        onRequestClose={() => setLoginOpen(false)}
-      />
     </div>
   );
 }
