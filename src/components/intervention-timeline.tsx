@@ -1,10 +1,45 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import useSimSettings from '@/stores/simsettings';
+import useSimSettings, {
+  DEFAULT_INTERVENTIONS,
+  type Interventions as InterventionSettings
+} from '@/stores/simsettings';
 
 import '@/styles/intervention-timeline.css';
 import Interventions from './interventions';
+
+const INTERVENTION_VALUE_KEYS = [
+  'mask',
+  'vaccine',
+  'capacity',
+  'lockdown',
+  'selfiso'
+] as const satisfies readonly (keyof Omit<InterventionSettings, 'time'>)[];
+
+function interventionSettingsMatch(
+  a: InterventionSettings,
+  b: InterventionSettings
+) {
+  return INTERVENTION_VALUE_KEYS.every((key) => a[key] === b[key]);
+}
+
+function getEffectiveInterventionAt(
+  time: number,
+  interventions: InterventionSettings[]
+) {
+  const sorted = [...interventions].sort((a, b) => a.time - b.time);
+  const first = sorted[0];
+  if (!first) return null;
+
+  let active = first;
+  for (const intervention of sorted) {
+    if (intervention.time > time) break;
+    active = intervention;
+  }
+
+  return active;
+}
 
 export default function InterventionTimeline() {
   const hours = useSimSettings((state) => state.hours);
@@ -18,6 +53,7 @@ export default function InterventionTimeline() {
   );
 
   const [curtime, setCurtime] = useState(0);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
   const values = useMemo(
     () =>
       Array.from(new Set(interventions.map((intervention) => intervention.time))).sort(
@@ -25,7 +61,6 @@ export default function InterventionTimeline() {
       ),
     [interventions]
   );
-  const timelineValues = values.filter((value) => value > 0);
   const dragTimeRef = useRef<number | null>(null);
   const pointerDragRef = useRef(false);
   const valuesRef = useRef(values);
@@ -35,16 +70,34 @@ export default function InterventionTimeline() {
     valuesRef.current = values;
   }, [values]);
 
+  const addInterventionAt = (time: number) => {
+    const activeIntervention = getEffectiveInterventionAt(time, interventions);
+
+    if (
+      activeIntervention &&
+      interventionSettingsMatch(activeIntervention, DEFAULT_INTERVENTIONS)
+    ) {
+      setTimelineError(
+        'That intervention would not change any settings. Adjust an existing intervention before adding another one.'
+      );
+      return;
+    }
+
+    addInterventions(time, activeIntervention ?? DEFAULT_INTERVENTIONS);
+    setCurtime(time);
+    setTimelineError(null);
+  };
+
   const getTrackTime = (clientX: number, track: HTMLElement) => {
     const rect = track.getBoundingClientRect();
     if (rect.width <= 0) return curtime;
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    return Math.min(hours, Math.max(1, Math.round(ratio * hours)));
+    return Math.min(hours, Math.max(0, Math.round(ratio * hours)));
   };
 
   const moveIntervention = (fromTime: number, toTime: number) => {
-    const nextTime = Math.min(hours, Math.max(1, toTime));
-    if (fromTime === 0 || fromTime === nextTime) return;
+    const nextTime = Math.min(hours, Math.max(0, toTime));
+    if (fromTime === nextTime) return;
     if (values.includes(nextTime)) {
       setCurtime(nextTime);
       return;
@@ -52,11 +105,12 @@ export default function InterventionTimeline() {
 
     setInterventions(fromTime, { time: nextTime });
     setCurtime(nextTime);
+    setTimelineError(null);
   };
 
   const moveDraggedIntervention = (fromTime: number, toTime: number) => {
-    const nextTime = Math.min(hours, Math.max(1, toTime));
-    if (fromTime === 0 || fromTime === nextTime) return fromTime;
+    const nextTime = Math.min(hours, Math.max(0, toTime));
+    if (fromTime === nextTime) return fromTime;
     if (valuesRef.current.includes(nextTime)) return fromTime;
 
     setInterventions(fromTime, { time: nextTime });
@@ -64,6 +118,7 @@ export default function InterventionTimeline() {
       .map((value) => (value === fromTime ? nextTime : value))
       .sort((a, b) => a - b);
     setCurtime(nextTime);
+    setTimelineError(null);
     return nextTime;
   };
 
@@ -94,6 +149,7 @@ export default function InterventionTimeline() {
 
     if (thumbValue !== null) {
       setCurtime(thumbValue);
+      setTimelineError(null);
       dragTimeRef.current = thumbValue;
       return;
     }
@@ -102,12 +158,12 @@ export default function InterventionTimeline() {
 
     if (values.includes(nextTime)) {
       setCurtime(nextTime);
+      setTimelineError(null);
       dragTimeRef.current = nextTime;
-    } else if (curtime === 0 && values.length < 10) {
-      addInterventions(nextTime);
-      valuesRef.current = [...valuesRef.current, nextTime].sort((a, b) => a - b);
-      setCurtime(nextTime);
-      dragTimeRef.current = nextTime;
+    } else {
+      const fromTime = values.includes(curtime) ? curtime : values[0];
+      if (fromTime === undefined) return;
+      dragTimeRef.current = moveDraggedIntervention(fromTime, nextTime);
     }
   };
 
@@ -162,11 +218,12 @@ export default function InterventionTimeline() {
   };
 
   const deleteThumb = (time: number) => {
-    if (time === 0 || values.length === 1) return;
+    if (values.length === 1) return;
     const index = values.indexOf(time);
     const next = values.filter((value) => value !== time);
     deleteInterventions(time);
     setCurtime(next[Math.min(index, next.length - 1)] ?? 0);
+    setTimelineError(null);
   };
 
   const moveLeft = () => {
@@ -215,7 +272,7 @@ export default function InterventionTimeline() {
 
     if (e.key === 'Home') {
       e.preventDefault();
-      moveIntervention(value, 1);
+      moveIntervention(value, 0);
       return;
     }
 
@@ -254,35 +311,23 @@ export default function InterventionTimeline() {
       >
         <legend className="iv_timeline_legend">Intervention timeline</legend>
         <div className="iv_timeline_track_line" />
-        <button
-          type="button"
-          className={`iv_timeline_thumb iv_timeline_thumb--baseline${curtime === 0 ? ' current' : ''}`}
-          style={{ left: '0%' }}
-          aria-label="Baseline intervention hour 0"
-          onClick={() => setCurtime(0)}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            setCurtime(0);
-          }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            setCurtime(0);
-          }}
-        />
-        {timelineValues.map((value) => (
+        {values.map((value) => (
           <button
             key={value}
             type="button"
             role="slider"
             className={`iv_timeline_thumb${curtime === value ? ' current' : ''}`}
-            style={{ left: `${(value / hours) * 100}%` }}
-            aria-valuemin={1}
+            style={{ left: `${hours > 0 ? (value / hours) * 100 : 0}%` }}
+            aria-valuemin={0}
             aria-valuemax={hours}
             aria-valuenow={value}
             aria-label={`Intervention ${values.indexOf(value) + 1} hour`}
             onPointerDown={() => { thumbPointerValueRef.current = value; }}
             onMouseDown={() => { thumbPointerValueRef.current = value; }}
-            onFocus={() => setCurtime(value)}
+            onFocus={() => {
+              setCurtime(value);
+              setTimelineError(null);
+            }}
             onKeyDown={(e) => handleThumbKeyDown(e, value)}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -307,7 +352,7 @@ export default function InterventionTimeline() {
             type="button"
             className="iv_control_btn iv_control_btn--danger"
             onClick={() => deleteThumb(curtime)}
-            disabled={values.length <= 1 || values.indexOf(curtime) === 0}
+            disabled={values.length <= 1}
           >
             Delete
           </button>
@@ -316,8 +361,7 @@ export default function InterventionTimeline() {
             className="iv_control_btn iv_control_btn--add"
             onClick={() => {
               if (nextAddTime === undefined) return;
-              addInterventions(nextAddTime);
-              setCurtime(nextAddTime);
+              addInterventionAt(nextAddTime);
             }}
             disabled={values.length >= 10 || nextAddTime === undefined}
           >
@@ -334,10 +378,15 @@ export default function InterventionTimeline() {
           </button>
         </div>
       </div>
+      {timelineError && (
+        <div className="iv_timeline_error" role="alert">
+          {timelineError}
+        </div>
+      )}
 
       <div className="iv_intervention_label">
         <span className="iv_intervention_index">
-          {curtime === 0 ? 'Baseline Intervention' : `Intervention #${values.indexOf(curtime) + 1}`}
+          Intervention #{values.indexOf(curtime) + 1}
         </span>
         <span className="iv_intervention_hour">
           Hour {curtime.toString().padStart(3, '0')}
@@ -358,7 +407,7 @@ export default function InterventionTimeline() {
         )}
       </div>
 
-      <Interventions time={curtime} />
+      <Interventions time={curtime} onChange={() => setTimelineError(null)} />
     </div>
   );
 }

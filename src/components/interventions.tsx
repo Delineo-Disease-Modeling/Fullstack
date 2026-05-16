@@ -22,7 +22,12 @@ function easeOutCubic(t: number) {
   return 1 - (1 - t) ** 3;
 }
 
-export default function Interventions({ time }: { time: number }) {
+type InterventionsProps = {
+  time: number;
+  onChange?: () => void;
+};
+
+export default function Interventions({ time, onChange }: InterventionsProps) {
   const allInterventions = useSimSettings((state) => state.interventions);
   const setInterventions = useSimSettings((state) => state.setInterventions);
 
@@ -90,32 +95,47 @@ export default function Interventions({ time }: { time: number }) {
       <SimParameter
         label={'Percent Masking'}
         value={display.mask}
-        callback={(mask) => setInterventions(time, { mask })}
+        callback={(mask) => {
+          setInterventions(time, { mask });
+          onChange?.();
+        }}
         info={'Proportion of people who wear masks, reducing the probability of disease transmission between individuals.'}
       />
       <SimParameter
         label={'Percent Vaccinated'}
         value={display.vaccine}
-        callback={(vaccine) => setInterventions(time, { vaccine })}
+        callback={(vaccine) => {
+          setInterventions(time, { vaccine });
+          onChange?.();
+        }}
         info={'Proportion of the population that is vaccinated, reducing individual susceptibility to infection.'}
       />
       <SimParameter
         label={'Maximum Facility Capacity'}
         value={display.capacity}
-        callback={(capacity) => setInterventions(time, { capacity })}
+        callback={(capacity) => {
+          setInterventions(time, { capacity });
+          onChange?.();
+        }}
         info={'Scales the maximum occupancy of every facility. At 50%, a venue that holds 100 people caps at 50, and anyone over the limit is sent home.'}
         disabled
       />
       <SimParameter
         label={'Lockdown Probability'}
         value={display.lockdown}
-        callback={(lockdown) => setInterventions(time, { lockdown })}
+        callback={(lockdown) => {
+          setInterventions(time, { lockdown });
+          onChange?.();
+        }}
         info={'Chance that any person stays home instead of travelling to a facility during a movement event. Applies regardless of health status.'}
       />
       <SimParameter
         label={'Self-Isolation Percent'}
         value={display.selfiso}
-        callback={(selfiso) => setInterventions(time, { selfiso })}
+        callback={(selfiso) => {
+          setInterventions(time, { selfiso });
+          onChange?.();
+        }}
         info={'Chance that a symptomatic (visibly ill) person stays home instead of going to a facility, modelling voluntary quarantine behaviour.'}
       />
     </div>
