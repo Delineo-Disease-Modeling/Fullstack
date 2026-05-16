@@ -26,6 +26,8 @@ export type Interventions = {
   selfiso: number;
 };
 
+type InterventionValues = Omit<Interventions, 'time'>;
+
 export type DmpMode = 'auto' | 'required' | 'off';
 
 export type SimSettings = {
@@ -45,7 +47,10 @@ export type SimSettings = {
 
 interface SimSettingsActions {
   setSettings: (new_settings: Partial<SimSettings>) => void;
-  addInterventions: (time: number) => void;
+  addInterventions: (
+    time: number,
+    values?: InterventionValues
+  ) => void;
   setInterventions: (
     time: number,
     new_interventions: Partial<Interventions>
@@ -55,13 +60,17 @@ interface SimSettingsActions {
 
 type SimSettingsStore = SimSettings & SimSettingsActions;
 
-const default_interventions: Interventions = {
-  time: 0,
-  mask: 0.4,
-  vaccine: 0.2,
+const DEFAULT_INTERVENTION_VALUES: InterventionValues = {
+  mask: 0.0,
+  vaccine: 0.0,
   capacity: 1.0,
   lockdown: 0.0,
-  selfiso: 0.5
+  selfiso: 0.0
+};
+
+export const DEFAULT_INTERVENTIONS: Interventions = {
+  time: 0,
+  ...DEFAULT_INTERVENTION_VALUES
 };
 
 const default_settings: SimSettings = {
@@ -78,7 +87,7 @@ const default_settings: SimSettings = {
     Delta: 'variant.Delta.general'
   },
   matrix_by_variant: {},
-  interventions: [{ ...default_interventions }]
+  interventions: [{ ...DEFAULT_INTERVENTIONS }]
 };
 
 const useSimSettings = create<SimSettingsStore>((set) => ({
@@ -88,10 +97,10 @@ const useSimSettings = create<SimSettingsStore>((set) => ({
     set((state) => ({ ...state, ...new_settings }));
   },
 
-  addInterventions: (time) => {
+  addInterventions: (time, values = DEFAULT_INTERVENTION_VALUES) => {
     set((state) => ({
       interventions: state.interventions.concat({
-        ...default_interventions,
+        ...values,
         time
       })
     }));
