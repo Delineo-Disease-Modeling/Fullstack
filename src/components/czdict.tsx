@@ -16,17 +16,38 @@ interface CzDictProps {
 export default function CzDict({ zone, setZone, locations, setLocations }: CzDictProps) {
   const { data: session } = useSession();
   const user = session?.user;
+  const userId = user?.id ?? null;
   const setSettings = useSimSettings((state) => state.setSettings);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const zoneRef = useRef(zone);
+  const previousUserIdRef = useRef<string | null>(null);
   zoneRef.current = zone;
+
+  useEffect(() => {
+    const previousUserId = previousUserIdRef.current;
+    const currentZone = zoneRef.current;
+
+    if (
+      previousUserId &&
+      previousUserId !== userId &&
+      currentZone?.user_id === previousUserId
+    ) {
+      setSettings({ zone: null, sim_id: null });
+    }
+
+    previousUserIdRef.current = userId;
+  }, [userId, setSettings]);
 
   useEffect(() => {
     let active = true;
     let es: EventSource | null = null;
     let fallbackTimer: number | null = null;
+
+    if (!userId) {
+      setLocations([]);
+    }
 
     const fetchZones = async () => {
       if (!active) return;
@@ -107,7 +128,7 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
       if (fallbackTimer) clearInterval(fallbackTimer);
       clearInterval(heartbeat);
     };
-  }, [setZone, setLocations]);
+  }, [setZone, setLocations, userId]);
 
   return (
     <div className="flex flex-col items-center gap-4">
