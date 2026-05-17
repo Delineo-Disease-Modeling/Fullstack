@@ -6,6 +6,7 @@ import {
   serviceResult
 } from '@/server/api/responses';
 import { getSessionUserId } from '@/server/api/session';
+import { getGuestZoneClaimTokenHashesFromHeaders } from '@/server/services/guest-zone-claims';
 import {
   createConvenienceZone,
   createConvenienceZoneSchema,
@@ -14,7 +15,10 @@ import {
 
 export async function GET(request: NextRequest) {
   const userId = await getSessionUserId(request.headers);
-  const zones = await listConvenienceZones(userId);
+  const guestClaimTokenHashes = getGuestZoneClaimTokenHashesFromHeaders(
+    request.headers
+  );
+  const zones = await listConvenienceZones(userId, guestClaimTokenHashes);
   return jsonData(zones);
 }
 
