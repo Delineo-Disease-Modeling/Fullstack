@@ -2,18 +2,22 @@ export const ANONYMOUS_ZONE_USER_EMAIL = 'anonymous-zones@delineo.local';
 
 type ZoneAccessRecord = {
   user_id: string;
-  user?: { email: string | null } | null;
+  guest_claim_token_hash?: string | null;
 };
 
 export function canReadConvenienceZone(
   zone: ZoneAccessRecord,
-  userId: string | null
+  userId: string | null,
+  guestClaimTokenHashes: string[] = []
 ) {
-  if (zone.user?.email === ANONYMOUS_ZONE_USER_EMAIL) {
+  if (userId && zone.user_id === userId) {
     return true;
   }
 
-  return !!userId && zone.user_id === userId;
+  return (
+    !!zone.guest_claim_token_hash &&
+    guestClaimTokenHashes.includes(zone.guest_claim_token_hash)
+  );
 }
 
 export function zoneAccessDenied(userId: string | null) {

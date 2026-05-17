@@ -11,12 +11,12 @@ type SimDataCacheEntry = {
 
 export async function listSimDataCacheForZone(
   czoneId: number,
-  userId: string | null
+  userId: string | null,
+  guestClaimTokenHashes: string[] = []
 ): Promise<ServiceResult<SimDataCacheEntry[]>> {
   const czone = await prisma.convenienceZone.findUnique({
     where: { id: czoneId },
     include: {
-      user: { select: { email: true } },
       simdata: { orderBy: { id: 'desc' } }
     }
   });
@@ -28,7 +28,7 @@ export async function listSimDataCacheForZone(
       status: 404
     };
   }
-  if (!canReadConvenienceZone(czone, userId)) {
+  if (!canReadConvenienceZone(czone, userId, guestClaimTokenHashes)) {
     return zoneAccessDenied(userId);
   }
 

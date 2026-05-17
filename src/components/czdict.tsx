@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
+import { getGuestZoneClaimHeaders } from '@/lib/guest-zone-claims';
 import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
 import EditDeleteActions from './edit-delete-actions';
@@ -52,7 +53,9 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
     const fetchZones = async () => {
       if (!active) return;
       try {
-        const res = await fetch('/api/convenience-zones');
+        const res = await fetch('/api/convenience-zones', {
+          headers: getGuestZoneClaimHeaders()
+        });
         const json = await res.json().catch(() => ({}));
         const locs = Array.isArray(json.data) ? json.data : [];
 
@@ -121,12 +124,19 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
     });
 
     const heartbeat = window.setInterval(fetchZones, 60_000);
+    window.addEventListener('delineo:guest-zone-claims-changed', fetchZones);
+    window.addEventListener('delineo:guest-zones-claimed', fetchZones);
 
     return () => {
       active = false;
       if (es) es.close();
       if (fallbackTimer) clearInterval(fallbackTimer);
       clearInterval(heartbeat);
+      window.removeEventListener(
+        'delineo:guest-zone-claims-changed',
+        fetchZones
+      );
+      window.removeEventListener('delineo:guest-zones-claimed', fetchZones);
     };
   }, [setZone, setLocations, userId]);
 
@@ -183,6 +193,13 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
           })}
         </div>
       </div>
+
+      {!user && (
+        <p className="sim_guest_save_notice">
+          Log in to save generated zones. Zones created during this visit will
+          be saved to your account when you log in.
+        </p>
+      )}
 
       {zone?.description && (
         <div className="sim_zone_description">

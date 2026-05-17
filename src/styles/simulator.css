@@ -305,6 +305,15 @@ div.sim_output {
   padding: 0 16px;
 }
 
+.sim_guest_save_notice {
+  width: 100%;
+  margin: -2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .sim_table_row {
   display: flex;
   width: 100%;

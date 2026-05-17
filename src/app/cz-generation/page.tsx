@@ -58,6 +58,10 @@ import {
   mergeGeoJsonFeatures,
   normalizeCbgId
 } from '@/lib/cz-geo';
+import {
+  createGuestZoneClaimToken,
+  rememberGuestZoneClaim
+} from '@/lib/guest-zone-claims';
 import { getStateFromCBG } from '@/lib/simulation-zone';
 import useSimSettings, { type ConvenienceZone } from '@/stores/simsettings';
 import '@/styles/cz-generation.css';
@@ -155,9 +159,16 @@ function FormField({
   );
 }
 
-async function fetchZoneById(zoneId: number): Promise<ConvenienceZone | null> {
+async function fetchZoneById(
+  zoneId: number,
+  guestClaimToken?: string | null
+): Promise<ConvenienceZone | null> {
   try {
-    const res = await fetch(`/api/convenience-zones/${zoneId}`);
+    const res = await fetch(`/api/convenience-zones/${zoneId}`, {
+      headers: guestClaimToken
+        ? { 'X-Delineo-Guest-Zone-Claims': guestClaimToken }
+        : {}
+    });
     if (!res.ok) return null;
     const json = await res.json().catch(() => ({}));
     const zone = json?.data as ConvenienceZone | undefined;
@@ -169,7 +180,8 @@ async function fetchZoneById(zoneId: number): Promise<ConvenienceZone | null> {
 
 function waitForZoneReady(
   zoneId: number,
-  onProgress: (percent: number) => void
+  onProgress: (percent: number) => void,
+  guestClaimToken?: string | null
 ): Promise<ConvenienceZone | null> {
   return new Promise((resolve) => {
     let done = false;
@@ -195,7 +207,7 @@ function waitForZoneReady(
     }, 1000);
 
     const checkReady = async () => {
-      const zone = await fetchZoneById(zoneId);
+      const zone = await fetchZoneById(zoneId, guestClaimToken);
       if (zone) finish(zone);
     };
 
@@ -2275,6 +2287,8 @@ export default function CZGeneration() {
         setDescription(descriptionToSave);
       }
 
+      const guestClaimToken = user?.id ? null : createGuestZoneClaimToken();
+
       const finalizePayload = {
         name: cityName,
         description: descriptionToSave,
@@ -2284,7 +2298,8 @@ export default function CZGeneration() {
         latitude: mapCenter?.[0] || 0,
         longitude: mapCenter?.[1] || 0,
         use_test_data: useTestData,
-        ...(user?.id ? { user_id: user.id } : {})
+        ...(user?.id ? { user_id: user.id } : {}),
+        ...(guestClaimToken ? { guest_claim_token: guestClaimToken } : {})
       };
 
       const resp = await fetch(algUrl('finalize-cz'), {
@@ -2301,6 +2316,9 @@ export default function CZGeneration() {
       }
 
       const zoneId: number = data.id;
+      if (guestClaimToken) {
+        rememberGuestZoneClaim(zoneId, guestClaimToken);
+      }
       setFinalizeProgress(15);
       setFinalizeStatusMessage(
         user?.id
@@ -2308,9 +2326,13 @@ export default function CZGeneration() {
           : 'Zone generated. Generating movement patterns...'
       );
 
-      const readyZone = await waitForZoneReady(zoneId, (pct) => {
-        setFinalizeProgress(pct);
-      });
+      const readyZone = await waitForZoneReady(
+        zoneId,
+        (pct) => {
+          setFinalizeProgress(pct);
+        },
+        guestClaimToken
+      );
 
       if (readyZone) {
         setSettings({

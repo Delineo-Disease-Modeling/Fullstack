@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
+import { getGuestZoneClaimHeaders } from '@/lib/guest-zone-claims';
 import '@/styles/settings-components.css';
 import Slider from './ui/slider';
 
@@ -245,7 +246,9 @@ export function SimRunSelector({
       return;
     }
     setLoading(true);
-    fetch(`/api/simdata/cache/${czone_id}`)
+    fetch(`/api/simdata/cache/${czone_id}`, {
+      headers: getGuestZoneClaimHeaders()
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`Invalid cache response ${res.status}`);
         return res.json();

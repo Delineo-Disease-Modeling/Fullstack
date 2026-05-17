@@ -12,6 +12,13 @@ const updateSchema = z.object({
   name: z.string().min(2).optional()
 });
 
+function getPublicZone<T extends { guest_claim_token_hash?: unknown }>(
+  zone: T
+) {
+  const { guest_claim_token_hash: _claimHash, ...publicZone } = zone;
+  return publicZone;
+}
+
 /** Optionally gzip-compress a response body if the client accepts it. */
 function maybeCompress(
   body: BodyInit,
@@ -64,6 +71,7 @@ export async function GET(
 
   const fileId = simdata.file_id;
   const mapCachePath = `${DB_FOLDER}${fileId}.map.json`;
+  const publicZone = getPublicZone(simdata.czone);
 
   const acceptEncoding = request.headers.get('accept-encoding');
 
@@ -106,7 +114,7 @@ export async function GET(
         data: {
           name: simdata.name,
           length: simdata.length,
-          zone: simdata.czone,
+          zone: publicZone,
           papdata: parsed.papdata,
           simdata: filteredSimdata,
           hotspots: parsed.hotspots ?? {}
@@ -120,7 +128,7 @@ export async function GET(
     }
 
     // Non-paginated: splice header + raw cache bytes + suffix (zero-parse)
-    const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(simdata.czone)}`;
+    const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(publicZone)}`;
 
     const body = Buffer.concat([
       Buffer.from(headerStr, 'utf8'),
