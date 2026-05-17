@@ -204,14 +204,14 @@ export default function Simulator() {
 
   return (
     <div className="sim_container">
-      <div className="sim_header">
-      <h1 className="sim_title">Run a simulation</h1>
+      <div className="sim_header" data-aos="fade-up" data-aos-once="true">
+        <h1 className="sim_title">Run a simulation</h1>
         <p className="sim_lede">
           Pick or generate a Convenience Zone, tune the disease and
           intervention parameters, then run the simulation.
         </p>
       </div>
-      <div className="sim_settings px-4">
+      <div className="sim_settings px-4" data-aos="fade-up" data-aos-once="true" data-aos-delay="80">
         <InstructionBanner>
           Generate a Convenience Zone or pick one that&apos;s already generated,
           then click &lsquo;Simulate&rsquo; to begin.

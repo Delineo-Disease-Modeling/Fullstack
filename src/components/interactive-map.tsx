@@ -61,6 +61,7 @@ export default function InteractiveMap({
 }) {
   const mapRef = useRef<MapRef>(null);
   const hasFittedRef = useRef(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
     null
   );
@@ -350,7 +351,13 @@ export default function InteractiveMap({
   );
 
   return (
-    <div className="relative h-full w-full">
+    <div
+      className="relative h-full w-full"
+      style={{
+        opacity: mapLoaded ? 1 : 0,
+        transition: 'opacity 400ms ease'
+      }}
+    >
       <MapLibreMap
         ref={mapRef}
         initialViewState={{
@@ -361,7 +368,7 @@ export default function InteractiveMap({
         style={{ width: '100%', height: '100%' }}
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
         interactiveLayerIds={seedEditMode ? ['seed-preview-fill'] : []}
-        onLoad={fitToSeedBounds}
+        onLoad={() => { fitToSeedBounds(); setMapLoaded(true); }}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

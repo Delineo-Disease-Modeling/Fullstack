@@ -2689,7 +2689,7 @@ coupling =
         </div>
       )}
       {!hasGenerated && (
-        <div className="czgen_header">
+        <div className="czgen_header" data-aos="fade-up" data-aos-once="true">
           <h1 className="czgen_title">Generate a Convenience Zone</h1>
           <p className="czgen_lede">
             Define your simulation&apos;s geographic area by selecting a location and clustering nearby Census Block Groups.
@@ -3741,7 +3741,7 @@ coupling =
             </div>
           </div>
         ) : (
-          <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-stretch">
+          <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-stretch" data-aos="fade-up" data-aos-once="true" data-aos-delay="80">
             <div className="czgen_map h-[50vh] min-h-80 max-h-112 lg:h-[calc(100vh-6rem)] lg:min-h-168 lg:max-h-none w-full lg:min-w-0 lg:flex-1">
               <InteractiveMap
                 onLocationSelect={(coords) => {

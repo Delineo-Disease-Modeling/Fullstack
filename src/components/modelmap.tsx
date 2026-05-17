@@ -349,7 +349,13 @@ function ClusteredMap({
   ] as unknown as string;
 
   return (
-    <div className="mapcontainer">
+    <div
+      className="mapcontainer"
+      style={{
+        opacity: mapInstance ? 1 : 0,
+        transition: 'opacity 400ms ease'
+      }}
+    >
       <MapLibreMap
         ref={mapRef}
         onLoad={handleMapLoad}
