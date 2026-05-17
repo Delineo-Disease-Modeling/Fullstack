@@ -4,6 +4,11 @@ import { invalidatePapdata } from '@/lib/papdata-cache';
 import { prisma } from '@/lib/prisma';
 import { broadcast } from '@/lib/sse-broadcast';
 import type { ServiceResult } from '@/server/api/responses';
+import {
+  ANONYMOUS_ZONE_USER_EMAIL,
+  canReadConvenienceZone,
+  zoneAccessDenied
+} from './zone-access';
 
 export const createConvenienceZoneSchema = z.object({
   name: z.string().min(1),
@@ -30,13 +35,18 @@ type ConvenienceZoneUpdateData = {
   description?: string;
 };
 
-const ANONYMOUS_ZONE_USER_EMAIL = 'anonymous-zones@delineo.local';
-
 function withReady(zone: ConvenienceZone): ConvenienceZoneWithReady {
   return {
     ...zone,
     ready: !!zone.papdata_id
   };
+}
+
+function stripOwnerRelation<T extends ConvenienceZone & { user?: unknown }>(
+  zone: T
+): ConvenienceZone {
+  const { user: _user, ...zoneData } = zone;
+  return zoneData;
 }
 
 async function getAnonymousZoneUserId() {
@@ -57,9 +67,13 @@ async function getAnonymousZoneUserId() {
 export async function listConvenienceZones(
   userId: string | null
 ): Promise<ConvenienceZoneWithReady[]> {
-  const zones = await prisma.convenienceZone.findMany(
-    userId ? { where: { user_id: userId } } : undefined
-  );
+  if (!userId) {
+    return [];
+  }
+
+  const zones = await prisma.convenienceZone.findMany({
+    where: { user_id: userId }
+  });
 
   return zones.map(withReady);
 }
@@ -127,15 +141,22 @@ export async function createConvenienceZone(
 }
 
 export async function getConvenienceZone(
-  id: number
+  id: number,
+  userId: string | null
 ): Promise<ServiceResult<ConvenienceZoneWithReady>> {
   try {
-    const zone = await prisma.convenienceZone.findUnique({ where: { id } });
+    const zone = await prisma.convenienceZone.findUnique({
+      where: { id },
+      include: { user: { select: { email: true } } }
+    });
     if (!zone) {
       return { ok: false, message: 'Not found', status: 404 };
     }
+    if (!canReadConvenienceZone(zone, userId)) {
+      return zoneAccessDenied(userId);
+    }
 
-    return { ok: true, data: withReady(zone) };
+    return { ok: true, data: withReady(stripOwnerRelation(zone)) };
   } catch (error) {
     return { ok: false, message: String(error), status: 500 };
   }

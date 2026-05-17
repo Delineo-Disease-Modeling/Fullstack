@@ -1,6 +1,7 @@
 import type { SimData } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { ServiceResult } from '@/server/api/responses';
+import { canReadConvenienceZone, zoneAccessDenied } from './zone-access';
 
 type SimDataCacheEntry = {
   name: SimData['name'];
@@ -9,11 +10,15 @@ type SimDataCacheEntry = {
 };
 
 export async function listSimDataCacheForZone(
-  czoneId: number
+  czoneId: number,
+  userId: string | null
 ): Promise<ServiceResult<SimDataCacheEntry[]>> {
   const czone = await prisma.convenienceZone.findUnique({
     where: { id: czoneId },
-    include: { simdata: { orderBy: { id: 'desc' } } }
+    include: {
+      user: { select: { email: true } },
+      simdata: { orderBy: { id: 'desc' } }
+    }
   });
 
   if (!czone) {
@@ -22,6 +27,9 @@ export async function listSimDataCacheForZone(
       message: `Could not find convenience zone #${czoneId}`,
       status: 404
     };
+  }
+  if (!canReadConvenienceZone(czone, userId)) {
+    return zoneAccessDenied(userId);
   }
 
   return {
