@@ -9,7 +9,6 @@ import {
   fetchCandidatePois,
   fetchCbgAtPoint,
   fetchCbgGeoJson,
-  fetchCzMetrics,
   fetchFrontierCandidates,
   fetchSecondOrderDestinations,
   finalizeConvenienceZone,
@@ -47,6 +46,7 @@ import {
   sameStringArray,
   startDateFromMonth
 } from '@/features/cz-generation/helpers';
+import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
 import { usePatternAvailability } from '@/features/cz-generation/hooks/use-pattern-availability';
 import type {
   ClusterAlgorithmMetadata,
@@ -60,8 +60,7 @@ import type {
   SeedEditAction,
   TraceCandidate,
   TraceLayerData,
-  TracePayload,
-  ZoneMetrics
+  TracePayload
 } from '@/features/cz-generation/types';
 import { useSession } from '@/lib/auth-client';
 import {
@@ -337,13 +336,8 @@ export default function CZGeneration() {
   >([]);
   const [manualFrontierLoading, setManualFrontierLoading] = useState(false);
   const [manualFrontierError, setManualFrontierError] = useState('');
-  const [zoneMetrics, setZoneMetrics] = useState<ZoneMetrics | null>(null);
-  const [zoneMetricsLoading, setZoneMetricsLoading] = useState(false);
-  const [zoneMetricsError, setZoneMetricsError] = useState('');
   const [savingHtmlMap, setSavingHtmlMap] = useState(false);
   const [zoneEditMode, setZoneEditMode] = useState(false);
-  const [_cziMetrics, setCziMetrics] = useState<ZoneMetrics | null>(null);
-  const [_cziLoading, setCziLoading] = useState(false);
   const [finalizeProgress, setFinalizeProgress] = useState(0);
   const [finalizeStatusMessage, setFinalizeStatusMessage] = useState('');
   const hasGenerated = phase === 'edit' || phase === 'finalizing';
@@ -585,6 +579,27 @@ export default function CZGeneration() {
   const manualEditPanelsActive = hasGenerated && (!growthTrace || zoneEditMode);
   const showCandidatePanels =
     !guidedSelectionMode && (Boolean(traceLayer) || manualEditPanelsActive);
+  const { metrics: _cziMetrics, loading: _cziLoading } = useCzMetrics({
+    enabled: hasGenerated,
+    seedCbg: seedCBG,
+    cbgs: selectedCBGs,
+    startDate,
+    useTestData,
+    debounceMs: 180,
+    warnMessage: 'Failed to compute CZI metrics:'
+  });
+  const {
+    metrics: zoneMetrics,
+    loading: zoneMetricsLoading,
+    error: zoneMetricsError
+  } = useCzMetrics({
+    enabled: !guidedSelectionMode && manualEditPanelsActive,
+    seedCbg: seedCBG,
+    cbgs: selectedCBGs,
+    startDate,
+    useTestData,
+    errorMessage: 'Failed to compute zone metrics.'
+  });
   const displayCandidates = traceLayer
     ? activeTraceCandidates
     : manualEditPanelsActive
@@ -862,44 +877,6 @@ export default function CZGeneration() {
   }, [cbgGeoJSON, focusedTraceCbg, showCandidatePanels]);
 
   useEffect(() => {
-    if (!hasGenerated || !seedCBG || selectedCBGs.length === 0) {
-      setCziMetrics(null);
-      setCziLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      setCziLoading(true);
-      try {
-        const data = await fetchCzMetrics({
-          seed_cbg: seedCBG,
-          cbg_list: selectedCBGs,
-          start_date: startDate,
-          use_test_data: useTestData
-        });
-        if (!cancelled) {
-          setCziMetrics(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setCziMetrics(null);
-        }
-        console.warn('Failed to compute CZI metrics:', err);
-      } finally {
-        if (!cancelled) {
-          setCziLoading(false);
-        }
-      }
-    }, 180);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [hasGenerated, seedCBG, selectedCBGs, startDate, useTestData]);
-
-  useEffect(() => {
     if (!showCandidatePanels || !selectedTraceCandidateCbg) {
       return;
     }
@@ -1065,62 +1042,6 @@ export default function CZGeneration() {
     seedGuardDistanceKm,
     selectedCBGs,
     selectedTraceCandidateCbg,
-    startDate,
-    useTestData
-  ]);
-
-  useEffect(() => {
-    if (
-      guidedSelectionMode ||
-      !manualEditPanelsActive ||
-      !seedCBG ||
-      !selectedCBGs.length
-    ) {
-      setZoneMetrics(null);
-      setZoneMetricsError('');
-      setZoneMetricsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setZoneMetricsLoading(true);
-    setZoneMetricsError('');
-
-    fetchCzMetrics({
-      seed_cbg: seedCBG,
-      cbg_list: selectedCBGs,
-      start_date: startDate,
-      use_test_data: useTestData
-    })
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-        setZoneMetrics(data || null);
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return;
-        }
-        setZoneMetrics(null);
-        setZoneMetricsError(
-          err instanceof Error ? err.message : 'Failed to compute zone metrics.'
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setZoneMetricsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    guidedSelectionMode,
-    manualEditPanelsActive,
-    seedCBG,
-    selectedCBGs,
     startDate,
     useTestData
   ]);
@@ -1886,8 +1807,6 @@ export default function CZGeneration() {
         setZoneEditMode(false);
         setManualFrontierCandidates([]);
         setManualFrontierError('');
-        setZoneMetrics(null);
-        setZoneMetricsError('');
         setCandidatePois([]);
         setCandidatePoiError('');
         setSelectedTraceCandidateCbg('');
@@ -2003,8 +1922,6 @@ export default function CZGeneration() {
       setZoneEditMode(false);
       setManualFrontierCandidates([]);
       setManualFrontierError('');
-      setZoneMetrics(null);
-      setZoneMetricsError('');
       setCandidatePois([]);
       setCandidatePoiError('');
 
