@@ -6,7 +6,7 @@
 
 - Start feature and fix work from the latest `main` on a short-lived branch.
 - Prefer branch names like `ryad/<feature-or-fix>`.
-- Use the foundation worktree and branch when coordinating refactor work: `Fullstack-refactor-foundation` on `ryad/fullstack-refactor-foundation`.
+- Use `ryad/fullstack-refactor` as the current refactor branch.
 - Treat unrelated dirty files as someone else's work. Do not revert, rewrite, or reformat outside the assigned ownership area.
 
 ## Current App Shape
