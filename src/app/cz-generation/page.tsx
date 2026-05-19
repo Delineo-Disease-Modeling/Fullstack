@@ -14,6 +14,7 @@ import {
   startClusteringPreview
 } from '@/features/cz-generation/api';
 import { CandidateAnalysisPanel } from '@/features/cz-generation/components/candidate-analysis-panel';
+import { FrontierCandidatesPanel } from '@/features/cz-generation/components/frontier-candidates-panel';
 import {
   CBG_GEOJSON_REQUEST_CHUNK_SIZE,
   CLUSTER_ALGORITHM_MANUAL,
@@ -578,6 +579,11 @@ export default function CZGeneration() {
     if (fallbackCbg) {
       setFocusedTraceNonce((prev) => prev + 1);
     }
+  }, []);
+  const handleTraceCandidateSelect = useCallback((cbgId: string) => {
+    setSelectedTraceCandidateCbg(cbgId);
+    setFocusedTraceCbg(cbgId);
+    setFocusedTraceNonce((prev) => prev + 1);
   }, []);
   const {
     candidates: manualFrontierCandidates,
@@ -2665,65 +2671,14 @@ coupling =
               )}
 
               {showCandidatePanels && (
-                <div className="czgen_subpanel h-[calc(100vh-13rem)] min-h-136 max-h-192 w-88 max-w-88">
-                  <div className="czgen_subpanel_header">
-                    <p className="czgen_subpanel_title">Frontier Candidates ({displayCandidates.length})</p>
-                  </div>
-                  <div className="czgen_subpanel_body">
-                    {!traceLayer && manualFrontierLoading ? (
-                      <div className="text-sm text-gray-500 px-2 py-2">
-                        Loading frontier candidates...
-                      </div>
-                    ) : !traceLayer && manualFrontierError ? (
-                      <div className="text-sm text-red-700 px-2 py-2">
-                        {manualFrontierError}
-                      </div>
-                    ) : displayCandidates.length === 0 ? (
-                      <div className="text-sm text-gray-500 px-2 py-2">
-                        {traceLayer
-                          ? 'No candidates at this step.'
-                          : 'No frontier candidates for the current zone.'}
-                      </div>
-                    ) : (
-                      displayCandidates.map((candidate) => {
-                        const cbgId = normalizeCbgId(candidate?.cbg);
-                        const isActive =
-                          cbgId === normalizeCbgId(selectedTraceCandidateCbg);
-                        return (
-                          <button
-                            type="button"
-                            key={cbgId}
-                            className={`text-left px-4 py-4 rounded border transition-colors ${
-                              isActive
-                                ? 'bg-[#e0f2fe] border-[#0284c7]'
-                                : 'bg-white border-[#d1d5db] hover:border-[#70B4D4]'
-                            }`}
-                            onClick={() => {
-                              setSelectedTraceCandidateCbg(cbgId);
-                              setFocusedTraceCbg(cbgId);
-                              setFocusedTraceNonce((prev) => prev + 1);
-                            }}
-                          >
-                            <div className="text-base font-semibold leading-tight">
-                              #{candidate.rank ?? '?'} {cbgId}
-                            </div>
-                            <div className="text-base text-gray-700 mt-1">
-                              Score: {Number(candidate.score ?? 0).toFixed(4)}
-                            </div>
-                            <div className="text-base text-gray-600">
-                              To cluster:{' '}
-                              {Number(
-                                candidate.movement_to_cluster ?? 0
-                              ).toLocaleString(undefined, {
-                                maximumFractionDigits: 1
-                              })}
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
+                <FrontierCandidatesPanel
+                  candidates={displayCandidates}
+                  hasTraceLayer={Boolean(traceLayer)}
+                  loading={manualFrontierLoading}
+                  error={manualFrontierError}
+                  selectedCbg={selectedTraceCandidateCbg}
+                  onSelectCbg={handleTraceCandidateSelect}
+                />
               )}
 
               {showCandidatePanels && (
