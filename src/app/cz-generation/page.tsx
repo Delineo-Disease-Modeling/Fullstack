@@ -11,7 +11,6 @@ import {
   fetchCbgGeoJson,
   fetchCzMetrics,
   fetchFrontierCandidates,
-  fetchPatternAvailability,
   fetchSecondOrderDestinations,
   finalizeConvenienceZone,
   getClusteringProgressUrl,
@@ -48,6 +47,7 @@ import {
   sameStringArray,
   startDateFromMonth
 } from '@/features/cz-generation/helpers';
+import { usePatternAvailability } from '@/features/cz-generation/hooks/use-pattern-availability';
 import type {
   ClusterAlgorithmMetadata,
   ClusteringPreviewResponse,
@@ -295,8 +295,6 @@ export default function CZGeneration() {
   const [seedResolveError, setSeedResolveError] = useState('');
   const [startDate, setStartDate] = useState('2019-01-01');
   const [endDate, setEndDate] = useState('2019-02-01');
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [availableMonthsLoading, setAvailableMonthsLoading] = useState(false);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -718,51 +716,8 @@ export default function CZGeneration() {
   const detectedStateAbbr = getStateFromCBG(
     seedStateCbg ? [seedStateCbg] : null
   );
-
-  useEffect(() => {
-    if (!detectedStateAbbr) {
-      setAvailableMonths([]);
-      setAvailableMonthsLoading(false);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setAvailableMonthsLoading(true);
-
-    fetchPatternAvailability(
-      {
-        state: detectedStateAbbr,
-        startDate: '2018-01-01',
-        endDate: '2025-12-31'
-      },
-      controller.signal
-    )
-      .then(async (resp) => {
-        const months = Array.isArray(resp?.data?.available_months)
-          ? resp.data.available_months.filter(
-              (m): m is string => typeof m === 'string'
-            )
-          : [];
-        setAvailableMonths(months);
-      })
-      .catch((err) => {
-        if ((err as Error).name === 'AbortError') {
-          return;
-        }
-        console.warn('Failed to load available months:', err);
-        setAvailableMonths([]);
-      })
-      .finally(() => {
-        setAvailableMonthsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [detectedStateAbbr]);
-
-  const monthOptions = useMemo(
-    () => [...availableMonths].sort(),
-    [availableMonths]
-  );
+  const { availableMonths, availableMonthsLoading, monthOptions } =
+    usePatternAvailability(detectedStateAbbr);
 
   useEffect(() => {
     if (availableMonths.length === 0) return;

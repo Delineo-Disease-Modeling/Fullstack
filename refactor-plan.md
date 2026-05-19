@@ -1,7 +1,7 @@
 # Fullstack Refactor Plan
 
-Baseline: `origin/main` at `4f4b4ef3652313d98ef629f1ecfa0d4e3594b952`
-(`Disable lockdown probability control`), fetched on 2026-05-14.
+Baseline: `origin/main` at `7d8ddf3` (`Made website page layouts more
+consistent Added smoother AOS/loading animations`), refreshed on 2026-05-19.
 
 This supersedes the old Vite-to-Next migration note. `main` is already a
 Next.js App Router application with Prisma, Better Auth, Zustand, MapLibre, and
@@ -10,13 +10,16 @@ while making the app safer to change.
 
 ## Current State
 
-- `src/app/cz-generation/page.tsx` is the main refactor target at 4,554 lines.
+- `src/app/cz-generation/page.tsx` is the main refactor target at 4,074 lines.
   It mixes algorithm selection, seed lookup, editable CBG state, trace playback,
   API calls, map state, finalization, and a large JSX surface.
-- `src/components/modelmap.tsx` is 1,574 lines and combines data preparation,
-  geometry helpers, icon generation, MapLibre layers, playback state, and view
-  controls.
-- API routes under `src/app/api` total about 2,029 lines. They repeat request
+- `src/components/modelmap.tsx` is 782 lines after an initial model-map data
+  extraction. `src/features/model-map/map-data.ts` is now 1,047 lines and still
+  holds substantial pure map transformation logic.
+- `src/features/cz-generation` already contains constants, helpers, types, and
+  an API client. The next CZ-generation work should extract workflow hooks and
+  presentational panels.
+- API routes under `src/app/api` total about 2,202 lines. They repeat request
   parsing, id validation, auth checks, response shape handling, and file/db
   resolution logic.
 - Shared simulator data types are informal. Papdata, patterns, simulation
@@ -25,26 +28,26 @@ while making the app safer to change.
 - Styling is split across many global CSS files imported by pages/components.
   There is no clear ownership model for page styles versus reusable component
   styles.
-- The README still describes the old client/server Vite setup and should be
-  brought in line with the current Next.js app.
+- `package.json` now has `lint`, `typecheck`, and `test` scripts. Tests use the
+  Node test runner and currently cover selected pure helpers and route/service
+  utilities.
 
 ## Baseline Checks
 
-Run from a clean `origin/main` checkout:
+Run from a clean checkout:
 
 ```bash
-/Users/ryad/Code/delineo/Fullstack/node_modules/.bin/biome lint ./src
-/Users/ryad/Code/delineo/Fullstack/node_modules/.bin/tsc --noEmit -p tsconfig.json
+pnpm lint
+pnpm typecheck
+pnpm test
 ```
 
 Observed baseline:
 
-- TypeScript passes when generated Prisma files and installed dependencies are
-  available.
-- Biome reports 57 warnings, mostly `noExplicitAny`, plus one CSS selector
-  specificity warning in `src/styles/navbar.css`.
-- There is no test script in `package.json`, so the refactor needs to add a
-  minimal automated safety net before large movement.
+- `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass on
+  `ryad/fullstack-refactor` before the next extraction.
+- `pnpm test` currently runs 18 Node tests.
+- Keep this validation gate green after each small extraction.
 
 ## Goals
 
@@ -95,8 +98,8 @@ Purpose: make the current app measurable before moving code.
 
 Tasks:
 
-- Add a `typecheck` script: `tsc --noEmit`.
-- Add a lightweight test runner, preferably Vitest, for pure TypeScript modules.
+- Keep the existing `typecheck` script: `tsc --noEmit`.
+- Keep the existing Node test runner unless a later need justifies Vitest.
 - Add focused fixtures for papdata, patterns, simdata, chart data, and map cache
   payloads under `src/test/fixtures` or an equivalent test-only folder.
 - Add tests for existing pure helpers before extracting them:
