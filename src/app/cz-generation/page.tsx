@@ -6,7 +6,6 @@ import { Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   exportCzMapHtml,
-  fetchCandidatePois,
   fetchCbgAtPoint,
   fetchCbgGeoJson,
   fetchFrontierCandidates,
@@ -46,6 +45,7 @@ import {
   sameStringArray,
   startDateFromMonth
 } from '@/features/cz-generation/helpers';
+import { useCandidatePois } from '@/features/cz-generation/hooks/use-candidate-pois';
 import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
 import { usePatternAvailability } from '@/features/cz-generation/hooks/use-pattern-availability';
 import type {
@@ -55,7 +55,6 @@ import type {
   GuidedSecondOrderMetadata,
   GuidedSelectionStyle,
   LookupLocationResult,
-  PoiAnalysis,
   ResolvedSeedLookup,
   SeedEditAction,
   TraceCandidate,
@@ -83,6 +82,8 @@ const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false
 });
 const CBGMap = dynamic(() => import('@/components/cbg-map'), { ssr: false });
+
+const EMPTY_CBG_LIST: string[] = [];
 
 type FormFieldProps = {
   label: string;
@@ -328,9 +329,6 @@ export default function CZGeneration() {
     useState('');
   const [focusedTraceCbg, setFocusedTraceCbg] = useState('');
   const [focusedTraceNonce, setFocusedTraceNonce] = useState(0);
-  const [candidatePois, setCandidatePois] = useState<PoiAnalysis[]>([]);
-  const [candidatePoiLoading, setCandidatePoiLoading] = useState(false);
-  const [candidatePoiError, setCandidatePoiError] = useState('');
   const [manualFrontierCandidates, setManualFrontierCandidates] = useState<
     TraceCandidate[]
   >([]);
@@ -579,6 +577,27 @@ export default function CZGeneration() {
   const manualEditPanelsActive = hasGenerated && (!growthTrace || zoneEditMode);
   const showCandidatePanels =
     !guidedSelectionMode && (Boolean(traceLayer) || manualEditPanelsActive);
+  const candidatePoiCluster = useMemo(
+    () =>
+      traceLayer
+        ? Array.isArray(activeTraceStep?.cluster_before)
+          ? activeTraceStep.cluster_before
+          : EMPTY_CBG_LIST
+        : selectedCBGs,
+    [activeTraceStep, selectedCBGs, traceLayer]
+  );
+  const {
+    pois: candidatePois,
+    loading: candidatePoiLoading,
+    error: candidatePoiError
+  } = useCandidatePois({
+    enabled: showCandidatePanels,
+    seedCbg: seedCBG,
+    candidateCbg: selectedTraceCandidateCbg,
+    clusterCbgs: candidatePoiCluster,
+    startDate,
+    useTestData
+  });
   const { metrics: _cziMetrics, loading: _cziLoading } = useCzMetrics({
     enabled: hasGenerated,
     seedCbg: seedCBG,
@@ -826,9 +845,6 @@ export default function CZGeneration() {
       if (!manualEditPanelsActive) {
         setSelectedTraceCandidateCbg('');
         setFocusedTraceCbg('');
-        setCandidatePois([]);
-        setCandidatePoiError('');
-        setCandidatePoiLoading(false);
       }
       return;
     }
@@ -875,71 +891,6 @@ export default function CZGeneration() {
         );
       });
   }, [cbgGeoJSON, focusedTraceCbg, showCandidatePanels]);
-
-  useEffect(() => {
-    if (!showCandidatePanels || !selectedTraceCandidateCbg) {
-      return;
-    }
-
-    const poiCluster = traceLayer
-      ? Array.isArray(activeTraceStep?.cluster_before)
-        ? activeTraceStep.cluster_before
-        : []
-      : selectedCBGs;
-    if (!poiCluster.length) {
-      setCandidatePois([]);
-      setCandidatePoiError('');
-      return;
-    }
-
-    let cancelled = false;
-    setCandidatePoiLoading(true);
-    setCandidatePoiError('');
-
-    fetchCandidatePois({
-      seed_cbg: seedCBG,
-      candidate_cbg: selectedTraceCandidateCbg,
-      cluster_cbgs: poiCluster,
-      start_date: startDate,
-      use_test_data: useTestData,
-      limit: 8
-    })
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-        setCandidatePois(
-          Array.isArray(data?.pois) ? (data.pois as PoiAnalysis[]) : []
-        );
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return;
-        }
-        setCandidatePois([]);
-        setCandidatePoiError(
-          err instanceof Error ? err.message : 'Failed to load POI analysis.'
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setCandidatePoiLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeTraceStep,
-    seedCBG,
-    selectedCBGs,
-    selectedTraceCandidateCbg,
-    showCandidatePanels,
-    startDate,
-    traceLayer,
-    useTestData
-  ]);
 
   useEffect(() => {
     if (
@@ -1807,8 +1758,6 @@ export default function CZGeneration() {
         setZoneEditMode(false);
         setManualFrontierCandidates([]);
         setManualFrontierError('');
-        setCandidatePois([]);
-        setCandidatePoiError('');
         setSelectedTraceCandidateCbg('');
         setFocusedTraceCbg('');
         setCbgGeoJSON(seedGeoJson);
@@ -1922,8 +1871,6 @@ export default function CZGeneration() {
       setZoneEditMode(false);
       setManualFrontierCandidates([]);
       setManualFrontierError('');
-      setCandidatePois([]);
-      setCandidatePoiError('');
 
       if (data.geojson || data.trace_geojson) {
         setCbgGeoJSON(
