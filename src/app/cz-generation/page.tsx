@@ -8,12 +8,10 @@ import {
   exportCzMapHtml,
   fetchCbgAtPoint,
   fetchCbgGeoJson,
-  fetchFrontierCandidates,
   fetchSecondOrderDestinations,
   finalizeConvenienceZone,
   getClusteringProgressUrl,
   startClusteringPreview,
-  type FrontierCandidatesResponse
 } from '@/features/cz-generation/api';
 import {
   CBG_GEOJSON_REQUEST_CHUNK_SIZE,
@@ -47,6 +45,7 @@ import {
 } from '@/features/cz-generation/helpers';
 import { useCandidatePois } from '@/features/cz-generation/hooks/use-candidate-pois';
 import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
+import { useManualFrontierCandidates } from '@/features/cz-generation/hooks/use-manual-frontier-candidates';
 import { usePatternAvailability } from '@/features/cz-generation/hooks/use-pattern-availability';
 import type {
   ClusterAlgorithmMetadata,
@@ -329,11 +328,6 @@ export default function CZGeneration() {
     useState('');
   const [focusedTraceCbg, setFocusedTraceCbg] = useState('');
   const [focusedTraceNonce, setFocusedTraceNonce] = useState(0);
-  const [manualFrontierCandidates, setManualFrontierCandidates] = useState<
-    TraceCandidate[]
-  >([]);
-  const [manualFrontierLoading, setManualFrontierLoading] = useState(false);
-  const [manualFrontierError, setManualFrontierError] = useState('');
   const [savingHtmlMap, setSavingHtmlMap] = useState(false);
   const [zoneEditMode, setZoneEditMode] = useState(false);
   const [finalizeProgress, setFinalizeProgress] = useState(0);
@@ -577,6 +571,30 @@ export default function CZGeneration() {
   const manualEditPanelsActive = hasGenerated && (!growthTrace || zoneEditMode);
   const showCandidatePanels =
     !guidedSelectionMode && (Boolean(traceLayer) || manualEditPanelsActive);
+  const handleManualFrontierFallback = useCallback((fallbackCbg: string) => {
+    setSelectedTraceCandidateCbg(fallbackCbg);
+    setFocusedTraceCbg(fallbackCbg);
+    if (fallbackCbg) {
+      setFocusedTraceNonce((prev) => prev + 1);
+    }
+  }, []);
+  const {
+    candidates: manualFrontierCandidates,
+    loading: manualFrontierLoading,
+    error: manualFrontierError
+  } = useManualFrontierCandidates({
+    enabled: !guidedSelectionMode && manualEditPanelsActive,
+    seedCbg: seedCBG,
+    cbgs: selectedCBGs,
+    clusterAlgorithm,
+    minPop,
+    startDate,
+    useTestData,
+    seedGuardDistanceKm,
+    mobilityPruneMinSeedCapturePct,
+    selectedCbg: selectedTraceCandidateCbg,
+    onFallbackCbg: handleManualFrontierFallback
+  });
   const candidatePoiCluster = useMemo(
     () =>
       traceLayer
@@ -891,111 +909,6 @@ export default function CZGeneration() {
         );
       });
   }, [cbgGeoJSON, focusedTraceCbg, showCandidatePanels]);
-
-  useEffect(() => {
-    if (
-      guidedSelectionMode ||
-      !manualEditPanelsActive ||
-      !seedCBG ||
-      !selectedCBGs.length
-    ) {
-      setManualFrontierCandidates([]);
-      setManualFrontierError('');
-      setManualFrontierLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setManualFrontierLoading(true);
-    setManualFrontierError('');
-
-    const req: Record<string, unknown> = {
-      seed_cbg: seedCBG,
-      cbg_list: selectedCBGs,
-      algorithm: clusterAlgorithm,
-      min_pop: Number(minPop),
-      start_date: startDate,
-      use_test_data: useTestData,
-      limit: 2000
-    };
-
-    if (clusterAlgorithm === 'greedy_weight_seed_guard') {
-      if (Number.isFinite(Number(seedGuardDistanceKm))) {
-        req.seed_guard_distance_km = Number(seedGuardDistanceKm);
-      }
-    }
-    if (clusterAlgorithm === 'mobility_prune') {
-      const minSeedCapture = Number(mobilityPruneMinSeedCapturePct) / 100;
-      if (Number.isFinite(minSeedCapture)) {
-        req.mobility_prune_min_seed_capture = Math.min(
-          1,
-          Math.max(0, minSeedCapture)
-        );
-      }
-    }
-
-    fetchFrontierCandidates(req)
-      .then((data: FrontierCandidatesResponse) => {
-        if (cancelled) {
-          return;
-        }
-        const nextCandidates = Array.isArray(data?.candidates)
-          ? data.candidates
-          : [];
-        setManualFrontierCandidates(nextCandidates);
-
-        const selectedNow = normalizeCbgId(selectedTraceCandidateCbg);
-        const selectedStillValid =
-          (selectedNow && selectedCBGs.includes(selectedNow)) ||
-          nextCandidates.some(
-            (candidate: TraceCandidate) =>
-              normalizeCbgId(candidate?.cbg) === selectedNow
-          );
-
-        if (!selectedStillValid) {
-          const fallbackCbg = normalizeCbgId(
-            nextCandidates[0]?.cbg || selectedCBGs[0] || ''
-          );
-          setSelectedTraceCandidateCbg(fallbackCbg);
-          setFocusedTraceCbg(fallbackCbg);
-          if (fallbackCbg) {
-            setFocusedTraceNonce((prev) => prev + 1);
-          }
-        }
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return;
-        }
-        setManualFrontierCandidates([]);
-        setManualFrontierError(
-          err instanceof Error
-            ? err.message
-            : 'Failed to load frontier candidates.'
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setManualFrontierLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    clusterAlgorithm,
-    guidedSelectionMode,
-    manualEditPanelsActive,
-    minPop,
-    mobilityPruneMinSeedCapturePct,
-    seedCBG,
-    seedGuardDistanceKm,
-    selectedCBGs,
-    selectedTraceCandidateCbg,
-    startDate,
-    useTestData
-  ]);
 
   const lookupLocation = async (
     query: string
@@ -1756,8 +1669,6 @@ export default function CZGeneration() {
         setTraceStepIndex(0);
         setTraceEnabled(false);
         setZoneEditMode(false);
-        setManualFrontierCandidates([]);
-        setManualFrontierError('');
         setSelectedTraceCandidateCbg('');
         setFocusedTraceCbg('');
         setCbgGeoJSON(seedGeoJson);
@@ -1869,8 +1780,6 @@ export default function CZGeneration() {
           responseAlgorithm !== 'mobility_prune'
       );
       setZoneEditMode(false);
-      setManualFrontierCandidates([]);
-      setManualFrontierError('');
 
       if (data.geojson || data.trace_geojson) {
         setCbgGeoJSON(
