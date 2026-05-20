@@ -251,9 +251,23 @@ div.sim_output {
 }
 
 .sim_table_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px 16px;
   background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.sim_table_header_toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
 }
 
 .sim_table_title {

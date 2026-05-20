@@ -250,10 +250,11 @@ export function SimRunSelector({
       headers: getGuestZoneClaimHeaders()
     })
       .then((res) => {
+        if (res.status === 401) return null;
         if (!res.ok) throw new Error(`Invalid cache response ${res.status}`);
         return res.json();
       })
-      .then((json) => { setData(json.data); setLoading(false); })
+      .then((json) => { setData(json?.data ?? null); setLoading(false); })
       .catch((e) => {
         console.error(e);
         setData(null);

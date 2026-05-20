@@ -61,6 +61,15 @@ export default function InterventionTimeline() {
       ),
     [interventions]
   );
+  const showNoChangeWarning = useMemo(() => {
+    const curIndex = values.indexOf(curtime);
+    if (curIndex <= 0) return false;
+    const prevTime = values[curIndex - 1];
+    const prev = interventions.find((i) => i.time === prevTime);
+    const cur = interventions.find((i) => i.time === curtime);
+    return !!(prev && cur && interventionSettingsMatch(cur, prev));
+  }, [values, curtime, interventions]);
+
   const dragTimeRef = useRef<number | null>(null);
   const pointerDragRef = useRef(false);
   const valuesRef = useRef(values);
@@ -72,17 +81,6 @@ export default function InterventionTimeline() {
 
   const addInterventionAt = (time: number) => {
     const activeIntervention = getEffectiveInterventionAt(time, interventions);
-
-    if (
-      activeIntervention &&
-      interventionSettingsMatch(activeIntervention, DEFAULT_INTERVENTIONS)
-    ) {
-      setTimelineError(
-        'That intervention would not change any settings. Adjust an existing intervention before adding another one.'
-      );
-      return;
-    }
-
     addInterventions(time, activeIntervention ?? DEFAULT_INTERVENTIONS);
     setCurtime(time);
     setTimelineError(null);
@@ -96,7 +94,8 @@ export default function InterventionTimeline() {
   };
 
   const moveIntervention = (fromTime: number, toTime: number) => {
-    const nextTime = Math.min(hours, Math.max(0, toTime));
+    if (fromTime === 0) return;
+    const nextTime = Math.min(hours, Math.max(1, toTime));
     if (fromTime === nextTime) return;
     if (values.includes(nextTime)) {
       setCurtime(nextTime);
@@ -109,7 +108,8 @@ export default function InterventionTimeline() {
   };
 
   const moveDraggedIntervention = (fromTime: number, toTime: number) => {
-    const nextTime = Math.min(hours, Math.max(0, toTime));
+    if (fromTime === 0) return fromTime;
+    const nextTime = Math.min(hours, Math.max(1, toTime));
     if (fromTime === nextTime) return fromTime;
     if (valuesRef.current.includes(nextTime)) return fromTime;
 
@@ -252,6 +252,11 @@ export default function InterventionTimeline() {
     e: React.KeyboardEvent<HTMLButtonElement>,
     value: number
   ) => {
+    if (value === 0 && ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+      e.preventDefault();
+      return;
+    }
+
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       deleteThumb(value);
@@ -316,7 +321,7 @@ export default function InterventionTimeline() {
             key={value}
             type="button"
             role="slider"
-            className={`iv_timeline_thumb${curtime === value ? ' current' : ''}`}
+            className={`iv_timeline_thumb${curtime === value ? ' current' : ''}${value === 0 ? ' seed' : ''}`}
             style={{ left: `${hours > 0 ? (value / hours) * 100 : 0}%` }}
             aria-valuemin={0}
             aria-valuemax={hours}
@@ -389,7 +394,11 @@ export default function InterventionTimeline() {
           Intervention #{values.indexOf(curtime) + 1}
         </span>
         <span className="iv_intervention_hour">
-          Hour {curtime.toString().padStart(3, '0')}
+          {curtime === 0 ? (
+            <>Hour 000 <span className="iv_seed_badge">seed</span></>
+          ) : (
+            `Hour ${curtime.toString().padStart(3, '0')}`
+          )}
         </span>
         {zone && (
           <span className="iv_intervention_date">
@@ -407,6 +416,11 @@ export default function InterventionTimeline() {
         )}
       </div>
 
+      {showNoChangeWarning && (
+        <div className="iv_timeline_warning" role="status">
+          This intervention has the same settings as the previous one, no change will occur at this point.
+        </div>
+      )}
       <Interventions time={curtime} onChange={() => setTimelineError(null)} />
     </div>
   );

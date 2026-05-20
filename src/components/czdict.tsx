@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
-import { getGuestZoneClaimHeaders } from '@/lib/guest-zone-claims';
 import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
 import EditDeleteActions from './edit-delete-actions';
@@ -22,6 +21,7 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [showMyZones, setShowMyZones] = useState(false);
   const zoneRef = useRef(zone);
   const previousUserIdRef = useRef<string | null>(null);
   zoneRef.current = zone;
@@ -46,16 +46,10 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
     let es: EventSource | null = null;
     let fallbackTimer: number | null = null;
 
-    if (!userId) {
-      setLocations([]);
-    }
-
     const fetchZones = async () => {
       if (!active) return;
       try {
-        const res = await fetch('/api/convenience-zones', {
-          headers: getGuestZoneClaimHeaders()
-        });
+        const res = await fetch('/api/convenience-zones?all=true');
         const json = await res.json().catch(() => ({}));
         const locs = Array.isArray(json.data) ? json.data : [];
 
@@ -145,6 +139,16 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
       <div className="sim_table sim_table--zones">
         <div className="sim_table_header">
           <h3 className="sim_table_title">Zones</h3>
+          {user && (
+            <label className="sim_table_header_toggle">
+              <input
+                type="checkbox"
+                checked={showMyZones}
+                onChange={(e) => setShowMyZones(e.target.checked)}
+              />
+              My zones
+            </label>
+          )}
         </div>
 
         <div className="sim_table_columns">
@@ -154,43 +158,51 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
         </div>
 
         <div className="sim_table_body" style={{ overflowAnchor: 'none' }}>
-          {loading ? (
-            <p className="sim_table_empty">Loading...</p>
-          ) : locations.length === 0 && (
-            <p className="sim_table_empty">
-              {loadError || 'No zones found, create one to get started.'}
-            </p>
-          )}
-          {locations.map((loc) => {
-            const isSelected = zone?.id === loc.id;
-            const rowClasses = [
-              'sim_table_row',
-              isSelected ? 'is-selected' : '',
-              !loc.ready ? 'is-pending' : ''
-            ]
-              .filter(Boolean)
-              .join(' ');
-            return (
-              <button
-                type="button"
-                key={loc.id}
-                className={rowClasses}
-                onClick={() => {
-                  setZone(loc);
-                  setSettings({ sim_id: null });
-                }}
-              >
-                <span className="flex-1 truncate">{loc.name}</span>
-                <span className="flex-1 text-center">{loc.size}</span>
-                <span className="flex-1 text-right">
-                  {new Date(loc.created_at).toLocaleDateString()}
-                </span>
-                {!loc.ready && (
-                  <span className="sim_table_row_badge">Generating…</span>
-                )}
-              </button>
-            );
-          })}
+          {(() => {
+            const visibleLocations = showMyZones
+              ? locations.filter((l) => l.user_id === userId)
+              : locations;
+
+            if (loading) return <p className="sim_table_empty">Loading...</p>;
+            if (visibleLocations.length === 0) {
+              const message = loadError
+                || (showMyZones
+                  ? "You haven't generated any zones yet."
+                  : 'No zones found, create one to get started.');
+              return <p className="sim_table_empty">{message}</p>;
+            }
+
+            return visibleLocations.map((loc) => {
+              const isSelected = zone?.id === loc.id;
+              const rowClasses = [
+                'sim_table_row',
+                isSelected ? 'is-selected' : '',
+                !loc.ready ? 'is-pending' : ''
+              ]
+                .filter(Boolean)
+                .join(' ');
+              return (
+                <button
+                  type="button"
+                  key={loc.id}
+                  className={rowClasses}
+                  onClick={() => {
+                    setZone(loc);
+                    setSettings({ sim_id: null });
+                  }}
+                >
+                  <span className="flex-1 truncate">{loc.name}</span>
+                  <span className="flex-1 text-center">{loc.size}</span>
+                  <span className="flex-1 text-right">
+                    {new Date(loc.created_at).toLocaleDateString()}
+                  </span>
+                  {!loc.ready && (
+                    <span className="sim_table_row_badge">Generating…</span>
+                  )}
+                </button>
+              );
+            });
+          })()}
         </div>
       </div>
 

@@ -92,6 +92,13 @@ export async function listConvenienceZones(
   return zones.map(withReady);
 }
 
+export async function listAllConvenienceZones(): Promise<ConvenienceZoneWithReady[]> {
+  const zones = await prisma.convenienceZone.findMany({
+    orderBy: { created_at: 'desc' }
+  });
+  return zones.map(withReady);
+}
+
 export async function createConvenienceZone(
   input: CreateConvenienceZoneInput,
   sessionUserId: string | null

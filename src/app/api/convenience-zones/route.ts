@@ -10,10 +10,16 @@ import { getGuestZoneClaimTokenHashesFromHeaders } from '@/server/services/guest
 import {
   createConvenienceZone,
   createConvenienceZoneSchema,
+  listAllConvenienceZones,
   listConvenienceZones
 } from '@/server/services/convenience-zones';
 
 export async function GET(request: NextRequest) {
+  if (request.nextUrl.searchParams.get('all') === 'true') {
+    const zones = await listAllConvenienceZones();
+    return jsonData(zones);
+  }
+
   const userId = await getSessionUserId(request.headers);
   const guestClaimTokenHashes = getGuestZoneClaimTokenHashesFromHeaders(
     request.headers
