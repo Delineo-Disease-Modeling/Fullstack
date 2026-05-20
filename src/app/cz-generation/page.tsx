@@ -7,18 +7,17 @@ import {
   fetchCbgGeoJson,
   lookupLocation
 } from '@/features/cz-generation/api';
-import { CandidateAnalysisPanel } from '@/features/cz-generation/components/candidate-analysis-panel';
-import { ConnectedCitiesPanel } from '@/features/cz-generation/components/connected-cities-panel';
-import { FrontierCandidatesPanel } from '@/features/cz-generation/components/frontier-candidates-panel';
-import { GeneratedActionBar } from '@/features/cz-generation/components/generated-action-bar';
+import { AlgorithmGuideModal } from '@/features/cz-generation/components/algorithm-guide-modal';
+import { FinalizingProgressModal } from '@/features/cz-generation/components/finalizing-progress-modal';
+import {
+  GenerationIntroHeader,
+  GenerationLoadingState
+} from '@/features/cz-generation/components/generation-page-chrome';
+import { GeneratedZoneWorkspace } from '@/features/cz-generation/components/generated-zone-workspace';
 import { GuidedTermsHelpModal } from '@/features/cz-generation/components/guided-terms-help-modal';
 import { SetupSeedPanel } from '@/features/cz-generation/components/setup-seed-panel';
 import {
-  CLUSTER_ALGORITHM_MANUAL,
-  CLUSTER_ALGORITHM_OPTIONS,
   EMPTY_LIST,
-  GUIDED_REGION_PALETTE,
-  GUIDED_SEED_STYLE,
   type ClusterAlgorithm
 } from '@/features/cz-generation/constants';
 import {
@@ -27,12 +26,12 @@ import {
   endDateFromMonth,
   monthFromDate,
   monthFromEndDate,
-  sameStringArray,
   startDateFromMonth
 } from '@/features/cz-generation/helpers';
 import { useCandidatePois } from '@/features/cz-generation/hooks/use-candidate-pois';
 import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
 import { useGenerationPreviewSubmit } from '@/features/cz-generation/hooks/use-generation-preview-submit';
+import { useGuidedSelectionState } from '@/features/cz-generation/hooks/use-guided-selection-state';
 import { useManualFrontierCandidates } from '@/features/cz-generation/hooks/use-manual-frontier-candidates';
 import { usePatternAvailability } from '@/features/cz-generation/hooks/use-pattern-availability';
 import { useSeedEditing } from '@/features/cz-generation/hooks/use-seed-editing';
@@ -41,7 +40,6 @@ import type {
   ClusterAlgorithmMetadata,
   GuidedDestinationCandidate,
   GuidedSecondOrderMetadata,
-  GuidedSelectionStyle,
   TraceCandidate,
   TraceLayerData,
   TracePayload
@@ -60,7 +58,6 @@ import '@/styles/cz-generation.css';
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false
 });
-const CBGMap = dynamic(() => import('@/components/cbg-map'), { ssr: false });
 
 const EMPTY_CBG_LIST: string[] = [];
 
@@ -183,128 +180,22 @@ export default function CZGeneration() {
     ? activeTraceStep.candidates
     : EMPTY_LIST;
 
-  const guidedSelectedDestinations = useMemo(
-    () =>
-      guidedDestinations.filter((destination) =>
-        selectedGuidedDestinationIds.includes(destination.unit_id)
-      ),
-    [guidedDestinations, selectedGuidedDestinationIds]
-  );
-
-  const guidedSelectionSummary = useMemo(() => {
-    const selectedLinkedOutboundFlow = guidedSelectedDestinations.reduce(
-      (sum, destination) =>
-        sum +
-        (destination.gateway_cbgs ?? []).reduce(
-          (inner, detail) => inner + Number(detail.seed_outbound_flow ?? 0),
-          0
-        ),
-      0
-    );
-    const selectedLinkedOutboundShare = Math.min(
-      1,
-      Number(guidedMetadata?.total_seed_external_outbound_flow ?? 0) > 0
-        ? selectedLinkedOutboundFlow /
-            Number(guidedMetadata?.total_seed_external_outbound_flow ?? 0)
-        : 0
-    );
-    const selectedExternalBidirectionalShare = Math.min(
-      1,
-      guidedSelectedDestinations.reduce(
-        (sum, destination) =>
-          sum + Number(destination.share_of_seed_external_bidirectional ?? 0),
-        0
-      )
-    );
-    const selectedSeedMovementShare = Math.min(
-      1,
-      guidedSelectedDestinations.reduce(
-        (sum, destination) =>
-          sum + Number(destination.share_of_seed_total_movement ?? 0),
-        0
-      )
-    );
-    const selectedPopulation =
-      Number(guidedMetadata?.seed_population ?? 0) +
-      guidedSelectedDestinations.reduce(
-        (sum, destination) => sum + Number(destination.population ?? 0),
-        0
-      );
-    return {
-      selectedLinkedOutboundFlow,
-      selectedLinkedOutboundShare,
-      selectedExternalBidirectionalShare,
-      selectedSeedMovementShare,
-      externalRemainderShare: Math.max(
-        0,
-        1 - selectedExternalBidirectionalShare
-      ),
-      selectedPopulation
-    };
-  }, [guidedMetadata, guidedSelectedDestinations]);
-
-  const guidedSeedLabel = useMemo(() => {
-    if (guidedMetadata?.seed_city_labels?.length) {
-      return guidedMetadata.seed_city_labels.join(', ');
-    }
-    if (guidedMetadata?.seed_zip_codes?.length) {
-      return guidedMetadata.seed_zip_codes.join(', ');
-    }
-    return `${guidedSeedCbgs.length} seed CBGs`;
-  }, [guidedMetadata, guidedSeedCbgs]);
-
-  const guidedSelectedDestinationSummary = useMemo(() => {
-    const labels = guidedSelectedDestinations
-      .map((destination) => destination.label)
-      .filter(Boolean);
-    if (labels.length === 0) {
-      return 'Seed only';
-    }
-    if (labels.length <= 3) {
-      return labels.join(', ');
-    }
-    return `${labels.slice(0, 3).join(', ')} +${labels.length - 3} more`;
-  }, [guidedSelectedDestinations]);
-
-  const guidedStyleByUnitId = useMemo(() => {
-    const styleMap = new Map<string, GuidedSelectionStyle>();
-    guidedSelectedDestinations.forEach((destination, index) => {
-      styleMap.set(
-        destination.unit_id,
-        GUIDED_REGION_PALETTE[index % GUIDED_REGION_PALETTE.length]
-      );
-    });
-    return styleMap;
-  }, [guidedSelectedDestinations]);
-
-  const guidedSelectionStyleByCbg = useMemo(() => {
-    if (!guidedSelectionMode) {
-      return null;
-    }
-    const styleMap = new Map<string, GuidedSelectionStyle>();
-    guidedSeedCbgs.forEach((cbg) => {
-      const normalized = normalizeCbgId(cbg);
-      if (normalized) {
-        styleMap.set(normalized, GUIDED_SEED_STYLE);
-      }
-    });
-    guidedSelectedDestinations.forEach((destination) => {
-      const style =
-        guidedStyleByUnitId.get(destination.unit_id) || GUIDED_SEED_STYLE;
-      destination.cbgs.forEach((cbg) => {
-        const normalized = normalizeCbgId(cbg);
-        if (normalized) {
-          styleMap.set(normalized, style);
-        }
-      });
-    });
-    return styleMap;
-  }, [
-    guidedSeedCbgs,
+  const {
     guidedSelectedDestinations,
+    guidedSelectionSummary,
+    guidedSeedLabel,
+    guidedSelectedDestinationSummary,
+    guidedStyleByUnitId,
+    guidedSelectionStyleByCbg
+  } = useGuidedSelectionState({
     guidedSelectionMode,
-    guidedStyleByUnitId
-  ]);
+    guidedDestinations,
+    selectedGuidedDestinationIds,
+    guidedMetadata,
+    guidedSeedCbgs,
+    setSelectedCBGs,
+    setTotalPopulation
+  });
 
   const selectedTraceCandidate = useMemo(
     () =>
@@ -578,24 +469,8 @@ export default function CZGeneration() {
   useEffect(() => {
     if (!guidedSelectionMode) {
       setShowGuidedSummaryPanel(false);
-      return;
     }
-
-    const nextSelectedCBGs = dedupeCbgList([
-      ...guidedSeedCbgs,
-      ...guidedSelectedDestinations.flatMap((destination) => destination.cbgs)
-    ]);
-
-    setSelectedCBGs((prev) =>
-      sameStringArray(prev, nextSelectedCBGs) ? prev : nextSelectedCBGs
-    );
-    setTotalPopulation(guidedSelectionSummary.selectedPopulation);
-  }, [
-    guidedSeedCbgs,
-    guidedSelectedDestinations,
-    guidedSelectionMode,
-    guidedSelectionSummary.selectedPopulation
-  ]);
+  }, [guidedSelectionMode]);
 
   useEffect(() => {
     if (!guidedSelectionMode || selectedCBGs.length === 0) {
@@ -921,263 +796,112 @@ export default function CZGeneration() {
   });
 
   if (isPending) {
-    return (
-      <div className="czgen_page">
-        <p className="czgen_lede" style={{ textAlign: 'center', paddingTop: '60px' }}>
-          Loading...
-        </p>
-      </div>
-    );
+    return <GenerationLoadingState />;
   }
 
   return (
     <div className="czgen_page">
-      {isFinalizing && (
-        <div
-          className="czgen_modal_overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-live="polite"
-        >
-          <div className="czgen_modal">
-            <p className="czgen_modal_title">Generating convenience zone</p>
-            <p className="czgen_modal_subtitle">
-              {finalizeStatusMessage || 'Preparing movement patterns...'}
-            </p>
-            <div className="czgen_progress_track">
-              <div
-                className="czgen_progress_fill"
-                style={{
-                  width: `${Math.max(2, Math.min(100, finalizeProgress))}%`
-                }}
-              />
-            </div>
-            <div className="mt-2 text-right text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              {finalizeProgress}%
-            </div>
-            <p className="mt-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              This can take a few minutes. You&apos;ll be taken to the simulator
-              automatically once generation is complete.
-            </p>
-          </div>
-        </div>
-      )}
-      {showAlgorithmGuide && (
-        <div
-          className="czgen_modal_overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="algorithm-guide-title"
-          tabIndex={-1}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setShowAlgorithmGuide(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setShowAlgorithmGuide(false);
-            }
-          }}
-        >
-          <div className="czgen_modal" style={{ width: 'min(34rem, 92vw)' }}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p id="algorithm-guide-title" className="czgen_modal_title">
-                  Algorithm Guide
-                </p>
-                <p className="czgen_modal_subtitle">
-                  Start with Mobility Prune unless the zone needs manual city
-                  selection or diagnostic tracing.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAlgorithmGuide(false)}
-                className="czgen_btn czgen_btn--sm"
-                style={{ flexShrink: 0 }}
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-4 flex flex-col gap-3">
-              {CLUSTER_ALGORITHM_OPTIONS.map((option) => {
-                const manual = CLUSTER_ALGORITHM_MANUAL[option.value];
-                return (
-                  <div
-                    key={option.value}
-                    className="border-l-4 px-3 py-2 text-sm"
-                    style={{
-                      borderColor: 'var(--color-primary-blue-soft)',
-                      background: 'var(--color-bg-surface)',
-                      color: 'var(--color-text-muted)',
-                      borderRadius: '0 8px 8px 0'
-                    }}
-                  >
-                    <div className="flex flex-wrap items-center gap-2 font-semibold" style={{ color: 'var(--color-text-main)' }}>
-                      <span>{option.label}</span>
-                      {manual.recommended && (
-                        <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'rgba(22,163,74,0.1)', color: '#166534' }}>
-                          default
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1">{manual.summary}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <FinalizingProgressModal
+        open={isFinalizing}
+        progress={finalizeProgress}
+        statusMessage={finalizeStatusMessage}
+      />
+      <AlgorithmGuideModal
+        open={showAlgorithmGuide}
+        onClose={() => setShowAlgorithmGuide(false)}
+      />
       <GuidedTermsHelpModal
         open={showGuidedTermsHelp}
         onClose={() => setShowGuidedTermsHelp(false)}
       />
-      {!hasGenerated && (
-        <div className="czgen_header" data-aos="fade-up" data-aos-once="true">
-          <h1 className="czgen_title">Generate a Convenience Zone</h1>
-          <p className="czgen_lede">
-            Define your simulation&apos;s geographic area by selecting a location and clustering nearby Census Block Groups.
-          </p>
-        </div>
-      )}
+      {!hasGenerated && <GenerationIntroHeader />}
       <form
         onSubmit={handleGenerateSubmit}
         className="czgen_form"
       >
         {hasGenerated ? (
-          <div className="w-full flex flex-col gap-4">
-            <div className="flex gap-4 w-full flex-wrap 2xl:flex-nowrap">
-              <div className="czgen_map h-[50vh] min-h-80 max-h-140 lg:h-[calc(100vh-13rem)] lg:min-h-136 lg:max-h-192 relative flex-1 min-w-0 w-full lg:min-w-176">
-                {cbgGeoJSON ? (
-                  <CBGMap
-                    cbgData={cbgGeoJSON}
-                    center={null}
-                    onCBGClick={handleCBGClick}
-                    onMapBackgroundClick={handleMapBackgroundClick}
-                    onTraceCbgInspect={
-                      manualEditPanelsActive ? null : handleTraceCbgInspect
-                    }
-                    selectedCBGs={selectedCBGs}
-                    seedCbgId={seedCBG}
-                    seedCbgIds={mapSeedCbgIds}
-                    seedGuardRadiusKm={seedGuardDistanceKm}
-                    showSeedGuardCircle={
-                      clusterAlgorithm === 'greedy_weight_seed_guard'
-                    }
-                    traceLayer={activeMapTraceLayer}
-                    selectionStyleByCbg={guidedSelectionStyleByCbg}
-                    editingEnabled={
-                      !guidedSelectionMode &&
-                      (manualEditPanelsActive || !activeMapTraceLayer)
-                    }
-                    focusedCbgId={focusedTraceCbg}
-                    focusNonce={focusedTraceNonce}
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500">
-                    <div className="text-center">
-                      <p>CBG map not available</p>
-                      <p className="text-sm">
-                        GeoJSON endpoint needed on Algorithms server
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {guidedSelectionMode && (
-                <ConnectedCitiesPanel
-                  seedLabel={guidedSeedLabel}
-                  destinations={guidedDestinations}
-                  selectedDestinationIds={selectedGuidedDestinationIds}
-                  selectedDestinations={guidedSelectedDestinations}
-                  selectedCbgCount={selectedCBGs.length}
-                  metadata={guidedMetadata}
-                  selectionSummary={guidedSelectionSummary}
-                  styleByUnitId={guidedStyleByUnitId}
-                  loading={guidedDestinationLoading}
-                  error={guidedDestinationError}
-                  isFinalizing={isFinalizing}
-                  showSummary={showGuidedSummaryPanel}
-                  onShowSummary={() => setShowGuidedSummaryPanel(true)}
-                  onHideSummary={() => setShowGuidedSummaryPanel(false)}
-                  onShowTermsHelp={() => setShowGuidedTermsHelp(true)}
-                  onUseRecommended={selectRecommendedGuidedDestinations}
-                  onSeedOnly={() => setSelectedGuidedDestinationIds([])}
-                  onToggleDestination={toggleGuidedDestination}
-                />
-              )}
-
-              {showCandidatePanels && (
-                <FrontierCandidatesPanel
-                  candidates={displayCandidates}
-                  hasTraceLayer={Boolean(traceLayer)}
-                  loading={manualFrontierLoading}
-                  error={manualFrontierError}
-                  selectedCbg={selectedTraceCandidateCbg}
-                  onSelectCbg={handleTraceCandidateSelect}
-                />
-              )}
-
-              {showCandidatePanels && (
-                <CandidateAnalysisPanel
-                  selectedCbg={selectedTraceCandidateCbg}
-                  population={selectedTraceFeatureProperties?.population}
-                  status={selectedAnalysisStatus}
-                  candidate={selectedAnalysisCandidate}
-                  pois={candidatePois}
-                  poisLoading={candidatePoiLoading}
-                  poisError={candidatePoiError}
-                />
-              )}
-            </div>
-
-            <GeneratedActionBar
-              guidedSelectionMode={guidedSelectionMode}
-              selectedGuidedDestinationCount={
-                selectedGuidedDestinationIds.length
-              }
-              selectedCbgCount={selectedCBGs.length}
-              guidedSelectedDestinationSummary={
-                guidedSelectedDestinationSummary
-              }
-              guidedSelectionSummary={guidedSelectionSummary}
-              mobilityPruneMetadata={mobilityPruneMetadata}
-              totalPopulation={totalPopulation}
-              showTraceControls={showTraceControls}
-              growthTrace={growthTrace}
-              traceStepCount={traceSteps.length}
-              traceEnabled={traceEnabled}
-              traceStepIndex={traceStepIndex}
-              maxTraceStep={maxTraceStep}
-              onTraceEnabledChange={setTraceEnabled}
-              onJumpTraceStep={jumpToTraceStep}
-              zoneMetricsLoading={zoneMetricsLoading}
-              zoneMetricsError={zoneMetricsError}
-              zoneMetrics={zoneMetrics}
-              clusterAlgorithm={clusterAlgorithm}
-              manualEditPanelsActive={manualEditPanelsActive}
-              seedGuardDistanceKm={seedGuardDistanceKm}
-              onSeedGuardDistanceChange={setSeedGuardDistanceKm}
-              loading={loading}
-              isFinalizing={isFinalizing}
-              algorithmMetadata={algorithmMetadata}
-              zoneEditMode={zoneEditMode}
-              onEnterZoneEditMode={() => {
-                setZoneEditMode(true);
-                setTraceEnabled(false);
-              }}
-              onEnterTraceView={() => {
-                setZoneEditMode(false);
-                setTraceEnabled(Boolean(growthTrace?.steps?.length));
-              }}
-              onSaveHtmlMap={saveCZHtmlMap}
-              savingHtmlMap={savingHtmlMap}
-              onFinalize={finalizeCZ}
-            />
-          </div>
+          <GeneratedZoneWorkspace
+            cbgGeoJSON={cbgGeoJSON}
+            selectedCBGs={selectedCBGs}
+            seedCBG={seedCBG}
+            mapSeedCbgIds={mapSeedCbgIds}
+            seedGuardDistanceKm={seedGuardDistanceKm}
+            clusterAlgorithm={clusterAlgorithm}
+            activeMapTraceLayer={activeMapTraceLayer}
+            guidedSelectionStyleByCbg={guidedSelectionStyleByCbg}
+            manualEditPanelsActive={manualEditPanelsActive}
+            guidedSelectionMode={guidedSelectionMode}
+            focusedTraceCbg={focusedTraceCbg}
+            focusedTraceNonce={focusedTraceNonce}
+            onCBGClick={handleCBGClick}
+            onMapBackgroundClick={handleMapBackgroundClick}
+            onTraceCbgInspect={handleTraceCbgInspect}
+            guidedSeedLabel={guidedSeedLabel}
+            guidedDestinations={guidedDestinations}
+            selectedGuidedDestinationIds={selectedGuidedDestinationIds}
+            guidedSelectedDestinations={guidedSelectedDestinations}
+            guidedMetadata={guidedMetadata}
+            guidedSelectionSummary={guidedSelectionSummary}
+            guidedStyleByUnitId={guidedStyleByUnitId}
+            guidedDestinationLoading={guidedDestinationLoading}
+            guidedDestinationError={guidedDestinationError}
+            isFinalizing={isFinalizing}
+            showGuidedSummaryPanel={showGuidedSummaryPanel}
+            onShowGuidedSummary={() => setShowGuidedSummaryPanel(true)}
+            onHideGuidedSummary={() => setShowGuidedSummaryPanel(false)}
+            onShowGuidedTermsHelp={() => setShowGuidedTermsHelp(true)}
+            onUseRecommendedGuidedDestinations={
+              selectRecommendedGuidedDestinations
+            }
+            onSeedOnlyGuidedDestinations={() =>
+              setSelectedGuidedDestinationIds([])
+            }
+            onToggleGuidedDestination={toggleGuidedDestination}
+            showCandidatePanels={showCandidatePanels}
+            displayCandidates={displayCandidates}
+            traceLayer={traceLayer}
+            manualFrontierLoading={manualFrontierLoading}
+            manualFrontierError={manualFrontierError}
+            selectedTraceCandidateCbg={selectedTraceCandidateCbg}
+            onTraceCandidateSelect={handleTraceCandidateSelect}
+            selectedTracePopulation={selectedTraceFeatureProperties?.population}
+            selectedAnalysisStatus={selectedAnalysisStatus}
+            selectedAnalysisCandidate={selectedAnalysisCandidate}
+            candidatePois={candidatePois}
+            candidatePoiLoading={candidatePoiLoading}
+            candidatePoiError={candidatePoiError}
+            guidedSelectedDestinationSummary={
+              guidedSelectedDestinationSummary
+            }
+            mobilityPruneMetadata={mobilityPruneMetadata}
+            totalPopulation={totalPopulation}
+            showTraceControls={showTraceControls}
+            growthTrace={growthTrace}
+            traceStepCount={traceSteps.length}
+            traceEnabled={traceEnabled}
+            traceStepIndex={traceStepIndex}
+            maxTraceStep={maxTraceStep}
+            onTraceEnabledChange={setTraceEnabled}
+            onJumpTraceStep={jumpToTraceStep}
+            zoneMetricsLoading={zoneMetricsLoading}
+            zoneMetricsError={zoneMetricsError}
+            zoneMetrics={zoneMetrics}
+            loading={loading}
+            algorithmMetadata={algorithmMetadata}
+            zoneEditMode={zoneEditMode}
+            onEnterZoneEditMode={() => {
+              setZoneEditMode(true);
+              setTraceEnabled(false);
+            }}
+            onEnterTraceView={() => {
+              setZoneEditMode(false);
+              setTraceEnabled(Boolean(growthTrace?.steps?.length));
+            }}
+            onSaveHtmlMap={saveCZHtmlMap}
+            savingHtmlMap={savingHtmlMap}
+            onFinalize={finalizeCZ}
+            onSeedGuardDistanceChange={setSeedGuardDistanceKm}
+          />
         ) : (
           <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-stretch" data-aos="fade-up" data-aos-once="true" data-aos-delay="80">
             <div className="czgen_map h-[50vh] min-h-80 max-h-112 lg:h-[calc(100vh-6rem)] lg:min-h-168 lg:max-h-none w-full lg:min-w-0 lg:flex-1">
