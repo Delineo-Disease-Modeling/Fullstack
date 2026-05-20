@@ -16,6 +16,7 @@ import {
 import { CandidateAnalysisPanel } from '@/features/cz-generation/components/candidate-analysis-panel';
 import { ConnectedCitiesPanel } from '@/features/cz-generation/components/connected-cities-panel';
 import { FrontierCandidatesPanel } from '@/features/cz-generation/components/frontier-candidates-panel';
+import { GeneratedActionBar } from '@/features/cz-generation/components/generated-action-bar';
 import { GuidedTermsHelpModal } from '@/features/cz-generation/components/guided-terms-help-modal';
 import {
   CBG_GEOJSON_REQUEST_CHUNK_SIZE,
@@ -25,7 +26,6 @@ import {
   GUIDED_HARD_EXPLICIT_POPULATION,
   GUIDED_REGION_PALETTE,
   GUIDED_SEED_STYLE,
-  GUIDED_SOFT_EXPLICIT_POPULATION,
   INITIAL_SEED_EDIT_NEIGHBOR_RINGS,
   type ClusterAlgorithm
 } from '@/features/cz-generation/constants';
@@ -2246,460 +2246,49 @@ export default function CZGeneration() {
               )}
             </div>
 
-            <div
-              className={`czgen_actionbar ${
-                guidedSelectionMode
-                  ? 'flex-col xl:flex-row xl:items-start xl:justify-between'
-                  : 'items-start justify-between'
-              }`}
-            >
-              {guidedSelectionMode ? (
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-[#1f2937]">
-                    Ready to Generate
-                  </div>
-                  <div className="mt-1 text-sm text-gray-700">
-                    {selectedGuidedDestinationIds.length
-                      ? `Selected ${selectedGuidedDestinationIds.length} cities and ${selectedCBGs.length} linked CBGs: ${guidedSelectedDestinationSummary}.`
-                      : `Seed only is selected right now. The explicit layer contains ${selectedCBGs.length} seed CBGs.`}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-700">
-                    <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                      <span className="font-semibold text-[#1f2937]">
-                        Trips Leaving Seed Captured (linked CBGs):
-                      </span>{' '}
-                      {(
-                        guidedSelectionSummary.selectedLinkedOutboundShare * 100
-                      ).toFixed(1)}
-                      %
-                    </div>
-                    <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                      <span className="font-semibold text-[#1f2937]">
-                        Explicit Pop:
-                      </span>{' '}
-                      {Number(
-                        guidedSelectionSummary.selectedPopulation ?? 0
-                      ).toLocaleString()}
-                    </div>
-                  </div>
-                  {guidedSelectionSummary.selectedPopulation >
-                  GUIDED_HARD_EXPLICIT_POPULATION ? (
-                    <div className="mt-3 text-xs text-red-700">
-                      Finalize is disabled above{' '}
-                      {GUIDED_HARD_EXPLICIT_POPULATION.toLocaleString()}{' '}
-                      explicit residents.
-                    </div>
-                  ) : guidedSelectionSummary.selectedPopulation >
-                    GUIDED_SOFT_EXPLICIT_POPULATION ? (
-                    <div className="mt-3 text-xs text-amber-700">
-                      This selection is above the preferred explicit-population
-                      band of {GUIDED_SOFT_EXPLICIT_POPULATION.toLocaleString()}
-                      .
-                    </div>
-                  ) : (
-                    <div className="mt-3 text-xs text-gray-600">
-                      Choose connected cities on the right. The map updates as
-                      you change the explicit linked CBG layer.
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div>
-                    {mobilityPruneMetadata ? (
-                      <>
-                        <div className="text-sm font-semibold mb-2">
-                          Mobility Prune Summary
-                        </div>
-                        <div className="flex flex-wrap gap-2 text-xs text-gray-700">
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Final Zone:
-                            </span>{' '}
-                            {selectedCBGs.length} CBGs, pop{' '}
-                            {Number(totalPopulation || 0).toLocaleString()}
-                          </div>
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Seed Pop:
-                            </span>{' '}
-                            {Number(
-                              mobilityPruneMetadata.seed_population ?? 0
-                            ).toLocaleString()}
-                          </div>
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Envelope:
-                            </span>{' '}
-                            {Number(
-                              mobilityPruneMetadata.initial_cbg_count ?? 0
-                            ).toLocaleString()}{' '}
-                            CBGs, pop{' '}
-                            {Number(
-                              mobilityPruneMetadata.initial_population ?? 0
-                            ).toLocaleString()}
-                          </div>
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Envelope Target:
-                            </span>{' '}
-                            {Number(
-                              mobilityPruneMetadata.envelope_population_target ??
-                                0
-                            ).toLocaleString()}
-                          </div>
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Pruned:
-                            </span>{' '}
-                            {Number(
-                              mobilityPruneMetadata.removed_cbg_count ?? 0
-                            ).toLocaleString()}{' '}
-                            CBGs, pop{' '}
-                            {Number(
-                              mobilityPruneMetadata.population_reduced ?? 0
-                            ).toLocaleString()}
-                          </div>
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Minimum Seed Capture:
-                            </span>{' '}
-                            {Number(
-                              (mobilityPruneMetadata.min_seed_capture ?? 0) *
-                                100
-                            ).toFixed(0)}
-                            %
-                          </div>
-                          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-                            <span className="font-semibold text-[#1f2937]">
-                              Seed Capture:
-                            </span>{' '}
-                            {Number(
-                              (mobilityPruneMetadata.final_seed_capture_share ??
-                                0) * 100
-                            ).toFixed(1)}
-                            %
-                          </div>
-                        </div>
-                        {showTraceControls &&
-                          growthTrace?.supports_stepwise &&
-                          traceSteps.length > 0 && (
-                            <div className="mt-3 border-t border-[#dbeafe] pt-3">
-                              <label className="flex items-center gap-2 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={traceEnabled}
-                                  onChange={(e) =>
-                                    setTraceEnabled(e.target.checked)
-                                  }
-                                />
-                                Show pruning trace heat map
-                              </label>
-                              {traceEnabled && (
-                                <>
-                                  <div className="mt-2 text-xs text-gray-600">
-                                    Step{' '}
-                                    {Math.min(traceStepIndex, maxTraceStep) + 1}{' '}
-                                    of {traceSteps.length}
-                                  </div>
-                                  <div className="mt-2 flex gap-2">
-                                    <button
-                                      type="button"
-                                      className="czgen_btn czgen_btn--sm"
-                                      disabled={traceStepIndex <= 0}
-                                      onClick={() =>
-                                        jumpToTraceStep(traceStepIndex - 1)
-                                      }
-                                    >
-                                      Previous Step
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="czgen_btn czgen_btn--sm"
-                                      disabled={traceStepIndex >= maxTraceStep}
-                                      onClick={() =>
-                                        jumpToTraceStep(traceStepIndex + 1)
-                                      }
-                                    >
-                                      Next Step
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          )}
-                      </>
-                    ) : showTraceControls ? (
-                      <>
-                        <div className="text-sm font-semibold mb-2">
-                          Trace Controls
-                        </div>
-                        {growthTrace?.supports_stepwise &&
-                        traceSteps.length > 0 ? (
-                          <>
-                            <label className="flex items-center gap-2 text-xs mb-2">
-                              <input
-                                type="checkbox"
-                                checked={traceEnabled}
-                                onChange={(e) =>
-                                  setTraceEnabled(e.target.checked)
-                                }
-                              />
-                              Show frontier heat map
-                            </label>
-                            <div className="text-xs text-gray-600">
-                              Step {Math.min(traceStepIndex, maxTraceStep) + 1}{' '}
-                              of {traceSteps.length}
-                            </div>
-                            <div className="mt-2 flex gap-2">
-                              <button
-                                type="button"
-                                className="czgen_btn czgen_btn--sm"
-                                disabled={!traceEnabled || traceStepIndex <= 0}
-                                onClick={() =>
-                                  jumpToTraceStep(traceStepIndex - 1)
-                                }
-                              >
-                                Previous Step
-                              </button>
-                              <button
-                                type="button"
-                                className="czgen_btn czgen_btn--sm"
-                                disabled={
-                                  !traceEnabled ||
-                                  traceStepIndex >= maxTraceStep
-                                }
-                                onClick={() =>
-                                  jumpToTraceStep(traceStepIndex + 1)
-                                }
-                              >
-                                Next Step
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-xs text-gray-600">
-                            {growthTrace?.note ||
-                              'This algorithm does not expose a step-by-step greedy expansion trace.'}
-                          </div>
-                        )}
-                      </>
-                    ) : zoneMetricsLoading ? (
-                      <>
-                        <div className="text-sm font-semibold mb-2">
-                          Zone Metrics (Live)
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          Computing CZI...
-                        </div>
-                      </>
-                    ) : zoneMetricsError ? (
-                      <>
-                        <div className="text-sm font-semibold mb-2">
-                          Zone Metrics (Live)
-                        </div>
-                        <div className="text-xs text-red-700">
-                          {zoneMetricsError}
-                        </div>
-                      </>
-                    ) : zoneMetrics ? (
-                      <>
-                        <div className="text-sm font-semibold mb-2">
-                          Zone Metrics (Live)
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-700">
-                          <div>
-                            <span className="font-semibold">CBGs:</span>{' '}
-                            {zoneMetrics.cbg_count ?? selectedCBGs.length}
-                          </div>
-                          <div>
-                            <span className="font-semibold">CZI:</span>{' '}
-                            {Number(zoneMetrics.czi ?? 0).toFixed(4)}
-                          </div>
-                          <div>
-                            <span className="font-semibold">Inside:</span>{' '}
-                            {Number(
-                              zoneMetrics.movement_inside ?? 0
-                            ).toLocaleString(undefined, {
-                              maximumFractionDigits: 1
-                            })}
-                          </div>
-                          <div>
-                            <span className="font-semibold">Boundary:</span>{' '}
-                            {Number(
-                              zoneMetrics.movement_boundary ?? 0
-                            ).toLocaleString(undefined, {
-                              maximumFractionDigits: 1
-                            })}
-                          </div>
-                        </div>
-                        <div className="mt-1 text-xs text-gray-600">
-                          Click CBGs on the map to add or remove them. Frontier
-                          candidates update automatically.
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-sm font-semibold mb-2">
-                          Zone Metrics (Live)
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          No metrics available.
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {clusterAlgorithm === 'greedy_weight_seed_guard' &&
-                    manualEditPanelsActive && (
-                      <div className="min-w-[15rem] max-w-[18rem] flex flex-col gap-1">
-                        <label
-                          htmlFor="seed_guard_distance_live"
-                          className="text-sm font-semibold"
-                        >
-                          Seed Guard Radius (km)
-                        </label>
-                        <input
-                          id="seed_guard_distance_live"
-                          className="formfield"
-                          type="number"
-                          min={0}
-                          max={500}
-                          value={seedGuardDistanceKm}
-                          onChange={(e) =>
-                            setSeedGuardDistanceKm(Number(e.target.value))
-                          }
-                          disabled={loading || isFinalizing}
-                        />
-                        <div className="text-xs text-gray-600">
-                          Blue ring shows the seed guard radius and updates live
-                          as you change it.
-                        </div>
-                      </div>
-                    )}
-
-                  {algorithmMetadata && !algorithmMetadata.bounded_envelope && (
-                    <div className="min-w-[16rem] max-w-[22rem] flex flex-col gap-1 text-xs text-gray-700">
-                      <div className="text-sm font-semibold text-[#1f2937]">
-                        Hierarchy Summary
-                      </div>
-                      <div>
-                        <span className="font-semibold">Seed:</span>{' '}
-                        {algorithmMetadata.seed_zip_codes?.length
-                          ? algorithmMetadata.seed_zip_codes.join(', ')
-                          : `${algorithmMetadata.seed_cbgs?.length ?? 0} seed CBGs`}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Core:</span>{' '}
-                        {algorithmMetadata.core_cluster?.length ?? 0} CBGs
-                        {algorithmMetadata.core_population !== undefined
-                          ? `, pop ${Number(
-                              algorithmMetadata.core_population
-                            ).toLocaleString()}`
-                          : ''}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Satellites:</span>{' '}
-                        {algorithmMetadata.selected_satellites?.length ?? 0}
-                      </div>
-                      {algorithmMetadata.selected_satellites &&
-                        algorithmMetadata.selected_satellites.length > 0 && (
-                          <div>
-                            <span className="font-semibold">Selected:</span>{' '}
-                            {algorithmMetadata.selected_satellites
-                              .map(
-                                (item) =>
-                                  item.label || item.unit_id || 'Unknown'
-                              )
-                              .join(', ')}
-                          </div>
-                        )}
-                      {algorithmMetadata.external_pressure_share !==
-                        undefined && (
-                        <div>
-                          <span className="font-semibold">
-                            External Pressure:
-                          </span>{' '}
-                          {Number(
-                            (algorithmMetadata.external_pressure_share ?? 0) *
-                              100
-                          ).toFixed(1)}
-                          %
-                        </div>
-                      )}
-                      {algorithmMetadata.population_target_met !==
-                        undefined && (
-                        <div>
-                          <span className="font-semibold">
-                            Population Target:
-                          </span>{' '}
-                          {algorithmMetadata.population_target_met
-                            ? 'Met'
-                            : 'Not met'}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div
-                className={`flex flex-wrap items-center gap-2 ${
-                  guidedSelectionMode ? 'xl:justify-end' : ''
-                }`}
-              >
-                {growthTrace && !zoneEditMode && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setZoneEditMode(true);
-                      setTraceEnabled(false);
-                    }}
-                    disabled={loading || isFinalizing}
-                    className="czgen_btn"
-                  >
-                    Edit Zone
-                  </button>
-                )}
-                {growthTrace && zoneEditMode && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setZoneEditMode(false);
-                      setTraceEnabled(Boolean(growthTrace?.steps?.length));
-                    }}
-                    disabled={loading || isFinalizing}
-                    className="czgen_btn"
-                  >
-                    Trace View
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={saveCZHtmlMap}
-                  disabled={loading || isFinalizing || savingHtmlMap}
-                  className="czgen_btn"
-                >
-                  {savingHtmlMap ? 'Saving HTML Map...' : 'Save HTML Map'}
-                </button>
-                <button
-                  type="button"
-                  onClick={finalizeCZ}
-                  disabled={
-                    loading ||
-                    isFinalizing ||
-                    (guidedSelectionMode &&
-                      guidedSelectionSummary.selectedPopulation >
-                        GUIDED_HARD_EXPLICIT_POPULATION)
-                  }
-                  className="czgen_btn czgen_btn--primary"
-                >
-                  {isFinalizing
-                    ? 'Generating Patterns...'
-                    : 'Finalize & Generate'}
-                </button>
-              </div>
-            </div>
+            <GeneratedActionBar
+              guidedSelectionMode={guidedSelectionMode}
+              selectedGuidedDestinationCount={
+                selectedGuidedDestinationIds.length
+              }
+              selectedCbgCount={selectedCBGs.length}
+              guidedSelectedDestinationSummary={
+                guidedSelectedDestinationSummary
+              }
+              guidedSelectionSummary={guidedSelectionSummary}
+              mobilityPruneMetadata={mobilityPruneMetadata}
+              totalPopulation={totalPopulation}
+              showTraceControls={showTraceControls}
+              growthTrace={growthTrace}
+              traceStepCount={traceSteps.length}
+              traceEnabled={traceEnabled}
+              traceStepIndex={traceStepIndex}
+              maxTraceStep={maxTraceStep}
+              onTraceEnabledChange={setTraceEnabled}
+              onJumpTraceStep={jumpToTraceStep}
+              zoneMetricsLoading={zoneMetricsLoading}
+              zoneMetricsError={zoneMetricsError}
+              zoneMetrics={zoneMetrics}
+              clusterAlgorithm={clusterAlgorithm}
+              manualEditPanelsActive={manualEditPanelsActive}
+              seedGuardDistanceKm={seedGuardDistanceKm}
+              onSeedGuardDistanceChange={setSeedGuardDistanceKm}
+              loading={loading}
+              isFinalizing={isFinalizing}
+              algorithmMetadata={algorithmMetadata}
+              zoneEditMode={zoneEditMode}
+              onEnterZoneEditMode={() => {
+                setZoneEditMode(true);
+                setTraceEnabled(false);
+              }}
+              onEnterTraceView={() => {
+                setZoneEditMode(false);
+                setTraceEnabled(Boolean(growthTrace?.steps?.length));
+              }}
+              onSaveHtmlMap={saveCZHtmlMap}
+              savingHtmlMap={savingHtmlMap}
+              onFinalize={finalizeCZ}
+            />
           </div>
         ) : (
           <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-stretch" data-aos="fade-up" data-aos-once="true" data-aos-delay="80">

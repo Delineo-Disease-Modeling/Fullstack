@@ -8,17 +8,9 @@ import {
 import type {
   GuidedDestinationCandidate,
   GuidedSecondOrderMetadata,
+  GuidedSelectionSummary,
   GuidedSelectionStyle
 } from '@/features/cz-generation/types';
-
-type GuidedSelectionSummary = {
-  selectedLinkedOutboundFlow: number;
-  selectedLinkedOutboundShare: number;
-  selectedExternalBidirectionalShare: number;
-  selectedSeedMovementShare: number;
-  externalRemainderShare: number;
-  selectedPopulation: number;
-};
 
 type ConnectedCitiesPanelProps = {
   seedLabel: string;
