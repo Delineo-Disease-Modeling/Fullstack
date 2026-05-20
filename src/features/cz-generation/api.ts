@@ -3,6 +3,7 @@ import { getResponseErrorMessage, readJsonObject } from './helpers';
 import type {
   ClusteringPreviewResponse,
   GuidedSecondOrderMetadata,
+  LookupLocationResult,
   PoiAnalysis,
   TraceCandidate,
   ZoneMetrics
@@ -140,6 +141,37 @@ export async function fetchCbgAtPoint(latlng: LatLng, stateFips: string) {
     },
     errorMessage: 'Failed to resolve clicked map location to CBG.'
   });
+}
+
+export async function lookupLocation(
+  query: string
+): Promise<LookupLocationResult | null> {
+  const location = String(query ?? '').trim();
+  if (!location) {
+    return null;
+  }
+
+  const response = await fetch('/api/lookup-location', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ location })
+  });
+  if (response.status === 404) {
+    return null;
+  }
+
+  const data = await readJsonObject(response);
+  if (!response.ok) {
+    throw new Error(
+      getResponseErrorMessage(
+        response,
+        data,
+        `Location lookup failed with status ${response.status}`
+      )
+    );
+  }
+
+  return data as LookupLocationResult;
 }
 
 export async function fetchCzMetrics(body: {
