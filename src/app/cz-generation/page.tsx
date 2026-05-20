@@ -1,13 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  exportCzMapHtml,
   fetchCbgAtPoint,
   fetchCbgGeoJson,
-  finalizeConvenienceZone,
   lookupLocation
 } from '@/features/cz-generation/api';
 import { CandidateAnalysisPanel } from '@/features/cz-generation/components/candidate-analysis-panel';
@@ -20,7 +17,6 @@ import {
   CLUSTER_ALGORITHM_MANUAL,
   CLUSTER_ALGORITHM_OPTIONS,
   EMPTY_LIST,
-  GUIDED_HARD_EXPLICIT_POPULATION,
   GUIDED_REGION_PALETTE,
   GUIDED_SEED_STYLE,
   type ClusterAlgorithm
@@ -29,7 +25,6 @@ import {
   clampIndex,
   dedupeCbgList,
   endDateFromMonth,
-  getLengthHours,
   monthFromDate,
   monthFromEndDate,
   sameStringArray,
@@ -41,6 +36,7 @@ import { useGenerationPreviewSubmit } from '@/features/cz-generation/hooks/use-g
 import { useManualFrontierCandidates } from '@/features/cz-generation/hooks/use-manual-frontier-candidates';
 import { usePatternAvailability } from '@/features/cz-generation/hooks/use-pattern-availability';
 import { useSeedEditing } from '@/features/cz-generation/hooks/use-seed-editing';
+import { useZoneFinalization } from '@/features/cz-generation/hooks/use-zone-finalization';
 import type {
   ClusterAlgorithmMetadata,
   GuidedDestinationCandidate,
@@ -50,7 +46,6 @@ import type {
   TraceLayerData,
   TracePayload
 } from '@/features/cz-generation/types';
-import { useSession } from '@/lib/auth-client';
 import {
   type GeoJSONData,
   getBoundsForGeoJson,
@@ -59,12 +54,7 @@ import {
   mergeGeoJsonFeatures,
   normalizeCbgId
 } from '@/lib/cz-geo';
-import {
-  createGuestZoneClaimToken,
-  rememberGuestZoneClaim
-} from '@/lib/guest-zone-claims';
 import { getStateFromCBG } from '@/lib/simulation-zone';
-import useSimSettings, { type ConvenienceZone } from '@/stores/simsettings';
 import '@/styles/cz-generation.css';
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
@@ -74,91 +64,7 @@ const CBGMap = dynamic(() => import('@/components/cbg-map'), { ssr: false });
 
 const EMPTY_CBG_LIST: string[] = [];
 
-async function fetchZoneById(
-  zoneId: number,
-  guestClaimToken?: string | null
-): Promise<ConvenienceZone | null> {
-  try {
-    const res = await fetch(`/api/convenience-zones/${zoneId}`, {
-      headers: guestClaimToken
-        ? { 'X-Delineo-Guest-Zone-Claims': guestClaimToken }
-        : {}
-    });
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => ({}));
-    const zone = json?.data as ConvenienceZone | undefined;
-    return zone?.ready ? zone : null;
-  } catch {
-    return null;
-  }
-}
-
-function waitForZoneReady(
-  zoneId: number,
-  onProgress: (percent: number) => void,
-  guestClaimToken?: string | null
-): Promise<ConvenienceZone | null> {
-  return new Promise((resolve) => {
-    let done = false;
-    let currentProgress = 15;
-    let es: EventSource | null = null;
-
-    const finish = (zone: ConvenienceZone | null) => {
-      if (done) return;
-      done = true;
-      if (progressTimer) clearInterval(progressTimer);
-      if (pollTimer) clearInterval(pollTimer);
-      if (es) es.close();
-      resolve(zone);
-    };
-
-    const progressTimer = window.setInterval(() => {
-      if (done) return;
-      currentProgress = Math.min(
-        92,
-        currentProgress + (92 - currentProgress) * 0.05
-      );
-      onProgress(Math.round(currentProgress));
-    }, 1000);
-
-    const checkReady = async () => {
-      const zone = await fetchZoneById(zoneId, guestClaimToken);
-      if (zone) finish(zone);
-    };
-
-    const pollTimer = window.setInterval(checkReady, 5000);
-
-    try {
-      es = new EventSource('/api/convenience-zones/events');
-      es.onmessage = (ev) => {
-        try {
-          const payload = JSON.parse(ev.data);
-          if (
-            payload?.type === 'zone-ready' &&
-            Number(payload.zone_id) === zoneId
-          ) {
-            checkReady();
-          }
-        } catch {
-          // ignore non-JSON heartbeats
-        }
-      };
-      es.onerror = () => {
-        // polling remains as fallback
-      };
-    } catch {
-      // EventSource may be unavailable; polling will still run
-    }
-
-    checkReady();
-  });
-}
-
 export default function CZGeneration() {
-  const router = useRouter();
-  const { data: session, isPending } = useSession();
-  const user = session?.user;
-  const setSettings = useSimSettings((state) => state.setSettings);
   const isResolvingMapClickRef = useRef(false);
   const attemptedTraceGeoJsonFetchRef = useRef(new Set<string>());
 
@@ -240,10 +146,7 @@ export default function CZGeneration() {
     useState('');
   const [focusedTraceCbg, setFocusedTraceCbg] = useState('');
   const [focusedTraceNonce, setFocusedTraceNonce] = useState(0);
-  const [savingHtmlMap, setSavingHtmlMap] = useState(false);
   const [zoneEditMode, setZoneEditMode] = useState(false);
-  const [finalizeProgress, setFinalizeProgress] = useState(0);
-  const [finalizeStatusMessage, setFinalizeStatusMessage] = useState('');
   const hasGenerated = phase === 'edit' || phase === 'finalizing';
   const isFinalizing = phase === 'finalizing';
   const isGuidedSecondOrderAlgorithm =
@@ -986,217 +889,36 @@ export default function CZGeneration() {
     setMobilityPruneMinSeedCapturePct
   });
 
-  const finalizeCZ = async () => {
-    if (selectedCBGs.length === 0) {
-      setError('Please select at least one CBG');
-      return;
-    }
-
-    if (isPending) {
-      setError(
-        'Please wait while we check whether this zone should be saved to your account.'
-      );
-      return;
-    }
-
-    const lengthHours = getLengthHours(startDate, endDate);
-    if (!lengthHours || lengthHours <= 0) {
-      setError('End date must be after start date.');
-      return;
-    }
-
-    if (
-      guidedSelectionMode &&
-      guidedSelectionSummary.selectedPopulation >
-        GUIDED_HARD_EXPLICIT_POPULATION
-    ) {
-      setError(
-        `Guided explicit population is ${Number(
-          guidedSelectionSummary.selectedPopulation
-        ).toLocaleString()}, which is above the supported cap of ${GUIDED_HARD_EXPLICIT_POPULATION.toLocaleString()}. Remove some connected cities before finalizing.`
-      );
-      return;
-    }
-
-    setPhase('finalizing');
-    setError('');
-    setFinalizeProgress(5);
-    setFinalizeStatusMessage('Creating convenience zone...');
-
-    try {
-      const trimmedDescription = String(description ?? '').trim();
-      const now = new Date();
-      const algorithmLabel =
-        CLUSTER_ALGORITHM_OPTIONS.find(
-          (option) => option.value === clusterAlgorithm
-        )?.label || clusterAlgorithm;
-
-      const generatedDescription = [
-        `Auto-generated on ${now.toLocaleString()}`,
-        `Location: ${cityName || location || 'N/A'}`,
-        `Seed CBG: ${seedCBG || 'N/A'}`,
-        `Algorithm: ${algorithmLabel}`,
-        clusterAlgorithm === 'mobility_prune'
-          ? `Minimum seed movement captured: ${Number(
-              mobilityPruneMinSeedCapturePct || 0
-            ).toFixed(0)}%`
-          : isGuidedSecondOrderAlgorithm
-            ? 'Minimum population filter: not used in guided connected cities mode'
-            : `Minimum population: ${Number(minPop || 0).toLocaleString()}`,
-        `Date range: ${startDate} to ${endDate}`,
-        `CBGs in zone: ${selectedCBGs.length}`,
-        `Test data mode: ${useTestData ? 'Yes' : 'No'}`
-      ];
-
-      if (isGuidedSecondOrderAlgorithm && guidedMetadata) {
-        const selectedLabels = guidedSelectedDestinations.map(
-          (destination) => destination.label
-        );
-        generatedDescription.push(
-          `Seed region: ${
-            guidedMetadata.seed_city_labels?.join(', ') ||
-            guidedMetadata.seed_zip_codes?.join(', ') ||
-            `${guidedMetadata.seed_cbgs.length} seed CBGs`
-          }`
-        );
-        generatedDescription.push(
-          `Selected connected cities: ${
-            selectedLabels.length ? selectedLabels.join(', ') : 'Seed only'
-          }`
-        );
-        generatedDescription.push(
-          `Explicit linked CBGs: ${selectedCBGs.length}`
-        );
-        generatedDescription.push(
-          `Explicit population: ${Number(
-            guidedSelectionSummary.selectedPopulation || 0
-          ).toLocaleString()}`
-        );
-        generatedDescription.push(
-          `Captured external outbound flow (linked CBGs): ${(
-            guidedSelectionSummary.selectedLinkedOutboundShare * 100
-          ).toFixed(1)}%`
-        );
-        generatedDescription.push(
-          `Captured total seed movement: ${(
-            guidedSelectionSummary.selectedSeedMovementShare * 100
-          ).toFixed(1)}%`
-        );
-        generatedDescription.push(
-          `Unmodeled external pressure: ${(
-            guidedSelectionSummary.externalRemainderShare * 100
-          ).toFixed(1)}%`
-        );
-      }
-
-      if (clusterAlgorithm === 'greedy_weight_seed_guard') {
-        generatedDescription.push(
-          `Seed guard distance (km): ${seedGuardDistanceKm}`
-        );
-      }
-      const descriptionToSave =
-        trimmedDescription || generatedDescription.join('\n');
-      if (!trimmedDescription) {
-        setDescription(descriptionToSave);
-      }
-
-      const guestClaimToken = user?.id ? null : createGuestZoneClaimToken();
-
-      const finalizePayload = {
-        name: cityName,
-        description: descriptionToSave,
-        cbg_list: selectedCBGs,
-        start_date: new Date(`${startDate}T00:00:00`).toISOString(),
-        length: lengthHours,
-        latitude: mapCenter?.[0] || 0,
-        longitude: mapCenter?.[1] || 0,
-        use_test_data: useTestData,
-        ...(user?.id ? { user_id: user.id } : {}),
-        ...(guestClaimToken ? { guest_claim_token: guestClaimToken } : {})
-      };
-
-      const data = await finalizeConvenienceZone(finalizePayload);
-      if (!data?.id) {
-        throw new Error(
-          data?.message ||
-            'Failed to create convenience zone. Please try again.'
-        );
-      }
-
-      const zoneId: number = data.id;
-      if (guestClaimToken) {
-        rememberGuestZoneClaim(zoneId, guestClaimToken);
-      }
-      setFinalizeProgress(15);
-      setFinalizeStatusMessage(
-        user?.id
-          ? 'Zone saved. Generating movement patterns...'
-          : 'Zone generated. Generating movement patterns...'
-      );
-
-      const readyZone = await waitForZoneReady(
-        zoneId,
-        (pct) => {
-          setFinalizeProgress(pct);
-        },
-        guestClaimToken
-      );
-
-      if (readyZone) {
-        setSettings({
-          zone: readyZone,
-          hours: readyZone.length,
-          sim_id: null
-        });
-      }
-
-      setFinalizeProgress(100);
-      setFinalizeStatusMessage('Generation complete. Opening simulator...');
-
-      router.push('/simulator');
-    } catch (err) {
-      console.error('Error finalizing CZ:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to create convenience zone. Please try again.'
-      );
-      setPhase('edit');
-    }
-  };
-
-  const saveCZHtmlMap = async () => {
-    if (!selectedCBGs.length) {
-      setError('Please select at least one CBG');
-      return;
-    }
-
-    setSavingHtmlMap(true);
-    try {
-      const suggestedName =
-        String(cityName || location || 'cz-map').trim() || 'cz-map';
-      const exportedMap = await exportCzMapHtml({
-        cbg_list: selectedCBGs,
-        name: suggestedName
-      });
-
-      const url = URL.createObjectURL(exportedMap.blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = exportedMap.filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to save CZ HTML map:', err);
-      setError(
-        err instanceof Error ? err.message : 'Failed to export the CZ HTML map.'
-      );
-    } finally {
-      setSavingHtmlMap(false);
-    }
-  };
+  const {
+    isPending,
+    savingHtmlMap,
+    finalizeProgress,
+    finalizeStatusMessage,
+    finalizeCZ,
+    saveCZHtmlMap
+  } = useZoneFinalization({
+    selectedCBGs,
+    startDate,
+    endDate,
+    guidedSelectionMode,
+    guidedSelectionSummary,
+    description,
+    setDescription,
+    cityName,
+    location,
+    seedCBG,
+    clusterAlgorithm,
+    mobilityPruneMinSeedCapturePct,
+    isGuidedSecondOrderAlgorithm,
+    minPop,
+    useTestData,
+    guidedMetadata,
+    guidedSelectedDestinations,
+    seedGuardDistanceKm,
+    mapCenter,
+    setError,
+    setPhase
+  });
 
   if (isPending) {
     return (
