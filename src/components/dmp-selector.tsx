@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronRight, Upload } from 'lucide-react';
 import '@/styles/dmp-selector.css';
 import useSimSettings from '@/stores/simsettings';
@@ -48,7 +48,9 @@ export default function DmpSelector() {
   const currentUser = useAuthStore((s) => s.user);
 
   const [expanded, setExpanded] = useState(false);
-  const [selectedVariant, setSelectedVariant] = useState<string>(variants[0] ?? '');
+  const [selectedVariant, setSelectedVariant] = useState<string>(
+    variants[0] ?? ''
+  );
   const [matrices, setMatrices] = useState<MatrixListItem[]>([]);
   const [loadingMatrices, setLoadingMatrices] = useState(true);
   const [newVariantName, setNewVariantName] = useState('');
@@ -62,11 +64,7 @@ export default function DmpSelector() {
     }
   }, [variants, selectedVariant]);
 
-  useEffect(() => {
-    fetchMatrices();
-  }, []);
-
-  async function fetchMatrices() {
+  const fetchMatrices = useCallback(async () => {
     setLoadingMatrices(true);
     try {
       const res = await fetch('/api/dmp/matrices');
@@ -93,7 +91,11 @@ export default function DmpSelector() {
     } finally {
       setLoadingMatrices(false);
     }
-  }
+  }, [setSettings]);
+
+  useEffect(() => {
+    fetchMatrices();
+  }, [fetchMatrices]);
 
   // ── Variants ─────────────────────────────────────────────
 
@@ -112,7 +114,11 @@ export default function DmpSelector() {
   }
 
   function removeVariant(name: string) {
-    if (variants.length <= 1 || (BUILT_IN_VARIANTS as readonly string[]).includes(name)) return;
+    if (
+      variants.length <= 1 ||
+      (BUILT_IN_VARIANTS as readonly string[]).includes(name)
+    )
+      return;
     const nextVariants = variants.filter((v) => v !== name);
     const updated = { ...matrixByVariant };
     delete updated[name];
@@ -186,7 +192,11 @@ export default function DmpSelector() {
         const res = await fetch('/api/dmp/matrices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), content })
+          body: JSON.stringify({
+            name: name.trim(),
+            description: description.trim(),
+            content
+          })
         });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
@@ -221,9 +231,12 @@ export default function DmpSelector() {
   }
 
   async function deleteMatrix(matrix: MatrixListItem) {
-    if (!window.confirm(`Delete "${matrix.name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete "${matrix.name}"? This cannot be undone.`))
+      return;
     try {
-      const res = await fetch(`/api/dmp/matrices/${matrix.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/dmp/matrices/${matrix.id}`, {
+        method: 'DELETE'
+      });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         alert(json.message ?? 'Delete failed.');
@@ -263,209 +276,251 @@ export default function DmpSelector() {
       </button>
 
       <div className={`dmps_body_wrapper${expanded ? ' is-open' : ''}`}>
-      <div className="dmps_body_inner">
-      <div className="dmps_body">
-        {/* ── Left: Variants ── */}
-        <div className="dmps_panel">
-          <div className="dmps_panel_header">
-            <span>Variants</span>
-          </div>
+        <div className="dmps_body_inner">
+          <div className="dmps_body">
+            {/* ── Left: Variants ── */}
+            <div className="dmps_panel">
+              <div className="dmps_panel_header">
+                <span>Variants</span>
+              </div>
 
-          <ul className="dmps_list">
-            {variants.length === 0 && (
-              <li className="dmps_list_empty">No variants added.</li>
-            )}
-            {variants.map((v) => {
-              const isBuiltIn = (BUILT_IN_VARIANTS as readonly string[]).includes(v);
-              return (
-                <li key={v}>
-                  <button
-                    type="button"
-                    className={`dmps_variant_row${v === selectedVariant ? ' is-selected' : ''}`}
-                    onClick={() => setSelectedVariant(v)}
-                  >
-                    <span className="dmps_variant_dot" />
-                    <span className="dmps_variant_name">{v}</span>
-                    {isBuiltIn && (
-                      <span className="dmps_badge dmps_badge--default">Default</span>
-                    )}
-                    {!isBuiltIn && matrixByVariant[v] != null && (
-                      <span className="dmps_variant_badge">✓</span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+              <ul className="dmps_list">
+                {variants.length === 0 && (
+                  <li className="dmps_list_empty">No variants added.</li>
+                )}
+                {variants.map((v) => {
+                  const isBuiltIn = (
+                    BUILT_IN_VARIANTS as readonly string[]
+                  ).includes(v);
+                  return (
+                    <li key={v}>
+                      <button
+                        type="button"
+                        className={`dmps_variant_row${v === selectedVariant ? ' is-selected' : ''}`}
+                        onClick={() => setSelectedVariant(v)}
+                      >
+                        <span className="dmps_variant_dot" />
+                        <span className="dmps_variant_name">{v}</span>
+                        {isBuiltIn && (
+                          <span className="dmps_badge dmps_badge--default">
+                            Default
+                          </span>
+                        )}
+                        {!isBuiltIn && matrixByVariant[v] != null && (
+                          <span className="dmps_variant_badge">✓</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
 
-          <div className="dmps_adder">
-            <input
-              className="dmps_adder_input"
-              placeholder="New variant…"
-              maxLength={32}
-              value={newVariantName}
-              onChange={(e) => setNewVariantName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') addVariant(); }}
-            />
-            <button
-              type="button"
-              className="dmps_icon_btn"
-              title="Add variant"
-              onClick={addVariant}
-              disabled={
-                !newVariantName.trim() ||
-                variants.includes(newVariantName.trim()) ||
-                variants.length >= 8
-              }
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="dmps_icon_btn dmps_icon_btn--danger"
-              title="Remove selected variant"
-              onClick={() => removeVariant(selectedVariant)}
-              disabled={
-                variants.length <= 1 ||
-                (BUILT_IN_VARIANTS as readonly string[]).includes(selectedVariant)
-              }
-            >
-              −
-            </button>
-          </div>
-        </div>
-
-        {/* ── Right: Matrices ── */}
-        <div className="dmps_panel">
-          <div className="dmps_panel_header">
-            <span>Matrices</span>
-            <div className="dmps_panel_header_actions">
-              {currentUser && (
+              <div className="dmps_adder">
+                <input
+                  className="dmps_adder_input"
+                  placeholder="New variant…"
+                  maxLength={32}
+                  value={newVariantName}
+                  onChange={(e) => setNewVariantName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') addVariant();
+                  }}
+                />
                 <button
                   type="button"
-                  className="dmps_upload_btn"
-                  onClick={openUpload}
+                  className="dmps_icon_btn"
+                  title="Add variant"
+                  onClick={addVariant}
+                  disabled={
+                    !newVariantName.trim() ||
+                    variants.includes(newVariantName.trim()) ||
+                    variants.length >= 8
+                  }
                 >
-                  <Upload size={11} aria-hidden="true" />
-                  Upload
+                  +
                 </button>
+                <button
+                  type="button"
+                  className="dmps_icon_btn dmps_icon_btn--danger"
+                  title="Remove selected variant"
+                  onClick={() => removeVariant(selectedVariant)}
+                  disabled={
+                    variants.length <= 1 ||
+                    (BUILT_IN_VARIANTS as readonly string[]).includes(
+                      selectedVariant
+                    )
+                  }
+                >
+                  −
+                </button>
+              </div>
+            </div>
+
+            {/* ── Right: Matrices ── */}
+            <div className="dmps_panel">
+              <div className="dmps_panel_header">
+                <span>Matrices</span>
+                <div className="dmps_panel_header_actions">
+                  {currentUser && (
+                    <button
+                      type="button"
+                      className="dmps_upload_btn"
+                      onClick={openUpload}
+                    >
+                      <Upload size={11} aria-hidden="true" />
+                      Upload
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <ul className="dmps_list">
+                {loadingMatrices && (
+                  <li className="dmps_list_empty">Loading…</li>
+                )}
+                {!loadingMatrices && matrices.length === 0 && (
+                  <li className="dmps_list_empty">No matrices found.</li>
+                )}
+                {matrices.map((m) => {
+                  const isAssigned = m.id === assignedMatrixId;
+                  return (
+                    <li key={m.id}>
+                      <div
+                        className={`dmps_matrix_row${isAssigned ? ' is-assigned' : ''}`}
+                        title={`Assign "${m.name}" to ${selectedVariant || 'selected variant'}`}
+                      >
+                        <button
+                          type="button"
+                          className="dmps_matrix_select"
+                          onClick={() => assignMatrix(m.id)}
+                        >
+                          <div className="dmps_matrix_info">
+                            <div className="dmps_matrix_name">{m.name}</div>
+                            <div className="dmps_matrix_desc">
+                              {m.description}
+                            </div>
+                            <div className="dmps_matrix_meta">
+                              {m.is_default && (
+                                <span className="dmps_badge dmps_badge--default">
+                                  Built-in
+                                </span>
+                              )}
+                              {m.is_owner && (
+                                <span className="dmps_badge dmps_badge--mine">
+                                  Yours
+                                </span>
+                              )}
+                              {m.user && !m.is_default && (
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    color: 'var(--color-text-muted)'
+                                  }}
+                                >
+                                  {m.user.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                        <div className="dmps_matrix_actions">
+                          {m.is_owner && !m.is_default && (
+                            <>
+                              <button
+                                type="button"
+                                className="dmps_icon_btn"
+                                title="Edit matrix"
+                                onClick={() => openEdit(m)}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                className="dmps_icon_btn dmps_icon_btn--danger"
+                                title="Delete matrix"
+                                onClick={() => deleteMatrix(m)}
+                              >
+                                ✕
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {!currentUser && (
+                <p className="dmps_hint">Log in to upload your own matrices.</p>
               )}
             </div>
           </div>
-
-          <ul className="dmps_list">
-            {loadingMatrices && (
-              <li className="dmps_list_empty">Loading…</li>
-            )}
-            {!loadingMatrices && matrices.length === 0 && (
-              <li className="dmps_list_empty">No matrices found.</li>
-            )}
-            {matrices.map((m) => {
-              const isAssigned = m.id === assignedMatrixId;
-              return (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    className={`dmps_matrix_row${isAssigned ? ' is-assigned' : ''}`}
-                    onClick={() => assignMatrix(m.id)}
-                    title={`Assign "${m.name}" to ${selectedVariant || 'selected variant'}`}
-                  >
-                    <div className="dmps_matrix_info">
-                      <div className="dmps_matrix_name">{m.name}</div>
-                      <div className="dmps_matrix_desc">{m.description}</div>
-                      <div className="dmps_matrix_meta">
-                        {m.is_default && (
-                          <span className="dmps_badge dmps_badge--default">Built-in</span>
-                        )}
-                        {m.is_owner && (
-                          <span className="dmps_badge dmps_badge--mine">Yours</span>
-                        )}
-                        {m.user && !m.is_default && (
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                            {m.user.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div
-                      className="dmps_matrix_actions"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      {m.is_owner && !m.is_default && (
-                        <>
-                          <button
-                            type="button"
-                            className="dmps_icon_btn"
-                            title="Edit matrix"
-                            onClick={() => openEdit(m)}
-                          >
-                            ✎
-                          </button>
-                          <button
-                            type="button"
-                            className="dmps_icon_btn dmps_icon_btn--danger"
-                            title="Delete matrix"
-                            onClick={() => deleteMatrix(m)}
-                          >
-                            ✕
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          {!currentUser && (
-            <p className="dmps_hint">Log in to upload your own matrices.</p>
-          )}
         </div>
-      </div>
-      </div>
       </div>
 
       {/* ── Dialog ── */}
       {dialog.mode && (
-        <div className="dmps_overlay" onClick={closeDialog}>
+        <div className="dmps_overlay">
+          <button
+            type="button"
+            className="dmps_overlay_backdrop"
+            aria-label="Close matrix dialog"
+            onClick={closeDialog}
+          />
           <div
             className="dmps_dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dmps-dialog-title"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            <div className="dmps_dialog_title">
+            <div className="dmps_dialog_title" id="dmps-dialog-title">
               {dialog.mode === 'upload' ? 'Upload Matrix' : 'Edit Matrix'}
             </div>
 
             <div className="dmps_dialog_field">
-              <label className="dmps_dialog_label">Title</label>
+              <label className="dmps_dialog_label" htmlFor="dmps-dialog-name">
+                Title
+              </label>
               <input
+                id="dmps-dialog-name"
                 className="dmps_dialog_input"
                 maxLength={100}
                 placeholder="e.g. Custom Delta High Severity"
                 value={dialog.name}
-                onChange={(e) => setDialog((d) => ({ ...d, name: e.target.value }))}
+                onChange={(e) =>
+                  setDialog((d) => ({ ...d, name: e.target.value }))
+                }
               />
             </div>
 
             <div className="dmps_dialog_field">
-              <label className="dmps_dialog_label">Description</label>
+              <label
+                className="dmps_dialog_label"
+                htmlFor="dmps-dialog-description"
+              >
+                Description
+              </label>
               <textarea
+                id="dmps-dialog-description"
                 className="dmps_dialog_textarea"
                 maxLength={500}
                 placeholder="Brief description of this matrix set…"
                 value={dialog.description}
-                onChange={(e) => setDialog((d) => ({ ...d, description: e.target.value }))}
+                onChange={(e) =>
+                  setDialog((d) => ({ ...d, description: e.target.value }))
+                }
               />
             </div>
 
             <div className="dmps_dialog_field">
-              <label className="dmps_dialog_label">
+              <label className="dmps_dialog_label" htmlFor="dmps-dialog-file">
                 {dialog.mode === 'edit' ? 'Replace CSV (optional)' : 'CSV File'}
               </label>
               <input
+                id="dmps-dialog-file"
                 ref={fileInputRef}
                 type="file"
                 accept=".csv,text/csv"
@@ -482,7 +537,7 @@ export default function DmpSelector() {
                 </button>
                 <span className="dmps_file_name">
                   {dialog.content
-                    ? `${dialog.content.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).length} data rows loaded`
+                    ? `${dialog.content.split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')).length} data rows loaded`
                     : 'No file chosen'}
                 </span>
               </div>
@@ -507,7 +562,11 @@ export default function DmpSelector() {
                 onClick={submitDialog}
                 disabled={dialog.saving}
               >
-                {dialog.saving ? 'Saving…' : dialog.mode === 'upload' ? 'Upload' : 'Save'}
+                {dialog.saving
+                  ? 'Saving…'
+                  : dialog.mode === 'upload'
+                    ? 'Upload'
+                    : 'Save'}
               </button>
             </div>
           </div>

@@ -1,116 +1,36 @@
-export type Coordinate = [number, number];
+import type {
+  Coordinate,
+  GeoJSONData,
+  GeoJSONFeature,
+  GeoJSONGeometry,
+  HotspotsByLocation,
+  HouseholdCircleDraft,
+  HouseholdCircleLayout,
+  HouseholdLayoutBundle,
+  MapLocation,
+  MapPoi,
+  MapPoiType,
+  PapDataForMap,
+  PeopleDotFeature,
+  PeopleDotFeatureCollection,
+  PoiFeatureCollection,
+  SimTimeDataForMap
+} from './map-types';
 
-export type GeoJSONGeometry = {
-  type?: string;
-  coordinates?: unknown;
-};
-
-export type GeoJSONFeature = {
-  type?: string;
-  properties?: Record<string, unknown>;
-  geometry?: GeoJSONGeometry | null;
-};
-
-export type GeoJSONData = {
-  type?: string;
-  features?: GeoJSONFeature[];
-};
-
-export type HotspotsByLocation = Record<string, number[]>;
-
-export type MapLocation = {
-  id: string | number;
-  cbg?: unknown;
-  latitude?: unknown;
-  longitude?: unknown;
-  label?: string;
-  top_category?: string;
-  footprint?: GeoJSONGeometry | null;
-};
-
-export type PapDataForMap = {
-  homes?: MapLocation[];
-  places?: MapLocation[];
-};
-
-export type SimTimeDataForMap = {
-  h?: number[];
-  p?: number[];
-};
-
-export type MapPoiType = 'homes' | 'places';
-
-export type MapPoi = {
-  type: MapPoiType;
-  id: string | number;
-  latitude: number;
-  longitude: number;
-  label: string;
-  description: string;
-  footprint: GeoJSONGeometry | null;
-  icon: string;
-  population: number;
-  infected: number;
-};
-
-type HouseholdCircleLayout = {
-  anchorLat: number;
-  anchorLng: number;
-  centerLat: number;
-  centerLng: number;
-  radiusLat: number;
-  radiusLng: number;
-};
-
-type HouseholdLayoutBundle = {
-  fallback: HouseholdCircleLayout;
-  byCbg: Record<string, HouseholdCircleLayout>;
-};
-
-type HouseholdCircleDraft = {
-  cbgId: string;
-  anchorLat: number;
-  anchorLng: number;
-  x: number;
-  y: number;
-  radius: number;
-  homeCount: number;
-};
-
-type PeopleDotFeature = {
-  type: 'Feature';
-  properties: {
-    id: string;
-    loc_id: string | number;
-    loc_type: MapPoiType;
-    label: string;
-  };
-  geometry: {
-    type: 'Point';
-    coordinates: Coordinate;
-  };
-};
-
-export type PeopleDotFeatureCollection = {
-  type: 'FeatureCollection';
-  features: PeopleDotFeature[];
-};
-
-type PoiFeature = {
-  type: 'Feature';
-  properties: MapPoi & {
-    infection_ratio: number;
-  };
-  geometry: {
-    type: 'Point';
-    coordinates: Coordinate;
-  };
-};
-
-export type PoiFeatureCollection = {
-  type: 'FeatureCollection';
-  features: PoiFeature[];
-};
+export type {
+  Coordinate,
+  GeoJSONData,
+  GeoJSONFeature,
+  GeoJSONGeometry,
+  HotspotsByLocation,
+  MapLocation,
+  MapPoi,
+  MapPoiType,
+  PapDataForMap,
+  PeopleDotFeatureCollection,
+  PoiFeatureCollection,
+  SimTimeDataForMap
+} from './map-types';
 
 export const iconLookup: Record<string, string> = {
   'Depository Credit Intermediation': '🏦',

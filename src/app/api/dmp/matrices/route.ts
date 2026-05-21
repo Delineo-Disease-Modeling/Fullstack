@@ -27,18 +27,24 @@ function validateMatrixCsv(content: string): string | null {
     return 'CSV file has no data rows.';
   }
 
-  const numStates = dataLines[0].split(',').map((v) => v.trim()).filter(Boolean).length;
+  const numStates = dataLines[0]
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean).length;
   if (numStates < 2) {
     return `First data row has only ${numStates} column(s); expected at least 2 states.`;
   }
 
   for (let i = 0; i < dataLines.length; i++) {
-    const values = dataLines[i].split(',').map((v) => v.trim()).filter(Boolean);
+    const values = dataLines[i]
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
     if (values.length !== numStates) {
       return `Row ${i + 1} has ${values.length} column(s) but expected ${numStates}.`;
     }
     for (const val of values) {
-      if (isNaN(Number(val))) {
+      if (Number.isNaN(Number(val))) {
         return `Row ${i + 1} contains a non-numeric value: "${val}".`;
       }
     }
@@ -53,12 +59,20 @@ function validateMatrixCsv(content: string): string | null {
 }
 
 function getDefaultMatrixContent(): string {
-  const filePath = join(process.cwd(), 'public', 'data', 'matrices', 'combined_default.csv');
+  const filePath = join(
+    process.cwd(),
+    'public',
+    'data',
+    'matrices',
+    'combined_default.csv'
+  );
   return readFileSync(filePath, 'utf8');
 }
 
 async function ensureDefaultMatrix() {
-  const existing = await prisma.dmpMatrix.findFirst({ where: { is_default: true } });
+  const existing = await prisma.dmpMatrix.findFirst({
+    where: { is_default: true }
+  });
   if (existing) return;
   await prisma.dmpMatrix.create({
     data: {
@@ -107,7 +121,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) {
-      return Response.json({ message: 'Authentication required.' }, { status: 401 });
+      return Response.json(
+        { message: 'Authentication required.' },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();

@@ -198,6 +198,15 @@ export type GuidedSecondOrderMetadata = {
   recommended_explicit_population_cap?: number;
 };
 
+export type GuidedSelectionSummary = {
+  selectedLinkedOutboundFlow: number;
+  selectedLinkedOutboundShare: number;
+  selectedExternalBidirectionalShare: number;
+  selectedSeedMovementShare: number;
+  externalRemainderShare: number;
+  selectedPopulation: number;
+};
+
 export type GuidedSelectionStyle = {
   fillColor: string;
   lineColor: string;
