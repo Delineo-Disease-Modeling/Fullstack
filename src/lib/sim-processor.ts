@@ -12,6 +12,20 @@ import {
   type PatternTimestep
 } from './simulation-data';
 
+const PERF_TIMINGS = /^(1|true|yes|on)$/i.test(
+  process.env.DELINEO_PERF_TIMINGS ?? ''
+);
+
+function nowMs() {
+  return Number(process.hrtime.bigint()) / 1_000_000;
+}
+
+function logPerfTiming(label: string, startedAt: number) {
+  if (PERF_TIMINGS) {
+    console.info(`[perf] ${label}: ${((nowMs() - startedAt) / 1000).toFixed(3)}s`);
+  }
+}
+
 interface ProcessOpts {
   simDataId: number;
   simdataPath: string;
@@ -33,6 +47,7 @@ export const processingProgress = new Map<number, number>();
  * Returns the global stats object to be stored in SimData.global_stats.
  */
 export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
+  const totalStart = nowMs();
   const {
     simDataId,
     simdataPath,
@@ -44,8 +59,11 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   processingProgress.set(simDataId, 0);
 
   // Load papdata from shared cache (avoids redundant gunzip)
+  let stageStart = nowMs();
   const papdata = await getCachedPapdata(papdataId);
+  logPerfTiming('processSimulation papdata load', stageStart);
 
+  stageStart = nowMs();
   const homeIds = Object.keys(papdata.homes).sort(
     (a, b) => Number(a) - Number(b)
   );
@@ -83,8 +101,10 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   // Population count and age index for global stats
   const popCount = Object.keys(papdata.people ?? {}).length;
   const ageIndex = buildAgeIndex(papdata.people);
+  logPerfTiming('processSimulation papdata prep', stageStart);
 
   // Set up streams
+  stageStart = nowMs();
   const simIter = streamJsonObjectEntries<DiseaseStateTimestep>(
     simdataPath,
     simdataPath.endsWith('.gz')
@@ -234,12 +254,16 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     spl = await simIter.next();
     ppl = await patIter.next();
   }
+  logPerfTiming('processSimulation stream processing', stageStart);
 
   processingProgress.delete(simDataId);
 
   // Finalize map cache
   cacheParts.push(`},"hotspots":${JSON.stringify(hotspots)}`);
+  stageStart = nowMs();
   await writeFile(mapCachePath, cacheParts.join(''));
+  logPerfTiming('processSimulation map cache write', stageStart);
+  logPerfTiming('processSimulation total', totalStart);
 
   return globalStats;
 }
