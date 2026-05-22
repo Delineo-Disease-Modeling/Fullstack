@@ -135,7 +135,17 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   const hotspots: Record<string, number[]> = {};
   const prevInfected: Record<string, number> = {};
 
+  // Per-category accumulators for the stream loop (only populated when
+  // DELINEO_PERF_TIMINGS is set).
+  const perfAccum: Record<string, number> = {};
+  function accum(label: string, started: number) {
+    if (PERF_TIMINGS) {
+      perfAccum[label] = (perfAccum[label] || 0) + (nowMs() - started);
+    }
+  }
+
   let first = true;
+  let matchedTimesteps = 0;
   let spl = await simIter.next();
   let ppl = await patIter.next();
 
@@ -155,15 +165,19 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     const svalue = spl.value.value;
     const pvalue = ppl.value.value;
     const time = +skey / 60;
+    matchedTimesteps++;
 
     // === MAP CACHE: build infected set, homes/places arrays ===
+    let tStage = nowMs();
     const curinfected = new Set<string>();
     for (const people of Object.values(svalue)) {
       for (const key of Object.keys(people as Record<string, unknown>)) {
         curinfected.add(key);
       }
     }
+    accum('processSimulation/build_infected_set', tStage);
 
+    tStage = nowMs();
     const homesArray: number[] = [];
     for (const id of homeIds) {
       const pop: string[] | undefined = pvalue.homes?.[id];
@@ -177,7 +191,9 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
         homesArray.push(0, 0);
       }
     }
+    accum('processSimulation/build_homes_array', tStage);
 
+    tStage = nowMs();
     const placesArray: number[] = [];
     for (const id of placeIds) {
       const pop: string[] | undefined = pvalue.places?.[id];
@@ -198,14 +214,18 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
         prevInfected[id] = 0;
       }
     }
+    accum('processSimulation/build_places_array', tStage);
 
+    tStage = nowMs();
     if (!first) cacheParts.push(',');
     first = false;
     cacheParts.push(
       `"${skey}":${JSON.stringify({ h: homesArray, p: placesArray })}`
     );
+    accum('processSimulation/cache_parts_push', tStage);
 
     // === GLOBAL STATS: per-timestep aggregation ===
+    tStage = nowMs();
     const iot_data: DataPoint = { time };
     const ages_data: DataPoint = { time };
     const sexes_data: DataPoint = { time, Male: 0, Female: 0 };
@@ -243,6 +263,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     globalStats.ages.push(ages_data);
     globalStats.sexes.push(sexes_data);
     globalStats.states.push(states_data);
+    accum('processSimulation/global_stats_aggregation', tStage);
 
     if (totalLength > 0) {
       processingProgress.set(
@@ -254,7 +275,15 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     spl = await simIter.next();
     ppl = await patIter.next();
   }
-  logPerfTiming('processSimulation stream processing', stageStart);
+  logPerfTiming(
+    `processSimulation stream processing (${matchedTimesteps} timesteps)`,
+    stageStart
+  );
+  if (PERF_TIMINGS) {
+    for (const label of Object.keys(perfAccum).sort()) {
+      console.info(`[perf] ${label}: ${(perfAccum[label] / 1000).toFixed(3)}s`);
+    }
+  }
 
   processingProgress.delete(simDataId);
 
