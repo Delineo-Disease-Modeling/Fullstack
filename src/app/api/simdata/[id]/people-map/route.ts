@@ -171,9 +171,10 @@ function shouldIncludePerson(
   personId: string,
   infected: boolean,
   newlyInfected: boolean,
+  recovered: boolean,
   sampleRate: number
 ) {
-  if (sampleRate <= 1 || infected || newlyInfected) {
+  if (sampleRate <= 1 || infected || newlyInfected || recovered) {
     return true;
   }
 
@@ -241,10 +242,18 @@ async function buildPeopleMapPayload(
     const sampledPeople: PeopleMapPerson[] = [];
     for (const rawPersonId of people) {
       const personId = String(rawPersonId);
-      const infected = infectedNow.has(personId);
+      const recovered = recoveredNow.has(personId);
+      const infected = !recovered && infectedNow.has(personId);
       const newlyInfected = infected && !infectedBefore.has(personId);
-      const recovered = !infected && recoveredNow.has(personId);
-      if (!shouldIncludePerson(personId, infected, newlyInfected, sampleRate)) {
+      if (
+        !shouldIncludePerson(
+          personId,
+          infected,
+          newlyInfected,
+          recovered,
+          sampleRate
+        )
+      ) {
         continue;
       }
 

@@ -761,6 +761,16 @@ export default function ModelMap({
   );
   const [peopleMapError, setPeopleMapError] = useState<string | null>(null);
   const peopleMapCache = useRef<Map<string, PeopleMapData>>(new Map());
+  const peopleMapRequests = useRef<Map<string, Promise<PeopleMapData>>>(
+    new Map()
+  );
+  const playbackPeopleMapRequest = useRef<string | null>(null);
+  const playbackState = useRef({
+    heatmapMode,
+    isPlaying,
+    selectedTimestep: null as number | null,
+    simId
+  });
 
   useEffect(() => {
     resetModelMapLayoutCaches();
@@ -848,6 +858,15 @@ export default function ModelMap({
     return findNearestTimestep(targetMinutes);
   }, [currentTime, findNearestTimestep]);
 
+  useEffect(() => {
+    playbackState.current = {
+      heatmapMode,
+      isPlaying,
+      selectedTimestep,
+      simId
+    };
+  }, [heatmapMode, isPlaying, selectedTimestep, simId]);
+
   const pois = useMemo(() => {
     const dataForTime =
       selectedTimestep !== null
@@ -856,51 +875,140 @@ export default function ModelMap({
     return updateIcons(mapCenter, dataForTime, pap_data, hotspots, zoneGeoJSON);
   }, [hotspots, mapCenter, pap_data, sim_data, selectedTimestep, zoneGeoJSON]);
 
+  const loadPeopleMapData = useCallback(
+    async (timestep: number) => {
+      if (!simId) {
+        throw new Error('Missing simulation id.');
+      }
+
+      const cacheKey = `${simId}:${timestep}`;
+      const cached = peopleMapCache.current.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const existingRequest = peopleMapRequests.current.get(cacheKey);
+      if (existingRequest) {
+        return existingRequest;
+      }
+
+      const request = fetch(`/api/simdata/${simId}/people-map?time=${timestep}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`People map request failed: ${response.status}`);
+          }
+          return response.json() as Promise<{ data?: PeopleMapData }>;
+        })
+        .then((json) => {
+          if (!json.data) {
+            throw new Error('People map response did not include data.');
+          }
+          peopleMapCache.current.set(cacheKey, json.data);
+          return json.data;
+        })
+        .finally(() => {
+          peopleMapRequests.current.delete(cacheKey);
+        });
+
+      peopleMapRequests.current.set(cacheKey, request);
+      return request;
+    },
+    [simId]
+  );
+
   useEffect(() => {
     if (heatmapMode !== 'people' || !simId || selectedTimestep === null) {
       return;
     }
 
-    const cacheKey = `${simId}:${selectedTimestep}`;
-    const cached = peopleMapCache.current.get(cacheKey);
-    if (cached) {
-      setPeopleMapData(cached);
-      setPeopleMapError(null);
-      return;
-    }
-
-    const controller = new AbortController();
+    let active = true;
     setPeopleMapError(null);
 
-    fetch(`/api/simdata/${simId}/people-map?time=${selectedTimestep}`, {
-      signal: controller.signal
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`People map request failed: ${response.status}`);
-        }
-        return response.json() as Promise<{ data?: PeopleMapData }>;
-      })
-      .then((json) => {
-        if (controller.signal.aborted || !json.data) {
+    loadPeopleMapData(selectedTimestep)
+      .then((data) => {
+        if (!active) {
           return;
         }
-        peopleMapCache.current.set(cacheKey, json.data);
-        setPeopleMapData(json.data);
+        setPeopleMapData(data);
       })
       .catch((error) => {
-        if ((error as Error)?.name !== 'AbortError') {
-          console.warn('Failed to load person-level map data:', error);
-          setPeopleMapError('Person-level map data is unavailable.');
+        if (!active) {
+          return;
         }
+        console.warn('Failed to load person-level map data:', error);
+        setPeopleMapError('Person-level map data is unavailable.');
       });
 
-    return () => controller.abort();
-  }, [heatmapMode, selectedTimestep, simId]);
+    return () => {
+      active = false;
+    };
+  }, [heatmapMode, loadPeopleMapData, selectedTimestep, simId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!isPlaying || availableTimesteps.length === 0) return;
+      if (!isPlaying || availableTimesteps.length === 0) {
+        return;
+      }
+
+      if (
+        heatmapMode === 'people' &&
+        simId &&
+        selectedTimestep !== null &&
+        !peopleMapError
+      ) {
+        if (peopleMapData?.requested_time !== selectedTimestep) {
+          return;
+        }
+
+        const nextIndex = availableTimesteps.findIndex(
+          (ts) => ts > selectedTimestep
+        );
+        if (nextIndex === -1) {
+          return;
+        }
+
+        const nextTimestep = availableTimesteps[nextIndex];
+        const cacheKey = `${simId}:${nextTimestep}`;
+        const cached = peopleMapCache.current.get(cacheKey);
+        if (cached) {
+          setPeopleMapData(cached);
+          setCurrentTime(nextTimestep / 60);
+          return;
+        }
+
+        if (playbackPeopleMapRequest.current === cacheKey) {
+          return;
+        }
+
+        playbackPeopleMapRequest.current = cacheKey;
+        loadPeopleMapData(nextTimestep)
+          .then((data) => {
+            const latest = playbackState.current;
+            if (
+              !latest.isPlaying ||
+              latest.heatmapMode !== 'people' ||
+              latest.simId !== simId ||
+              latest.selectedTimestep !== selectedTimestep
+            ) {
+              return;
+            }
+
+            setPeopleMapError(null);
+            setPeopleMapData(data);
+            setCurrentTime(nextTimestep / 60);
+          })
+          .catch((error) => {
+            console.warn('Failed to preload person-level map data:', error);
+            setPeopleMapError('Person-level map data is unavailable.');
+          })
+          .finally(() => {
+            if (playbackPeopleMapRequest.current === cacheKey) {
+              playbackPeopleMapRequest.current = null;
+            }
+          });
+        return;
+      }
+
       setCurrentTime((prev) => {
         const currentMinutes = Math.round(prev * 60);
         const nextIndex = availableTimesteps.findIndex(
@@ -911,7 +1019,16 @@ export default function ModelMap({
       });
     }, 750);
     return () => clearInterval(interval);
-  }, [isPlaying, availableTimesteps]);
+  }, [
+    isPlaying,
+    availableTimesteps,
+    heatmapMode,
+    simId,
+    selectedTimestep,
+    peopleMapError,
+    peopleMapData,
+    loadPeopleMapData
+  ]);
 
   const peopleDotColor = heatmapMode === 'infection' ? '#dc2626' : '#2563eb';
 
