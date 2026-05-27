@@ -295,6 +295,7 @@ export default function SimulatorRun() {
           </div>
           <ModelMap
             selectedZone={selectedZone}
+            simId={sim_id ?? Number(run_id)}
             onMarkerClick={handleMarkerClick}
           />
           <PersonPathPanel simId={sim_id ?? Number(run_id)} />

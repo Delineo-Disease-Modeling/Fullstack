@@ -96,6 +96,51 @@ export type PeopleDotFeatureCollection = {
   features: PeopleDotFeature[];
 };
 
+export type PeopleMapPerson = {
+  id: string;
+  infected: boolean;
+  newly_infected: boolean;
+  recovered: boolean;
+};
+
+export type PeopleMapLocation = {
+  type: MapPoiType;
+  id: string;
+  people: PeopleMapPerson[];
+};
+
+export type PeopleMapData = {
+  time: number;
+  requested_time: number;
+  total_people: number;
+  returned_people: number;
+  sample_rate: number;
+  locations: PeopleMapLocation[];
+};
+
+export type PersonStatusDotFeature = {
+  type: 'Feature';
+  properties: {
+    id: string;
+    person_id: string;
+    loc_id: string;
+    loc_type: MapPoiType;
+    label: string;
+    infected: boolean;
+    newly_infected: boolean;
+    recovered: boolean;
+  };
+  geometry: {
+    type: 'Point';
+    coordinates: Coordinate;
+  };
+};
+
+export type PersonStatusDotFeatureCollection = {
+  type: 'FeatureCollection';
+  features: PersonStatusDotFeature[];
+};
+
 export type PoiFeature = {
   type: 'Feature';
   properties: MapPoi & {

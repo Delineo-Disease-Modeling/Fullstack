@@ -13,6 +13,9 @@ import type {
   PapDataForMap,
   PeopleDotFeature,
   PeopleDotFeatureCollection,
+  PeopleMapData,
+  PersonStatusDotFeature,
+  PersonStatusDotFeatureCollection,
   PoiFeatureCollection,
   SimTimeDataForMap
 } from './map-types';
@@ -28,6 +31,8 @@ export type {
   MapPoiType,
   PapDataForMap,
   PeopleDotFeatureCollection,
+  PeopleMapData,
+  PersonStatusDotFeatureCollection,
   PoiFeatureCollection,
   SimTimeDataForMap
 } from './map-types';
@@ -41,7 +46,7 @@ export const iconLookup: Record<string, string> = {
   'Child Day Care Services': '🏫',
   'Death Care Services': '🪦',
   'Elementary and Secondary Schools': '🏫',
-  'Florists': '💐',
+  Florists: '💐',
   'Museums, Historical Sites, and Similar Institutions': '🏛️',
   'Grocery Stores': '🛒',
   'Nursing Care Facilities (Skilled Nursing Facilities)': '🏥',
@@ -70,12 +75,14 @@ const NO_FOOTPRINT_DOT_JITTER_DEGREES = 0.0008;
 let householdLocs: Record<string, Coordinate> = {};
 let placeLocs: Record<string, Coordinate> = {};
 let placeDotLayouts: Record<string, Coordinate[]> = {};
+let personLayoutCache: Record<string, Coordinate[]> = {};
 let householdLayoutKey = '';
 
 export function resetModelMapLayoutCaches() {
   householdLocs = {};
   placeLocs = {};
   placeDotLayouts = {};
+  personLayoutCache = {};
   householdLayoutKey = '';
 }
 
@@ -335,6 +342,32 @@ export function samplePointsInFootprint(
   return accepted;
 }
 
+function computeDiskLayout(
+  centerLat: number,
+  centerLng: number,
+  count: number,
+  seed: number
+): Coordinate[] {
+  if (count <= 0) return [];
+  const offsetA = 1 + Math.floor(hashUnit(seed, 11) * 997);
+  const offsetB = 1 + Math.floor(hashUnit(seed, 13) * 997);
+  // Scale the disk radius with sqrt(count) so density stays roughly constant
+  const radius = NO_FOOTPRINT_DOT_JITTER_DEGREES * Math.max(1, Math.sqrt(count / 24));
+  const cos = Math.max(Math.cos((centerLat * Math.PI) / 180), 0.35);
+  const out: Coordinate[] = new Array(count);
+  for (let i = 0; i < count; i++) {
+    const u1 = halton(i + offsetA, 2);
+    const u2 = halton(i + offsetB, 3);
+    const r = Math.sqrt(u1) * radius;
+    const theta = u2 * Math.PI * 2;
+    out[i] = [
+      centerLng + (Math.cos(theta) * r) / cos,
+      centerLat + Math.sin(theta) * r
+    ];
+  }
+  return out;
+}
+
 export function summarizeGeometry(
   geometry: GeoJSONGeometry | null | undefined,
   longitudeScale: number
@@ -548,11 +581,7 @@ export function computeCbgHouseholdLayouts(
       .map((home) => {
         const lat = toNumber(home?.latitude);
         const lng = toNumber(home?.longitude);
-        if (
-          lat === null ||
-          lng === null ||
-          (lat === 0 && lng === 0)
-        ) {
+        if (lat === null || lng === null || (lat === 0 && lng === 0)) {
           return null;
         }
         const cos = Math.max(Math.cos((anchorLat * Math.PI) / 180), 0.35);
@@ -683,8 +712,10 @@ function buildHouseholdLayout(
       for (const home of validHomes) {
         const radialWeight = clamp(home.distance / sourceRadius, 0, 1);
         householdLocs[home.id] = [
-          layout.centerLat + Math.sin(home.angle) * layout.radiusLat * radialWeight,
-          layout.centerLng + Math.cos(home.angle) * layout.radiusLng * radialWeight
+          layout.centerLat +
+            Math.sin(home.angle) * layout.radiusLat * radialWeight,
+          layout.centerLng +
+            Math.cos(home.angle) * layout.radiusLng * radialWeight
         ];
       }
     }
@@ -737,8 +768,12 @@ export function updateIcons(
   const hasPlaceBounds = validPlaceCount > 0 && minLat !== Infinity;
   const placeCenterLat = hasPlaceBounds ? (minLat + maxLat) / 2 : mapCenter[0];
   const placeCenterLng = hasPlaceBounds ? (minLng + maxLng) / 2 : mapCenter[1];
-  const placeSpreadLat = hasPlaceBounds ? Math.max(maxLat - minLat, 0.02) : 0.06;
-  const placeSpreadLng = hasPlaceBounds ? Math.max(maxLng - minLng, 0.02) : 0.06;
+  const placeSpreadLat = hasPlaceBounds
+    ? Math.max(maxLat - minLat, 0.02)
+    : 0.06;
+  const placeSpreadLng = hasPlaceBounds
+    ? Math.max(maxLng - minLng, 0.02)
+    : 0.06;
   const homes = papData.homes ?? [];
   const householdLayouts = computeCbgHouseholdLayouts(
     zoneGeoJSON,
@@ -819,9 +854,11 @@ export function updateIcons(
           const angle = hashUnit(seed, 1) * Math.PI * 2;
           const radialWeight = Math.sqrt(hashUnit(seed, 2));
           lat =
-            circle.centerLat + Math.sin(angle) * circle.radiusLat * radialWeight;
+            circle.centerLat +
+            Math.sin(angle) * circle.radiusLat * radialWeight;
           lng =
-            circle.centerLng + Math.cos(angle) * circle.radiusLng * radialWeight;
+            circle.centerLng +
+            Math.cos(angle) * circle.radiusLng * radialWeight;
         }
       } else if (lat === null || lng === null || (lat === 0 && lng === 0)) {
         if (!(dataId in placeLocs)) {
@@ -868,8 +905,10 @@ export function updateIcons(
 }
 
 export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
-  const countForMode = (poi: MapPoi) =>
-    mode === 'infection' ? poi.infected : poi.population;
+  const countForMode = (poi: MapPoi) => {
+    if (mode === 'infection') return poi.infected;
+    return poi.population;
+  };
   const totalPeople = pois.reduce((sum, poi) => {
     const value = Number(countForMode(poi));
     return sum + (Number.isFinite(value) ? Math.max(0, value) : 0);
@@ -904,7 +943,11 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
     if (!isHome && poi.footprint) {
       footprintDots = placeDotLayouts[footprintKey] ?? null;
       if (!footprintDots) {
-        footprintDots = samplePointsInFootprint(poi.footprint, dotCount, baseSeed);
+        footprintDots = samplePointsInFootprint(
+          poi.footprint,
+          dotCount,
+          baseSeed
+        );
         placeDotLayouts[footprintKey] = footprintDots;
       }
     }
@@ -950,6 +993,88 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
     type: 'FeatureCollection',
     features
   } satisfies PeopleDotFeatureCollection;
+}
+
+export function makePersonStatusDotGeoJSON(
+  pois: MapPoi[],
+  peopleMapData: PeopleMapData | null | undefined
+) {
+  if (!peopleMapData?.locations?.length) {
+    return {
+      type: 'FeatureCollection',
+      features: []
+    } satisfies PersonStatusDotFeatureCollection;
+  }
+
+  const poiByKey = new Map<string, MapPoi>();
+  for (const poi of pois) {
+    poiByKey.set(`${poi.type}:${poi.id}`, poi);
+  }
+
+  const features: PersonStatusDotFeature[] = [];
+  for (const location of peopleMapData.locations) {
+    const poi = poiByKey.get(`${location.type}:${location.id}`);
+    if (
+      !poi ||
+      !Number.isFinite(poi.latitude) ||
+      !Number.isFinite(poi.longitude)
+    ) {
+      continue;
+    }
+
+    const sortedPeople = [...location.people].sort((left, right) =>
+      left.id.localeCompare(right.id)
+    );
+    const count = sortedPeople.length;
+    if (count === 0) continue;
+
+    const layoutKey = `${location.type}:${location.id}:${count}`;
+    let positions = personLayoutCache[layoutKey];
+    if (!positions) {
+      const seed = hashString(layoutKey);
+      if (location.type === 'places' && poi.footprint) {
+        positions = samplePointsInFootprint(poi.footprint, count, seed);
+      }
+      if (!positions || positions.length < count) {
+        positions = computeDiskLayout(
+          poi.latitude,
+          poi.longitude,
+          count,
+          seed
+        );
+      }
+      personLayoutCache[layoutKey] = positions;
+    }
+
+    for (let index = 0; index < count; index++) {
+      const person = sortedPeople[index];
+      const slot = positions[index];
+      const coordinates: Coordinate = slot ?? [poi.longitude, poi.latitude];
+
+      features.push({
+        type: 'Feature',
+        properties: {
+          id: `${location.type}-${location.id}-${person.id}`,
+          person_id: person.id,
+          loc_id: location.id,
+          loc_type: location.type,
+          label: poi.label,
+          infected: person.infected,
+          newly_infected: person.newly_infected,
+          recovered: person.recovered
+        },
+        geometry: {
+          type: 'Point',
+          coordinates
+        }
+      });
+    }
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features
+  } satisfies PersonStatusDotFeatureCollection;
 }
 
 export function makeGeoJSON(pois: MapPoi[]) {

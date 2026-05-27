@@ -1,7 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layer, Map as MapLibreMap, Popup, Source } from 'react-map-gl/maplibre';
+import {
+  Layer,
+  Map as MapLibreMap,
+  Popup,
+  Source
+} from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import useMapData from '@/stores/mapdata';
 
@@ -15,26 +20,123 @@ import {
   iconLookup,
   makeGeoJSON,
   makePeopleDotGeoJSON,
+  makePersonStatusDotGeoJSON,
   resetModelMapLayoutCaches,
   updateIcons,
   type GeoJSONData,
   type MapPoi,
-  type PeopleDotFeatureCollection
+  type PeopleDotFeatureCollection,
+  type PeopleMapData,
+  type PersonStatusDotFeatureCollection
 } from '@/features/model-map/map-data';
 
-const ALG_URL = process.env.NEXT_PUBLIC_ALG_URL || 'http://localhost:1880/';
+const RECOVERED_DOT_COLOR = '#16a34a';
 
-type HeatmapMode = 'markers' | 'population' | 'infection';
+type PersonStatusDotRadiusExpression = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number
+];
+
+const PERSON_STATUS_DOT_RADIUS: PersonStatusDotRadiusExpression = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  10,
+  1.8,
+  13,
+  2.8,
+  16,
+  4.3,
+  18,
+  6.2
+];
+
+const POINTS_CLUSTER_PROPERTIES = {
+  population: ['+', ['to-number', ['get', 'population']]],
+  infected: ['+', ['to-number', ['get', 'infected']]]
+} as const;
+
+const CLUSTER_COLOR_EXPRESSION = [
+  'case',
+  ['==', ['get', 'population'], 0],
+  '#4CAF50',
+  [
+    'interpolate',
+    ['linear'],
+    ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
+    0,
+    '#4CAF50',
+    0.15,
+    '#FFEB3B',
+    0.35,
+    '#FF9800',
+    0.5,
+    '#F44336'
+  ]
+] as unknown as string;
+
+type HeatmapMode = 'markers' | 'people' | 'population' | 'infection';
+
+// Only modes still surfaced in the toggle UI are restored from sessionStorage.
+// 'population' and 'infection' modes are intentionally hidden but kept as
+// HeatmapMode values so the rendering paths remain available if reintroduced.
+const HEATMAP_MODES: HeatmapMode[] = ['markers', 'people'];
+
+function getMapStorageKey(simId: number | null | undefined, field: string) {
+  return `delineo:model-map:${simId ?? 'unknown'}:${field}`;
+}
+
+function getStoredHeatmapMode(
+  simId: number | null | undefined,
+  fallback: HeatmapMode
+) {
+  if (typeof window === 'undefined' || !window.sessionStorage) {
+    return fallback;
+  }
+
+  const stored = window.sessionStorage.getItem(
+    getMapStorageKey(simId, 'heatmap-mode')
+  );
+  return HEATMAP_MODES.includes(stored as HeatmapMode)
+    ? (stored as HeatmapMode)
+    : fallback;
+}
+
+function getStoredCurrentTime(
+  simId: number | null | undefined,
+  fallback: number
+) {
+  if (typeof window === 'undefined' || !window.sessionStorage) {
+    return fallback;
+  }
+
+  const stored = Number.parseFloat(
+    window.sessionStorage.getItem(getMapStorageKey(simId, 'current-time')) ?? ''
+  );
+  return Number.isFinite(stored) && stored >= 1 ? stored : fallback;
+}
 
 type PointFeatureProperties = {
   cluster?: boolean;
   cluster_id?: number;
   description?: string;
   icon?: string;
-  id: string;
+  id?: string | number;
+  infected?: number | string;
   infection_ratio?: number | string;
-  label: string;
-  type: string;
+  label?: string;
+  point_count?: number | string;
+  population?: number | string;
+  type?: string;
 };
 
 type RenderedPointFeature = {
@@ -68,7 +170,7 @@ type ModelMapInstance = {
   project: (coordinate: [number, number]) => { x: number; y: number };
   queryRenderedFeatures: (
     geometry?: unknown,
-    options?: { source: string }
+    options?: { source?: string; layers?: string[] }
   ) => RenderedPointFeature[];
   setLayoutProperty: (id: string, name: string, value: string) => void;
 };
@@ -139,9 +241,11 @@ function EmojiOverlay({
         const isHotspot =
           props.type === 'places' &&
           hotspots &&
-          Object.keys(hotspots).includes(props.id);
+          Object.keys(hotspots).includes(String(props.id ?? ''));
         const pulse = isHotspot
-          ? 0.5 + 0.5 * Math.sin(time * 4 + (parseInt(props.id, 36) % 10))
+          ? 0.5 +
+            0.5 *
+              Math.sin(time * 4 + (parseInt(String(props.id ?? ''), 36) % 10))
           : 0;
         const pulseSize = size * (1 + 0.3 * pulse);
         const pulseAlpha = isHotspot ? 0.4 + 0.4 * pulse : 1.0;
@@ -190,6 +294,7 @@ interface ClusteredMapProps {
   heatmapMode: HeatmapMode;
   peopleDotGeoJSON: PeopleDotFeatureCollection;
   peopleDotColor: string;
+  personStatusDotGeoJSON: PersonStatusDotFeatureCollection;
 }
 
 function ClusteredMap({
@@ -201,7 +306,8 @@ function ClusteredMap({
   onMarkerClick,
   heatmapMode,
   peopleDotGeoJSON,
-  peopleDotColor
+  peopleDotColor,
+  personStatusDotGeoJSON
 }: ClusteredMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [mapInstance, setMapInstance] = useState<ModelMapInstance | null>(null);
@@ -252,14 +358,26 @@ function ClusteredMap({
           isMarkers ? 'visible' : 'none'
         );
     }
-    const isDots =
-      heatmapMode === 'population' || heatmapMode === 'infection';
+    const isDots = heatmapMode === 'population' || heatmapMode === 'infection';
     for (const id of ['people-dots-places']) {
       if (mapInstance.getLayer(id))
         mapInstance.setLayoutProperty(
           id,
           'visibility',
           isDots ? 'visible' : 'none'
+        );
+    }
+    const isPeople = heatmapMode === 'people';
+    for (const id of [
+      'person-status-uninfected',
+      'person-status-recovered',
+      'person-status-infected'
+    ]) {
+      if (mapInstance.getLayer(id))
+        mapInstance.setLayoutProperty(
+          id,
+          'visibility',
+          isPeople ? 'visible' : 'none'
         );
     }
   }, [heatmapMode, mapInstance]);
@@ -270,20 +388,10 @@ function ClusteredMap({
   };
 
   useEffect(() => {
-    if (!mapInstance) return;
-    const frame = requestAnimationFrame(() => {
-      const data = makeGeoJSON(pois);
-      const source = mapInstance.getSource('points');
-      if (source?.setData) source.setData(data);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pois, mapInstance]);
-
-  useEffect(() => {
     setPopupInfo(null);
   }, []);
 
-  const geojson = makeGeoJSON(pois);
+  const geojson = useMemo(() => makeGeoJSON(pois), [pois]);
 
   const handleClick = (event: MapClickEvent) => {
     const feature = event.features?.[0] as RenderedPointFeature | undefined;
@@ -304,10 +412,14 @@ function ClusteredMap({
       });
       return;
     }
+    if (props.id === undefined || !props.label || !props.type) return;
+    const markerId = String(props.id);
+    const markerLabel = props.label;
+    const markerType = props.type;
     onMarkerClick({
-      id: props.id,
-      label: props.label,
-      type: props.type
+      id: markerId,
+      label: markerLabel,
+      type: markerType
     });
     const coords = feature.geometry.coordinates;
     map.easeTo({
@@ -320,33 +432,16 @@ function ClusteredMap({
       () =>
         setPopupInfo({
           coordinates: coords,
-          label: props.label,
+          label: markerLabel,
           description: props.description ?? '',
           icon: props.icon ?? '',
-          id: props.id
+          id: markerId
         }),
       250
     );
   };
 
-  const clusterColor = [
-    'case',
-    ['==', ['get', 'population'], 0],
-    '#4CAF50',
-    [
-      'interpolate',
-      ['linear'],
-      ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
-      0,
-      '#4CAF50',
-      0.15,
-      '#FFEB3B',
-      0.35,
-      '#FF9800',
-      0.5,
-      '#F44336'
-    ]
-  ] as unknown as string;
+  const clusterColor = CLUSTER_COLOR_EXPRESSION;
 
   return (
     <div
@@ -396,9 +491,12 @@ function ClusteredMap({
                   'interpolate',
                   ['linear'],
                   ['zoom'],
-                  8, 0.8,
-                  11, 1.2,
-                  14, 2
+                  8,
+                  0.8,
+                  11,
+                  1.2,
+                  14,
+                  2
                 ] as const,
                 'line-opacity': 0.45
               }}
@@ -413,10 +511,7 @@ function ClusteredMap({
           clusterMaxZoom={18}
           clusterRadius={75}
           clusterMinPoints={3}
-          clusterProperties={{
-            population: ['+', ['to-number', ['get', 'population']]],
-            infected: ['+', ['to-number', ['get', 'infected']]]
-          }}
+          clusterProperties={POINTS_CLUSTER_PROPERTIES}
         >
           <Layer
             id="clusters"
@@ -499,20 +594,86 @@ function ClusteredMap({
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                10, 1.5,
-                13, 2.5,
-                16, 4,
-                18, 6,
+                10,
+                1.5,
+                13,
+                2.5,
+                16,
+                4,
+                18,
+                6
               ] as const,
               'circle-color': peopleDotColor,
               'circle-opacity': 0.72,
-              'circle-stroke-width': 0,
+              'circle-stroke-width': 0
+            }}
+          />
+        </Source>
+        <Source
+          id="person-status-dots"
+          type="geojson"
+          data={personStatusDotGeoJSON}
+        >
+          <Layer
+            id="person-status-uninfected"
+            type="circle"
+            filter={[
+              'all',
+              ['==', ['get', 'infected'], false],
+              ['!=', ['get', 'recovered'], true]
+            ]}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-radius': PERSON_STATUS_DOT_RADIUS,
+              'circle-color': '#2563eb',
+              'circle-opacity': 0.25,
+              'circle-stroke-width': 0
+            }}
+          />
+          <Layer
+            id="person-status-recovered"
+            type="circle"
+            filter={[
+              'all',
+              ['==', ['get', 'infected'], false],
+              ['==', ['get', 'recovered'], true]
+            ]}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-radius': PERSON_STATUS_DOT_RADIUS,
+              'circle-color': RECOVERED_DOT_COLOR,
+              'circle-opacity': 0.35,
+              'circle-stroke-width': 0
+            }}
+          />
+          <Layer
+            id="person-status-infected"
+            type="circle"
+            filter={['==', ['get', 'infected'], true]}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-radius': PERSON_STATUS_DOT_RADIUS,
+              'circle-color': '#dc2626',
+              'circle-opacity': 0.95,
+              'circle-stroke-width': 0
             }}
           />
         </Source>
         {zoneGeoJSON?.features?.length ? (
           <Source
-            id="zone-cbgs-top-outline"
+            id="zone-cbgs-top"
             type="geojson"
             data={zoneGeoJSON as unknown as string}
           >
@@ -525,9 +686,12 @@ function ClusteredMap({
                   'interpolate',
                   ['linear'],
                   ['zoom'],
-                  8, 1,
-                  11, 1.5,
-                  14, 2.4
+                  8,
+                  1,
+                  11,
+                  1.5,
+                  14,
+                  2.4
                 ] as const,
                 'line-opacity': 0.8
               }}
@@ -544,7 +708,9 @@ function ClusteredMap({
             style={{ zIndex: 10, marginTop: '1rem' }}
           >
             <div className="max-w-36 whitespace-pre-line font-[Poppins] text-center">
-              <div className="text-2xl mb-0.5 font-['Noto_Color_Emoji']">{popupInfo.icon}</div>
+              <div className="text-2xl mb-0.5 font-['Noto_Color_Emoji']">
+                {popupInfo.icon}
+              </div>
               <header className="text-sm font-bold mb-0.5">
                 {popupInfo.label}
               </header>
@@ -562,6 +728,7 @@ function ClusteredMap({
 
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
+  simId?: number | null;
   selectedZone: {
     latitude: number;
     longitude: number;
@@ -573,6 +740,7 @@ interface ModelMapProps {
 
 export default function ModelMap({
   onMarkerClick,
+  simId,
   selectedZone
 }: ModelMapProps) {
   const sim_data = useMapData((state) => state.simdata);
@@ -581,13 +749,43 @@ export default function ModelMap({
   const [zoneGeoJSON, setZoneGeoJSON] = useState<GeoJSONData | null>(null);
 
   const [maxHours, setMaxHours] = useState(1);
-  const [currentTime, setCurrentTime] = useState(1);
+  const [currentTime, setCurrentTime] = useState(() =>
+    getStoredCurrentTime(simId, 1)
+  );
   const [isPlaying, setIsPlaying] = useState(false);
-  const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('markers');
+  const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>(() =>
+    getStoredHeatmapMode(simId, 'markers')
+  );
+  const [peopleMapData, setPeopleMapData] = useState<PeopleMapData | null>(
+    null
+  );
+  const [peopleMapError, setPeopleMapError] = useState<string | null>(null);
+  const peopleMapCache = useRef<Map<string, PeopleMapData>>(new Map());
 
   useEffect(() => {
     resetModelMapLayoutCaches();
   }, []);
+
+  useEffect(() => {
+    setCurrentTime(getStoredCurrentTime(simId, 1));
+    setHeatmapMode(getStoredHeatmapMode(simId, 'markers'));
+  }, [simId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    window.sessionStorage.setItem(
+      getMapStorageKey(simId, 'current-time'),
+      currentTime.toString()
+    );
+  }, [currentTime, simId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    window.sessionStorage.setItem(
+      getMapStorageKey(simId, 'heatmap-mode'),
+      heatmapMode
+    );
+  }, [heatmapMode, simId]);
 
   useEffect(() => {
     const cbgList = selectedZone?.cbg_list?.filter(Boolean) ?? [];
@@ -598,7 +796,7 @@ export default function ModelMap({
 
     const controller = new AbortController();
     const cbgs = cbgList.join(',');
-    const url = new URL('cbg-geojson', ALG_URL);
+    const url = new URL('/api/cbg-geojson', window.location.origin);
     url.searchParams.set('cbgs', cbgs);
     url.searchParams.set('include_neighbors', 'false');
 
@@ -645,21 +843,60 @@ export default function ModelMap({
     [selectedZone]
   );
 
-  const pois = useMemo(() => {
+  const selectedTimestep = useMemo(() => {
     const targetMinutes = currentTime * 60;
-    const nearestTs = findNearestTimestep(targetMinutes);
+    return findNearestTimestep(targetMinutes);
+  }, [currentTime, findNearestTimestep]);
+
+  const pois = useMemo(() => {
     const dataForTime =
-      nearestTs !== null ? sim_data?.[nearestTs.toString()] : null;
+      selectedTimestep !== null
+        ? sim_data?.[selectedTimestep.toString()]
+        : null;
     return updateIcons(mapCenter, dataForTime, pap_data, hotspots, zoneGeoJSON);
-  }, [
-    currentTime,
-    hotspots,
-    mapCenter,
-    pap_data,
-    sim_data,
-    findNearestTimestep,
-    zoneGeoJSON
-  ]);
+  }, [hotspots, mapCenter, pap_data, sim_data, selectedTimestep, zoneGeoJSON]);
+
+  useEffect(() => {
+    if (heatmapMode !== 'people' || !simId || selectedTimestep === null) {
+      return;
+    }
+
+    const cacheKey = `${simId}:${selectedTimestep}`;
+    const cached = peopleMapCache.current.get(cacheKey);
+    if (cached) {
+      setPeopleMapData(cached);
+      setPeopleMapError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setPeopleMapError(null);
+
+    fetch(`/api/simdata/${simId}/people-map?time=${selectedTimestep}`, {
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`People map request failed: ${response.status}`);
+        }
+        return response.json() as Promise<{ data?: PeopleMapData }>;
+      })
+      .then((json) => {
+        if (controller.signal.aborted || !json.data) {
+          return;
+        }
+        peopleMapCache.current.set(cacheKey, json.data);
+        setPeopleMapData(json.data);
+      })
+      .catch((error) => {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.warn('Failed to load person-level map data:', error);
+          setPeopleMapError('Person-level map data is unavailable.');
+        }
+      });
+
+    return () => controller.abort();
+  }, [heatmapMode, selectedTimestep, simId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -676,7 +913,7 @@ export default function ModelMap({
     return () => clearInterval(interval);
   }, [isPlaying, availableTimesteps]);
 
-  const peopleDotColor = heatmapMode === 'infection' ? '#e53e3e' : '#3182ce';
+  const peopleDotColor = heatmapMode === 'infection' ? '#dc2626' : '#2563eb';
 
   const peopleDotGeoJSON = useMemo<PeopleDotFeatureCollection>(() => {
     if (heatmapMode !== 'population' && heatmapMode !== 'infection') {
@@ -684,6 +921,14 @@ export default function ModelMap({
     }
     return makePeopleDotGeoJSON(pois, heatmapMode);
   }, [pois, heatmapMode]);
+
+  const personStatusDotGeoJSON = useMemo<PersonStatusDotFeatureCollection>(
+    () =>
+      heatmapMode === 'people'
+        ? makePersonStatusDotGeoJSON(pois, peopleMapData)
+        : { type: 'FeatureCollection', features: [] },
+    [heatmapMode, peopleMapData, pois]
+  );
 
   useEffect(() => {
     if (sim_data) {
@@ -694,6 +939,14 @@ export default function ModelMap({
     }
   }, [sim_data]);
 
+  useEffect(() => {
+    if (!sim_data || maxHours <= 1) return;
+    setCurrentTime((prev) => {
+      if (!Number.isFinite(prev)) return 1;
+      return Math.min(Math.max(prev, 1), maxHours);
+    });
+  }, [maxHours, sim_data]);
+
   return (
     <div>
       <div className="heatmap-toggle">
@@ -701,27 +954,44 @@ export default function ModelMap({
         <div className="heatmap-toggle-group">
           <Button
             variant={heatmapMode === 'markers' ? 'primary' : 'secondary'}
-            className='text-xs'
+            className="text-xs"
             onClick={() => setHeatmapMode('markers')}
           >
             Markers
           </Button>
           <Button
-            variant={heatmapMode === 'population' ? 'primary' : 'secondary'}
-            className='text-xs'
-            onClick={() => setHeatmapMode('population')}
+            variant={heatmapMode === 'people' ? 'primary' : 'secondary'}
+            className="text-xs"
+            onClick={() => setHeatmapMode('people')}
           >
-            Population
-          </Button>
-          <Button
-            variant={heatmapMode === 'infection' ? 'primary' : 'secondary'}
-            className='text-xs'
-            onClick={() => setHeatmapMode('infection')}
-          >
-            Infection
+            Cases
           </Button>
         </div>
       </div>
+      {heatmapMode === 'people' && (
+        <div className="people-map-key">
+          <span className="people-map-key-item">
+            <span className="people-map-swatch people-map-swatch-blue" />
+            Uninfected
+          </span>
+          <span className="people-map-key-item">
+            <span className="people-map-swatch people-map-swatch-red" />
+            Infected
+          </span>
+          <span className="people-map-key-item">
+            <span className="people-map-swatch people-map-swatch-recovered" />
+            Recovered
+          </span>
+          {peopleMapData && peopleMapData.sample_rate > 1 && (
+            <span className="people-map-key-note">
+              sampled 1 in {peopleMapData.sample_rate}
+            </span>
+          )}
+          {peopleMapError && (
+            <span className="people-map-key-note">{peopleMapError}</span>
+          )}
+        </div>
+      )}
       <ClusteredMap
         currentTime={currentTime}
         mapCenter={mapCenter}
@@ -732,6 +1002,7 @@ export default function ModelMap({
         heatmapMode={heatmapMode}
         peopleDotGeoJSON={peopleDotGeoJSON}
         peopleDotColor={peopleDotColor}
+        personStatusDotGeoJSON={personStatusDotGeoJSON}
       />
       <div className="mt-3 text-center w-full">
         {new Date(
@@ -749,8 +1020,8 @@ export default function ModelMap({
       </div>
       <div className="flex items-center justify-center gap-3 mt-3">
         <Button
-          variant='primary'
-          className='py-1!'
+          variant="primary"
+          className="py-1!"
           onClick={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
