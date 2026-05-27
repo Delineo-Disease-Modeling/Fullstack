@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   makePeopleDotGeoJSON,
+  makePersonStatusDotGeoJSON,
   pointInGeometry,
   resetModelMapLayoutCaches,
   samplePointsInFootprint,
@@ -77,6 +78,53 @@ test('makePeopleDotGeoJSON ignores homes and places dots inside place footprints
   assert.equal(data.features.length, 3);
   assert.equal(data.features[0].properties.loc_id, 'p1');
   for (const feature of data.features) {
+    const [lng, lat] = feature.geometry.coordinates;
+    assert.equal(pointInGeometry(lng, lat, square), true);
+  }
+});
+
+test('makePersonStatusDotGeoJSON keeps person dots stable inside place footprints', () => {
+  const pois = [
+    {
+      type: 'places',
+      id: 'p1',
+      latitude: 0.5,
+      longitude: 0.5,
+      label: 'Clinic',
+      description: '3 people\n2 infected',
+      footprint: square,
+      icon: '🏥',
+      population: 3,
+      infected: 2
+    }
+  ];
+  const peopleMap = {
+    time: 60,
+    requested_time: 60,
+    total_people: 2,
+    returned_people: 2,
+    sample_rate: 1,
+    locations: [
+      {
+        type: 'places',
+        id: 'p1',
+        people: [
+          { id: 'a', infected: false, newly_infected: false },
+          { id: 'b', infected: true, newly_infected: true }
+        ]
+      }
+    ]
+  };
+
+  const first = makePersonStatusDotGeoJSON(pois, peopleMap);
+  const second = makePersonStatusDotGeoJSON(pois, peopleMap);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.features.length, 2);
+  assert.equal(first.features[1].properties.person_id, 'b');
+  assert.equal(first.features[1].properties.infected, true);
+  assert.equal(first.features[1].properties.newly_infected, true);
+  for (const feature of first.features) {
     const [lng, lat] = feature.geometry.coordinates;
     assert.equal(pointInGeometry(lng, lat, square), true);
   }
