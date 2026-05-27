@@ -1032,17 +1032,21 @@ export function makePersonStatusDotGeoJSON(
     let positions = personLayoutCache[layoutKey];
     if (!positions) {
       const seed = hashString(layoutKey);
-      if (location.type === 'places' && poi.footprint) {
-        positions = samplePointsInFootprint(poi.footprint, count, seed);
-      }
-      if (!positions || positions.length < count) {
-        positions = computeDiskLayout(
-          poi.latitude,
-          poi.longitude,
-          count,
-          seed
-        );
-      }
+      const footprintPoints =
+        location.type === 'places' && poi.footprint
+          ? samplePointsInFootprint(poi.footprint, count, seed)
+          : [];
+      const shortfall = Math.max(0, count - footprintPoints.length);
+      const diskPoints =
+        shortfall > 0
+          ? computeDiskLayout(
+              poi.latitude,
+              poi.longitude,
+              shortfall,
+              seed ^ 0x9e3779b1
+            )
+          : [];
+      positions = [...footprintPoints, ...diskPoints];
       personLayoutCache[layoutKey] = positions;
     }
 
