@@ -26,7 +26,7 @@ export type Interventions = {
   selfiso: number;
 };
 
-type InterventionValues = Omit<Interventions, 'time'>;
+export type InterventionValues = Omit<Interventions, 'time'>;
 
 export type DmpMode = 'auto' | 'required' | 'off';
 
@@ -51,16 +51,12 @@ interface SimSettingsActions {
     time: number,
     values?: InterventionValues
   ) => void;
-  setInterventions: (
-    time: number,
-    new_interventions: Partial<Interventions>
-  ) => void;
   deleteInterventions: (time: number) => void;
 }
 
 type SimSettingsStore = SimSettings & SimSettingsActions;
 
-const DEFAULT_INTERVENTION_VALUES: InterventionValues = {
+export const DEFAULT_INTERVENTION_VALUES: InterventionValues = {
   mask: 0.0,
   vaccine: 0.0,
   capacity: 1.0,
@@ -103,14 +99,6 @@ const useSimSettings = create<SimSettingsStore>((set) => ({
         ...values,
         time
       })
-    }));
-  },
-
-  setInterventions: (time, new_interventions) => {
-    set((state) => ({
-      interventions: state.interventions.map((i) =>
-        i.time !== time ? i : { ...i, ...new_interventions }
-      )
     }));
   },
 

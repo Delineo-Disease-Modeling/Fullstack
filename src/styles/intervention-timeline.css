@@ -39,77 +39,176 @@ div.iv_timeline_track_line {
   z-index: 0;
 }
 
-button.iv_timeline_thumb {
+/* Shared layout for the overlaid range inputs on the timeline track */
+input.iv_timeline_marker,
+input.iv_timeline_draft {
   position: absolute;
   top: 50%;
-  display: block;
-  width: 12px;
-  height: 22px;
-  padding: 0;
-  transform: translate(-50%, -50%);
-  border-radius: 4px;
-  background: linear-gradient(180deg, #5aa9ce, #2f789c);
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16), 0 4px 10px rgba(47, 120, 156, 0.32);
-  cursor: grab;
-  transition: transform 160ms ease;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+input.iv_timeline_marker::-webkit-slider-runnable-track,
+input.iv_timeline_marker::-moz-range-track,
+input.iv_timeline_draft::-webkit-slider-runnable-track,
+input.iv_timeline_draft::-moz-range-track {
+  background: transparent;
+  border: transparent;
+  height: 0;
+}
+
+/* Static marker dots for committed interventions */
+input.iv_timeline_marker {
   z-index: 1;
 }
 
-button.iv_timeline_thumb:hover {
-  transform: translate(-50%, -50%) scale(1.08);
+input.iv_timeline_marker::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-primary-blue);
+  border: 1.5px solid white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10);
+  cursor: default;
 }
 
-button.iv_timeline_thumb:active {
+input.iv_timeline_marker::-moz-range-thumb {
+  pointer-events: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-primary-blue);
+  border: 1.5px solid white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10);
+  cursor: default;
+}
+
+input.iv_timeline_marker.seed::-webkit-slider-thumb {
+  background: #4a8c4a;
+}
+
+input.iv_timeline_marker.seed::-moz-range-thumb {
+  background: #4a8c4a;
+}
+
+/* Draggable thumb for the new-intervention draft */
+input.iv_timeline_draft {
+  z-index: 2;
+}
+
+input.iv_timeline_draft::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 14px;
+  height: 26px;
+  border-radius: 4px;
+  background: var(--color-bg-dark);
+  border: 1.5px solid var(--color-primary-blue-soft);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18), 0 6px 14px rgba(15, 23, 42, 0.20);
+  cursor: grab;
+  transition: transform 160ms ease;
+}
+
+input.iv_timeline_draft::-webkit-slider-thumb:hover {
+  transform: scale(1.06);
+}
+
+input.iv_timeline_draft::-webkit-slider-thumb:active {
   cursor: grabbing;
-  transform: translate(-50%, -50%) scale(1.03);
+  transform: scale(1.02);
 }
 
-button.iv_timeline_thumb:focus-visible {
+input.iv_timeline_draft::-moz-range-thumb {
+  pointer-events: auto;
+  width: 12px;
+  height: 26px;
+  border-radius: 4px;
+  background: var(--color-bg-dark);
+  border: 1.5px solid var(--color-primary-blue-soft);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18), 0 6px 14px rgba(15, 23, 42, 0.20);
+  cursor: grab;
+  transition: transform 160ms ease;
+}
+
+input.iv_timeline_draft:focus-visible::-webkit-slider-thumb {
   outline: 2px solid var(--color-primary-blue-soft);
   outline-offset: 3px;
 }
 
-button.iv_timeline_thumb.current {
-  background: var(--color-bg-dark);
-  border-color: var(--color-primary-blue-soft);
-  width: 14px;
-  height: 26px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18), 0 6px 14px rgba(15, 23, 42, 0.20);
+input.iv_timeline_draft:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-primary-blue-soft);
+  outline-offset: 3px;
 }
 
-button.iv_timeline_thumb.seed {
-  background: linear-gradient(180deg, #7fb87f, #4a8c4a);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16), 0 4px 10px rgba(74, 140, 74, 0.28);
-  cursor: default;
+/* List of committed interventions below the bar */
+.iv_committed_list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
 }
 
-button.iv_timeline_thumb.seed:hover {
-  transform: translate(-50%, -50%);
+.iv_committed_row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  font-size: 13px;
 }
 
-button.iv_timeline_thumb.seed:active {
-  cursor: default;
-  transform: translate(-50%, -50%);
-}
-
-button.iv_timeline_thumb.seed.current {
-  background: var(--color-bg-dark);
-  border-color: #4a8c4a;
-}
-
-.iv_seed_badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(74, 140, 74, 0.15);
-  color: #3a7a3a;
-  font-size: 10px;
+.iv_committed_label {
   font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  vertical-align: middle;
-  margin-left: 4px;
+  color: var(--color-primary-blue);
+  min-width: 110px;
+}
+
+.iv_committed_hour {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  min-width: 70px;
+}
+
+.iv_committed_values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: 1;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.iv_committed_delete {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--color-accent-red);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.iv_committed_delete:hover {
+  background: rgba(232, 72, 90, 0.08);
+  border-color: rgba(232, 72, 90, 0.30);
 }
 
 .iv_timeline_warning {

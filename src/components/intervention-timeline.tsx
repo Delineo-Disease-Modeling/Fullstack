@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSimSettings, {
-  DEFAULT_INTERVENTIONS,
-  type Interventions as InterventionSettings
+  DEFAULT_INTERVENTION_VALUES,
+  type InterventionValues,
+  type Interventions
 } from '@/stores/simsettings';
+import { SimParameter } from './settings-components';
 
 import '@/styles/intervention-timeline.css';
-import Interventions from './interventions';
 
 const INTERVENTION_VALUE_KEYS = [
   'mask',
@@ -15,413 +16,209 @@ const INTERVENTION_VALUE_KEYS = [
   'capacity',
   'lockdown',
   'selfiso'
-] as const satisfies readonly (keyof Omit<InterventionSettings, 'time'>)[];
+] as const satisfies readonly (keyof InterventionValues)[];
 
-function interventionSettingsMatch(
-  a: InterventionSettings,
-  b: InterventionSettings
-) {
-  return INTERVENTION_VALUE_KEYS.every((key) => a[key] === b[key]);
+function valuesMatch(a: InterventionValues, b: InterventionValues) {
+  return INTERVENTION_VALUE_KEYS.every((k) => a[k] === b[k]);
 }
 
-function getEffectiveInterventionAt(
-  time: number,
-  interventions: InterventionSettings[]
-) {
-  const sorted = [...interventions].sort((a, b) => a.time - b.time);
-  const first = sorted[0];
-  if (!first) return null;
-
-  let active = first;
-  for (const intervention of sorted) {
-    if (intervention.time > time) break;
-    active = intervention;
-  }
-
-  return active;
-}
+const pad = (n: number) => n.toString().padStart(3, '0');
 
 export default function InterventionTimeline() {
   const hours = useSimSettings((state) => state.hours);
   const zone = useSimSettings((state) => state.zone);
   const interventions = useSimSettings((state) => state.interventions);
-
   const addInterventions = useSimSettings((state) => state.addInterventions);
-  const setInterventions = useSimSettings((state) => state.setInterventions);
   const deleteInterventions = useSimSettings(
     (state) => state.deleteInterventions
   );
 
-  const [curtime, setCurtime] = useState(0);
-  const [timelineError, setTimelineError] = useState<string | null>(null);
-  const values = useMemo(
-    () =>
-      Array.from(new Set(interventions.map((intervention) => intervention.time))).sort(
-        (a, b) => a - b
-      ),
-    [interventions]
-  );
-  const showNoChangeWarning = useMemo(() => {
-    const curIndex = values.indexOf(curtime);
-    if (curIndex <= 0) return false;
-    const prevTime = values[curIndex - 1];
-    const prev = interventions.find((i) => i.time === prevTime);
-    const cur = interventions.find((i) => i.time === curtime);
-    return !!(prev && cur && interventionSettingsMatch(cur, prev));
-  }, [values, curtime, interventions]);
+  const sorted = [...interventions].sort((a, b) => a.time - b.time);
 
-  const dragTimeRef = useRef<number | null>(null);
-  const pointerDragRef = useRef(false);
-  const valuesRef = useRef(values);
-  const thumbPointerValueRef = useRef<number | null>(null);
+  const [draftTime, setDraftTime] = useState(1);
+  const [draft, setDraft] = useState<InterventionValues>({
+    ...DEFAULT_INTERVENTION_VALUES
+  });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    valuesRef.current = values;
-  }, [values]);
+    if (draftTime > hours) setDraftTime(Math.max(1, hours));
+  }, [hours, draftTime]);
 
-  const addInterventionAt = (time: number) => {
-    const activeIntervention = getEffectiveInterventionAt(time, interventions);
-    addInterventions(time, activeIntervention ?? DEFAULT_INTERVENTIONS);
-    setCurtime(time);
-    setTimelineError(null);
-  };
+  const previous: Interventions =
+    sorted.reduce<Interventions | null>(
+      (best, cur) =>
+        cur.time < draftTime && (!best || cur.time > best.time) ? cur : best,
+      null
+    ) ?? sorted[0];
 
-  const getTrackTime = (clientX: number, track: HTMLElement) => {
-    const rect = track.getBoundingClientRect();
-    if (rect.width <= 0) return curtime;
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    return Math.min(hours, Math.max(0, Math.round(ratio * hours)));
-  };
-
-  const moveIntervention = (fromTime: number, toTime: number) => {
-    if (fromTime === 0) return;
-    const nextTime = Math.min(hours, Math.max(1, toTime));
-    if (fromTime === nextTime) return;
-    if (values.includes(nextTime)) {
-      setCurtime(nextTime);
+  const handleAdd = () => {
+    if (sorted.some((i) => i.time === draftTime)) {
+      setError(`An intervention already exists at hour ${pad(draftTime)}.`);
       return;
     }
-
-    setInterventions(fromTime, { time: nextTime });
-    setCurtime(nextTime);
-    setTimelineError(null);
-  };
-
-  const moveDraggedIntervention = (fromTime: number, toTime: number) => {
-    if (fromTime === 0) return fromTime;
-    const nextTime = Math.min(hours, Math.max(1, toTime));
-    if (fromTime === nextTime) return fromTime;
-    if (valuesRef.current.includes(nextTime)) return fromTime;
-
-    setInterventions(fromTime, { time: nextTime });
-    valuesRef.current = valuesRef.current
-      .map((value) => (value === fromTime ? nextTime : value))
-      .sort((a, b) => a - b);
-    setCurtime(nextTime);
-    setTimelineError(null);
-    return nextTime;
-  };
-
-  useEffect(() => {
-    const unused = Array.from({ length: hours }, (_, i) => i + 1).filter(
-      (v) => !values.includes(v)
-    );
-
-    for (let i = 0; i < values.length; i++) {
-      if (values[i] > hours) {
-        const newtime = unused.pop();
-        if (newtime !== undefined) {
-          setInterventions(values[i], { time: newtime });
-          if (curtime === values[i]) setCurtime(newtime);
-        }
-      }
-    }
-  }, [curtime, setInterventions, hours, values]);
-
-  useEffect(() => {
-    if (values.includes(curtime)) return;
-    setCurtime(values[0] ?? 0);
-  }, [curtime, values]);
-
-  const beginTimelineDrag = (clientX: number, track: HTMLElement) => {
-    const thumbValue = thumbPointerValueRef.current;
-    thumbPointerValueRef.current = null;
-
-    if (thumbValue !== null) {
-      setCurtime(thumbValue);
-      setTimelineError(null);
-      dragTimeRef.current = thumbValue;
+    if (previous && valuesMatch(draft, previous)) {
+      const label =
+        previous.time === 0
+          ? 'the seed intervention'
+          : `the previous intervention at hour ${pad(previous.time)}`;
+      setError(`No change from ${label} — adjust a percentage before adding.`);
       return;
     }
-
-    const nextTime = getTrackTime(clientX, track);
-
-    if (values.includes(nextTime)) {
-      setCurtime(nextTime);
-      setTimelineError(null);
-      dragTimeRef.current = nextTime;
-    } else {
-      const fromTime = values.includes(curtime) ? curtime : values[0];
-      if (fromTime === undefined) return;
-      dragTimeRef.current = moveDraggedIntervention(fromTime, nextTime);
-    }
+    addInterventions(draftTime, draft);
+    setError(null);
   };
 
-  const startTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
-    if (e.button !== 0) return;
-
-    pointerDragRef.current = true;
-    beginTimelineDrag(e.clientX, e.currentTarget);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    e.preventDefault();
+  const updateDraft = (next: Partial<InterventionValues>) => {
+    setDraft((d) => ({ ...d, ...next }));
+    setError(null);
   };
 
-  const continueTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-    const dragTime = dragTimeRef.current;
-    if (dragTime === null) return;
-
-    dragTimeRef.current = moveDraggedIntervention(
-      dragTime,
-      getTrackTime(e.clientX, e.currentTarget)
-    );
+  const onTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const t = Math.max(1, Math.min(hours, Math.round(ratio * hours)));
+    setDraftTime(t);
+    setError(null);
   };
 
-  const stopTimelineDrag = (e: React.PointerEvent<HTMLFieldSetElement>) => {
-    dragTimeRef.current = null;
-    pointerDragRef.current = false;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  const startTimelineMouseDrag = (e: React.MouseEvent<HTMLFieldSetElement>) => {
-    if (pointerDragRef.current || e.button !== 0) return;
-
-    beginTimelineDrag(e.clientX, e.currentTarget);
-    e.preventDefault();
-  };
-
-  const continueTimelineMouseDrag = (e: React.MouseEvent<HTMLFieldSetElement>) => {
-    const dragTime = dragTimeRef.current;
-    if (dragTime === null) return;
-
-    dragTimeRef.current = moveDraggedIntervention(
-      dragTime,
-      getTrackTime(e.clientX, e.currentTarget)
-    );
-  };
-
-  const stopTimelineMouseDrag = () => {
-    pointerDragRef.current = false;
-    dragTimeRef.current = null;
-  };
-
-  const deleteThumb = (time: number) => {
-    if (values.length === 1) return;
-    const index = values.indexOf(time);
-    const next = values.filter((value) => value !== time);
-    deleteInterventions(time);
-    setCurtime(next[Math.min(index, next.length - 1)] ?? 0);
-    setTimelineError(null);
-  };
-
-  const moveLeft = () => {
-    const sorted = [...values].sort((a, b) => a - b);
-    const currentIndex = sorted.indexOf(curtime);
-    if (currentIndex === -1) {
-      setCurtime(sorted[0] ?? 0);
-      return;
-    }
-    if (curtime === sorted[0]) setCurtime(sorted[sorted.length - 1]);
-    else setCurtime(sorted[currentIndex - 1]);
-  };
-
-  const moveRight = () => {
-    const sorted = [...values].sort((a, b) => a - b);
-    const currentIndex = sorted.indexOf(curtime);
-    if (currentIndex === -1) {
-      setCurtime(sorted[0] ?? 0);
-      return;
-    }
-    if (curtime === sorted[sorted.length - 1]) setCurtime(sorted[0]);
-    else setCurtime(sorted[currentIndex + 1]);
-  };
-
-  const handleThumbKeyDown = (
-    e: React.KeyboardEvent<HTMLButtonElement>,
-    value: number
-  ) => {
-    if (value === 0 && ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
-      e.preventDefault();
-      return;
-    }
-
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault();
-      deleteThumb(value);
-      return;
-    }
-
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      moveIntervention(value, value - 1);
-      return;
-    }
-
-    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      moveIntervention(value, value + 1);
-      return;
-    }
-
-    if (e.key === 'Home') {
-      e.preventDefault();
-      moveIntervention(value, 0);
-      return;
-    }
-
-    if (e.key === 'End') {
-      e.preventDefault();
-      moveIntervention(value, hours);
-    }
-  };
-
-  const nextAddTime = (() => {
-    const anchorTime = Math.min(hours, Math.max(1, curtime || 1));
-
-    for (let offset = 0; offset <= hours; offset++) {
-      const laterTime = anchorTime + offset;
-      if (laterTime <= hours && !values.includes(laterTime)) return laterTime;
-
-      const earlierTime = anchorTime - offset;
-      if (offset > 0 && earlierTime >= 1 && !values.includes(earlierTime)) {
-        return earlierTime;
-      }
-    }
-  })();
+  const dateAt = (hour: number) =>
+    zone
+      ? new Date(
+          new Date(zone.start_date).getTime() + hour * 60 * 60 * 1000
+        ).toLocaleString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          weekday: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : null;
 
   return (
     <div className="flex flex-col w-full max-w-250 gap-4">
-      <fieldset
+      <div
         className="iv_timeline_track"
-        onPointerDown={startTimelineDrag}
-        onPointerMove={continueTimelineDrag}
-        onPointerUp={stopTimelineDrag}
-        onPointerCancel={stopTimelineDrag}
-        onMouseDown={startTimelineMouseDrag}
-        onMouseMove={continueTimelineMouseDrag}
-        onMouseUp={stopTimelineMouseDrag}
-        onMouseLeave={stopTimelineMouseDrag}
+        role="group"
+        aria-label="New intervention timeline"
+        onPointerDown={onTrackPointerDown}
       >
-        <legend className="iv_timeline_legend">Intervention timeline</legend>
         <div className="iv_timeline_track_line" />
-        {values.map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="slider"
-            className={`iv_timeline_thumb${curtime === value ? ' current' : ''}${value === 0 ? ' seed' : ''}`}
-            style={{ left: `${hours > 0 ? (value / hours) * 100 : 0}%` }}
-            aria-valuemin={0}
-            aria-valuemax={hours}
-            aria-valuenow={value}
-            aria-label={`Intervention ${values.indexOf(value) + 1} hour`}
-            onPointerDown={() => { thumbPointerValueRef.current = value; }}
-            onMouseDown={() => { thumbPointerValueRef.current = value; }}
-            onFocus={() => {
-              setCurtime(value);
-              setTimelineError(null);
-            }}
-            onKeyDown={(e) => handleThumbKeyDown(e, value)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              deleteThumb(value);
-            }}
+
+        {sorted.map((i) => (
+          <input
+            key={`marker-${i.time}`}
+            className={`iv_timeline_marker${i.time === 0 ? ' seed' : ''}`}
+            type="range"
+            min={0}
+            max={hours}
+            value={i.time}
+            readOnly
+            tabIndex={-1}
+            aria-hidden
           />
         ))}
-      </fieldset>
 
-      <div className="flex w-full items-center justify-center">
-        <div className="iv_controls">
-          <button
-            type="button"
-            className="iv_control_btn"
-            onClick={moveLeft}
-            disabled={values.length <= 1}
-            aria-label="Previous intervention"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="iv_control_btn iv_control_btn--danger"
-            onClick={() => deleteThumb(curtime)}
-            disabled={values.length <= 1}
-          >
-            Delete
-          </button>
-          <button
-            type="button"
-            className="iv_control_btn iv_control_btn--add"
-            onClick={() => {
-              if (nextAddTime === undefined) return;
-              addInterventionAt(nextAddTime);
-            }}
-            disabled={values.length >= 10 || nextAddTime === undefined}
-          >
-            + Add
-          </button>
-          <button
-            type="button"
-            className="iv_control_btn"
-            onClick={moveRight}
-            disabled={values.length <= 1}
-            aria-label="Next intervention"
-          >
-            ›
-          </button>
-        </div>
+        <input
+          className="iv_timeline_draft"
+          type="range"
+          min={1}
+          max={hours}
+          value={draftTime}
+          onChange={(e) => {
+            setDraftTime(+e.target.value);
+            setError(null);
+          }}
+          aria-label="New intervention hour"
+        />
       </div>
-      {timelineError && (
-        <div className="iv_timeline_error" role="alert">
-          {timelineError}
-        </div>
-      )}
 
       <div className="iv_intervention_label">
-        <span className="iv_intervention_index">
-          Intervention #{values.indexOf(curtime) + 1}
-        </span>
-        <span className="iv_intervention_hour">
-          {curtime === 0 ? (
-            <>Hour 000 <span className="iv_seed_badge">seed</span></>
-          ) : (
-            `Hour ${curtime.toString().padStart(3, '0')}`
-          )}
-        </span>
+        <span className="iv_intervention_index">New Intervention</span>
+        <span className="iv_intervention_hour">Hour {pad(draftTime)}</span>
         {zone && (
-          <span className="iv_intervention_date">
-            {new Date(
-              new Date(zone.start_date).getTime() + curtime * 60 * 60 * 1000
-            ).toLocaleString('en-US', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              weekday: 'short',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </span>
+          <span className="iv_intervention_date">{dateAt(draftTime)}</span>
         )}
       </div>
 
-      {showNoChangeWarning && (
-        <div className="iv_timeline_warning" role="status">
-          This intervention has the same settings as the previous one, no change will occur at this point.
-        </div>
-      )}
-      <Interventions time={curtime} onChange={() => setTimelineError(null)} />
+      <div className="iv_sliders_grid">
+        <SimParameter
+          label="Percent Masking"
+          value={draft.mask}
+          callback={(mask) => updateDraft({ mask })}
+          info="Proportion of people who wear masks, reducing the probability of disease transmission between individuals."
+        />
+        <SimParameter
+          label="Percent Vaccinated"
+          value={draft.vaccine}
+          callback={(vaccine) => updateDraft({ vaccine })}
+          info="Proportion of the population that is vaccinated, reducing individual susceptibility to infection."
+        />
+        <SimParameter
+          label="Maximum Facility Capacity"
+          value={draft.capacity}
+          callback={(capacity) => updateDraft({ capacity })}
+          info="Scales the maximum occupancy of every facility. At 50%, a venue that holds 100 people caps at 50, and anyone over the limit is sent home."
+          disabled
+        />
+        <SimParameter
+          label="Lockdown Probability"
+          value={draft.lockdown}
+          callback={(lockdown) => updateDraft({ lockdown })}
+          info="Chance that any person stays home instead of travelling to a facility during a movement event. Applies regardless of health status."
+        />
+        <SimParameter
+          label="Self-Isolation Percent"
+          value={draft.selfiso}
+          callback={(selfiso) => updateDraft({ selfiso })}
+          info="Chance that a symptomatic (visibly ill) person stays home instead of going to a facility, modelling voluntary quarantine behaviour."
+        />
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          className="iv_control_btn iv_control_btn--add"
+          onClick={handleAdd}
+        >
+          + Add Intervention
+        </button>
+        {error && (
+          <div className="iv_timeline_error" role="alert">
+            {error}
+          </div>
+        )}
+      </div>
+
+      <div className="iv_committed_list">
+        {sorted.map((i, idx) => (
+          <div key={i.time} className="iv_committed_row">
+            <div className="iv_committed_label">
+              {idx === 0 ? 'Seed' : `Intervention #${idx + 1}`}
+            </div>
+            <div className="iv_committed_hour">Hour {pad(i.time)}</div>
+            <div className="iv_committed_values">
+              <span>Mask {Math.ceil(i.mask * 100)}%</span>
+              <span>Vaccine {Math.ceil(i.vaccine * 100)}%</span>
+              <span>Capacity {Math.ceil(i.capacity * 100)}%</span>
+              <span>Lockdown {Math.ceil(i.lockdown * 100)}%</span>
+              <span>Self-iso {Math.ceil(i.selfiso * 100)}%</span>
+            </div>
+            {idx !== 0 && (
+              <button
+                type="button"
+                className="iv_committed_delete"
+                onClick={() => deleteInterventions(i.time)}
+                aria-label={`Delete intervention at hour ${pad(i.time)}`}
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
