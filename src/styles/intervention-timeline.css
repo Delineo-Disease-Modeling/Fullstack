@@ -1,4 +1,4 @@
-fieldset.iv_timeline_track {
+.iv_timeline_track {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -6,23 +6,8 @@ fieldset.iv_timeline_track {
   width: 100%;
   min-width: 220px;
   height: 2rem;
-  padding: 0;
-  margin: 0;
-  border: 0;
   cursor: pointer;
   user-select: none;
-}
-
-legend.iv_timeline_legend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 div.iv_timeline_track_line {
