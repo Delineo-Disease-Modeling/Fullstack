@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { getCachedPapdata } from './papdata-cache';
 import {
@@ -291,10 +291,22 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
 
   processingProgress.delete(simDataId);
 
-  // Finalize map cache
+  // Finalize map cache.
+  //
+  // Write atomically (temp file + rename) rather than in place. GET
+  // /api/simdata/[id] returns 200 the moment this file exists, so an in-place
+  // writeFile lets the results page read a half-written file and fail
+  // JSON.parse — surfacing as "Failed to load run from URL". The bug is
+  // timing-dependent: it hits when the write window is wide (slow/contended
+  // disk, large payloads), e.g. long runs on the shared prod host, and is rare
+  // on a fast local SSD. rename() is atomic on the same filesystem, so a
+  // concurrent reader sees either no file (-> 202, keep polling) or the
+  // complete file — never a partial one.
   cacheParts.push(`},"hotspots":${JSON.stringify(hotspots)}`);
   stageStart = nowMs();
-  await writeFile(mapCachePath, cacheParts.join(''));
+  const tmpMapCachePath = `${mapCachePath}.tmp`;
+  await writeFile(tmpMapCachePath, cacheParts.join(''));
+  await rename(tmpMapCachePath, mapCachePath);
   logPerfTiming('processSimulation map cache write', stageStart);
   logPerfTiming('processSimulation total', totalStart);
 
