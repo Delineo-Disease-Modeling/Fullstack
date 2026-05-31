@@ -29,69 +29,17 @@ import {
   type PeopleMapData,
   type PersonStatusDotFeatureCollection
 } from '@/features/model-map/map-data';
-
-const RECOVERED_DOT_COLOR = '#16a34a';
-
-type PersonStatusDotRadiusExpression = [
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number
-];
-
-const PERSON_STATUS_DOT_RADIUS: PersonStatusDotRadiusExpression = [
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  10,
-  1.8,
-  13,
-  2.8,
-  16,
-  4.3,
-  18,
-  6.2
-];
-
-const POINTS_CLUSTER_PROPERTIES = {
-  population: ['+', ['to-number', ['get', 'population']]],
-  infected: ['+', ['to-number', ['get', 'infected']]]
-} as const;
-
-const CLUSTER_COLOR_EXPRESSION = [
-  'case',
-  ['==', ['get', 'population'], 0],
-  '#4CAF50',
-  [
-    'interpolate',
-    ['linear'],
-    ['sqrt', ['/', ['get', 'infected'], ['get', 'population']]],
-    0,
-    '#4CAF50',
-    0.15,
-    '#FFEB3B',
-    0.35,
-    '#FF9800',
-    0.5,
-    '#F44336'
-  ]
-] as unknown as string;
-
-type HeatmapMode = 'markers' | 'people' | 'population' | 'infection';
-
-// Only modes still surfaced in the toggle UI are restored from sessionStorage.
-// 'population' and 'infection' modes are intentionally hidden but kept as
-// HeatmapMode values so the rendering paths remain available if reintroduced.
-const HEATMAP_MODES: HeatmapMode[] = ['markers', 'people'];
-const PLAYBACK_INTERVAL_MS = 750;
-const PEOPLE_MAP_PREFETCH_STEPS = 4;
+import {
+  applyAlpha,
+  CLUSTER_COLOR_EXPRESSION,
+  HEATMAP_MODES,
+  PEOPLE_MAP_PREFETCH_STEPS,
+  PERSON_STATUS_DOT_RADIUS,
+  PLAYBACK_INTERVAL_MS,
+  POINTS_CLUSTER_PROPERTIES,
+  RECOVERED_DOT_COLOR,
+  type HeatmapMode
+} from '@/features/model-map/map-constants';
 
 function getMapStorageKey(simId: number | null | undefined, field: string) {
   return `delineo:model-map:${simId ?? 'unknown'}:${field}`;
@@ -197,11 +145,6 @@ type MapClickEvent = {
   target: unknown;
   features?: unknown[];
 };
-
-function applyAlpha(hex: string, alpha: number) {
-  const bigint = parseInt(hex.replace('#', ''), 16);
-  return `rgba(${(bigint >> 16) & 255},${(bigint >> 8) & 255},${bigint & 255},${alpha})`;
-}
 
 function EmojiOverlay({
   map,
