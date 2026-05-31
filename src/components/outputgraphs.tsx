@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CartesianGrid,
   Legend,
@@ -12,8 +12,8 @@ import {
   YAxis,
   type LegendPayload
 } from 'recharts';
-import type { ChartData } from '@/lib/simulation-data';
-import useSimSettings from '@/stores/simsettings';
+import { fetchChartData } from '@/lib/chartdata-client';
+import type { ChartData, DataPoint } from '@/lib/simulation-data';
 import { CustomTooltip } from './customtooltip';
 
 import '@/styles/outputgraphs.css';
@@ -28,6 +28,10 @@ const COLORS = [
   '#4fd0ff'
 ];
 
+// Baseline series share their metric's color but get this suffix + a dashed,
+// muted stroke so a paired (intervention vs. baseline) read stays legible.
+const BASELINE_SUFFIX = ' (baseline)';
+
 const CHART_TYPE_OPTIONS = [
   { value: 'iot', label: 'Infectiousness Over Time' },
   { value: 'ages', label: 'Age Of Infected' },
@@ -37,18 +41,24 @@ const CHART_TYPE_OPTIONS = [
 
 type ChartType = (typeof CHART_TYPE_OPTIONS)[number]['value'];
 
+type SeriesDef = { key: string; color: string; dashed: boolean };
+
 interface OutputGraphsProps {
+  simId: number | null;
+  baselineSimId?: number | null;
   selected_loc: { id: string; label: string; type: string } | null;
   onReset: () => void;
 }
 
 export default function OutputGraphs({
+  simId,
+  baselineSimId,
   selected_loc,
   onReset
 }: OutputGraphsProps) {
-  const sim_id = useSimSettings((state) => state.sim_id);
   const [chartType, setChartType] = useState<ChartType>('iot');
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [baselineData, setBaselineData] = useState<ChartData | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
@@ -71,56 +81,109 @@ export default function OutputGraphs({
 
   useEffect(() => {
     setChartData(null);
+    setBaselineData(null);
     setChartError(null);
     setProcessing(false);
-    const url = new URL(
-      `/api/simdata/${sim_id}/chartdata`,
-      window.location.origin
-    );
-    if (selected_loc) {
-      url.searchParams.append('loc_type', selected_loc.type);
-      url.searchParams.append('loc_id', selected_loc.id);
+
+    if (simId == null) {
+      return;
     }
-    const abortController = new AbortController();
 
-    const fetchData = () => {
-      fetch(url, { signal: abortController.signal })
-        .then(async (res) => {
-          if (res.status === 202) {
-            setProcessing(true);
-            setTimeout(fetchData, 15000);
+    const controller = new AbortController();
+    const { signal } = controller;
+    const loc = selected_loc
+      ? { id: selected_loc.id, type: selected_loc.type }
+      : null;
+
+    // Baseline overlay is best-effort: if it fails, the primary chart still
+    // renders. Kick it off in parallel with the primary fetch.
+    const baselinePromise =
+      baselineSimId != null
+        ? fetchChartData(baselineSimId, loc, signal).catch((err) => {
+            if ((err as Error).name !== 'AbortError') {
+              console.error('Baseline chart overlay failed:', err);
+            }
             return null;
-          }
-          const json = await res.json();
-          if (!res.ok)
-            throw new Error(
-              json.message || `Failed to fetch chart data (${res.status})`
-            );
-          return json;
-        })
-        .then((json) => {
-          if (json) {
-            setProcessing(false);
-            setHiddenLines(new Set());
-            setChartData(json.data);
-          }
-        })
-        .catch((err) => {
-          if (err.name === 'AbortError') return;
-          console.error(err);
-          setProcessing(false);
-          setChartError(err.message || 'Failed to load chart data');
-        });
-    };
-    fetchData();
+          })
+        : Promise.resolve(null);
 
-    return () => abortController.abort();
-  }, [sim_id, selected_loc]);
+    (async () => {
+      try {
+        const primary = await fetchChartData(simId, loc, signal, () =>
+          setProcessing(true)
+        );
+        if (signal.aborted) return;
+        setProcessing(false);
+        setHiddenLines(new Set());
+        setChartData(primary);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        console.error(err);
+        setProcessing(false);
+        setChartError((err as Error).message || 'Failed to load chart data');
+        return;
+      }
 
-  const selectedChartData = chartData?.[chartType] ?? [];
-  const chartKeys = Object.keys(selectedChartData[0] ?? {}).filter(
-    (key) => key !== 'time'
-  );
+      const baseline = await baselinePromise;
+      if (!signal.aborted && baseline) {
+        setBaselineData(baseline);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [simId, baselineSimId, selected_loc]);
+
+  const hasBaseline = baselineSimId != null && baselineData != null;
+
+  const { mergedData, seriesDefs } = useMemo<{
+    mergedData: DataPoint[];
+    seriesDefs: SeriesDef[];
+  }>(() => {
+    const primarySeries = chartData?.[chartType] ?? [];
+    const baseKeys = Object.keys(primarySeries[0] ?? {}).filter(
+      (key) => key !== 'time'
+    );
+    const colorOf = (index: number) => COLORS[index % COLORS.length];
+
+    if (!hasBaseline) {
+      return {
+        mergedData: primarySeries,
+        seriesDefs: baseKeys.map((key, index) => ({
+          key,
+          color: colorOf(index),
+          dashed: false
+        }))
+      };
+    }
+
+    const baselineSeries = baselineData?.[chartType] ?? [];
+    const byTime = new Map<number, DataPoint>();
+    for (const point of primarySeries) {
+      byTime.set(point.time, { ...point });
+    }
+    for (const point of baselineSeries) {
+      const merged = byTime.get(point.time) ?? { time: point.time };
+      for (const [key, value] of Object.entries(point)) {
+        if (key !== 'time') merged[`${key}${BASELINE_SUFFIX}`] = value;
+      }
+      byTime.set(point.time, merged);
+    }
+    const mergedData = [...byTime.values()].sort((a, b) => a.time - b.time);
+
+    const seriesDefs: SeriesDef[] = [
+      ...baseKeys.map((key, index) => ({
+        key,
+        color: colorOf(index),
+        dashed: false
+      })),
+      ...baseKeys.map((key, index) => ({
+        key: `${key}${BASELINE_SUFFIX}`,
+        color: colorOf(index),
+        dashed: true
+      }))
+    ];
+    return { mergedData, seriesDefs };
+  }, [chartType, chartData, baselineData, hasBaseline]);
 
   return (
     <div className="outputgraphs_container">
@@ -143,10 +206,15 @@ export default function OutputGraphs({
         </select>
       </div>
       <div className="relative outputgraph_chart">
-        <h6 className="text-center font-bold pb-4">
+        <h6 className="text-center font-bold pb-1">
           Infection Distribution Over Time
           {selected_loc && <span> for {selected_loc.label}</span>}
         </h6>
+        {hasBaseline && (
+          <p className="text-center text-xs text-(--color-text-muted) pb-3">
+            Solid = with interventions · Dashed = baseline (no interventions)
+          </p>
+        )}
         {chartError ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center">
             <p className="text-lg text-red-500">{chartError}</p>
@@ -164,7 +232,7 @@ export default function OutputGraphs({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={selectedChartData}>
+            <LineChart data={mergedData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 label={{ value: 'Time (h)', position: 'bottom' }}
@@ -191,12 +259,14 @@ export default function OutputGraphs({
                   </span>
                 )}
               />
-              {chartKeys.map((key, index) => (
+              {seriesDefs.map(({ key, color, dashed }) => (
                 <Line
                   type="monotone"
                   key={key}
                   dataKey={key}
-                  stroke={COLORS[index % COLORS.length]}
+                  stroke={color}
+                  strokeDasharray={dashed ? '4 3' : undefined}
+                  strokeOpacity={dashed ? 0.55 : 1}
                   dot={false}
                   hide={hiddenLines.has(key)}
                 />

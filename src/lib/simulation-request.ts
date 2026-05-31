@@ -9,7 +9,7 @@ import {
 export const DEFAULT_DISEASE_NAME = 'COVID-19';
 export const DEFAULT_VARIANTS = ['Delta'];
 
-export type SimulationRequestBody = SimSettings & {
+export type SimulationRequestBody = Omit<SimSettings, 'compareBaseline'> & {
   czone_id: number;
   length: number;
   start_date: string;
@@ -79,9 +79,12 @@ export async function buildSimulationRequest(
 
   const matrixCsvByVariant = await fetchMatrixCsvByVariant(settings.matrix_by_variant);
 
+  // compareBaseline is a client-only UI flag; keep it out of the sim payload.
+  const { compareBaseline: _compareBaseline, ...settingsForBody } = settings;
+
   return {
     body: {
-      ...settings,
+      ...settingsForBody,
       czone_id: zone.id,
       length: settings.hours * 60,
       start_date: startDate,

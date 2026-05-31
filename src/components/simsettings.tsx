@@ -28,6 +28,10 @@ interface SimSettingsProps {
   loading: boolean;
   progress: number;
   progressMessage: string | null;
+  // Persistent phase label shown above the bar (e.g. "Running simulation 1 of 2…")
+  // while compareBaseline runs two sims back-to-back. The per-step SSE text lives
+  // in progressMessage, which gets overwritten each tick.
+  progressPhase?: string | null;
 }
 
 type PatternAvailabilityData = {
@@ -86,11 +90,13 @@ export default function SimSettings({
   error,
   loading,
   progress,
-  progressMessage
+  progressMessage,
+  progressPhase
 }: SimSettingsProps) {
   const zone = useSimSettings((state) => state.zone);
   const hours = useSimSettings((state) => state.hours);
   const randseed = useSimSettings((state) => state.randseed);
+  const compareBaseline = useSimSettings((state) => state.compareBaseline);
   const sim_id = useSimSettings((state) => state.sim_id);
   const initialInfectedCount = useSimSettings(
     (state) => state.initial_infected_count
@@ -338,6 +344,14 @@ export default function SimSettings({
       <div className="sim_section">
         <h2 className="sim_section_title">Interventions</h2>
         <InterventionTimeline />
+        <SimBoolean
+          label={'Also run a baseline'}
+          description={
+            'Run a second simulation with no interventions over the same zone, then compare them side by side.'
+          }
+          value={compareBaseline}
+          callback={(compareBaseline) => setSettings({ compareBaseline })}
+        />
       </div>
 
       <div className="flex flex-col items-center gap-6 w-full">
@@ -367,6 +381,9 @@ export default function SimSettings({
         </Button>
         {loading && (
           <div className="sim_progress">
+            {progressPhase && (
+              <p className="sim_progress_phase font-medium">{progressPhase}</p>
+            )}
             <div className="sim_progress_track">
               <div className="sim_progress_fill" style={{ width: `${progress}%` }} />
             </div>

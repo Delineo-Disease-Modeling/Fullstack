@@ -43,6 +43,10 @@ export type SimSettings = {
   model_path_by_variant: Record<string, string | null>;
   matrix_by_variant: Record<string, number | null>;
   interventions: Interventions[];
+  // Client-only: when true, the submit flow also runs a second, no-intervention
+  // baseline sim over the same zone so the results page can compare the two.
+  // Stripped from the request payload in buildSimulationRequest.
+  compareBaseline: boolean;
 };
 
 interface SimSettingsActions {
@@ -83,7 +87,8 @@ const default_settings: SimSettings = {
     Delta: 'variant.Delta.general'
   },
   matrix_by_variant: {},
-  interventions: [{ ...DEFAULT_INTERVENTIONS }]
+  interventions: [{ ...DEFAULT_INTERVENTIONS }],
+  compareBaseline: false
 };
 
 const useSimSettings = create<SimSettingsStore>((set) => ({

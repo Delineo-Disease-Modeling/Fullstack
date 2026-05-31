@@ -1,15 +1,16 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import ComparisonSummary from '@/components/comparison-summary';
 import EditDeleteActions from '@/components/edit-delete-actions';
 import InstructionBanner from '@/components/instruction-banner';
 import LoginModal from '@/components/login-modal';
 import OutputGraphs from '@/components/outputgraphs';
 import PersonPathPanel from '@/components/person-path-panel';
 import { useSession } from '@/lib/auth-client';
-import useMapData from '@/stores/mapdata';
+import useMapData, { type PapData, type SimData } from '@/stores/mapdata';
 import useSimSettings from '@/stores/simsettings';
 import '@/styles/simulator.css';
 import '@/styles/settings-components.css';
@@ -23,9 +24,20 @@ interface SelectedLoc {
   type: string;
 }
 
+// The map-store fields that differ between the intervention and baseline runs.
+// Held in local state so the toggle can swap them without re-fetching.
+interface SimRunData {
+  simdata: SimData | null;
+  papdata: PapData | null;
+  hotspots: { [key: string]: number[] } | null;
+}
+
+type RunView = 'intervention' | 'baseline';
+
 export default function SimulatorRun() {
   const { run_id } = useParams<{ run_id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const sim_id = useSimSettings((state) => state.sim_id);
   const zone = useSimSettings((state) => state.zone);
   const runName = useMapData((state) => state.name);
@@ -45,6 +57,39 @@ export default function SimulatorRun() {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [loginOpen, setLoginOpen] = useState(false);
+
+  // Comparison mode: `?baseline=<id>` pairs this (intervention) run with a
+  // no-intervention baseline run over the same zone.
+  const baselineParam = Number(searchParams.get('baseline'));
+  const baselineId =
+    Number.isFinite(baselineParam) && baselineParam > 0 ? baselineParam : null;
+  const interventionSimId = Number(run_id);
+
+  const [interventionPayload, setInterventionPayload] =
+    useState<SimRunData | null>(null);
+  const [baselinePayload, setBaselinePayload] = useState<SimRunData | null>(null);
+  const [activeView, setActiveView] = useState<RunView>('intervention');
+
+  const activeSimId =
+    activeView === 'baseline' && baselineId != null
+      ? baselineId
+      : interventionSimId;
+
+  // Swap which run drives the map. setSimData merges by default, so clear it
+  // first to guarantee a clean replace rather than a union of both timelines.
+  const showRun = useCallback(
+    (view: RunView) => {
+      const payload =
+        view === 'baseline' ? baselinePayload : interventionPayload;
+      if (!payload) return;
+      setSimData(null);
+      setSimData(payload.simdata);
+      setHotspots(payload.hotspots ?? {});
+      setPapData(payload.papdata);
+      setActiveView(view);
+    },
+    [baselinePayload, interventionPayload, setHotspots, setPapData, setSimData]
+  );
 
   useEffect(() => {
     if (loading) {
@@ -69,6 +114,9 @@ export default function SimulatorRun() {
       setSimData(null);
       setPapData(null);
       setError(null);
+      setInterventionPayload(null);
+      setBaselinePayload(null);
+      setActiveView('intervention');
 
       try {
         // Poll until the map cache is ready (API returns 202 with progress while processing)
@@ -147,6 +195,34 @@ export default function SimulatorRun() {
         setRunName(name);
         setHotspots(hotspots);
         setPapData(papdata);
+        setInterventionPayload({ simdata, papdata, hotspots });
+
+        // In comparison mode, load the baseline run too (already cached from the
+        // submit step). Best-effort: a failure just disables the map toggle.
+        if (baselineId != null) {
+          try {
+            let baseRes: Response;
+            while (true) {
+              baseRes = await fetch(`/api/simdata/${baselineId}`, { signal });
+              if (baseRes.status !== 202) break;
+              await new Promise((r) => setTimeout(r, 2000));
+            }
+            if (baseRes.ok) {
+              const baseJson = await baseRes.json();
+              setBaselinePayload({
+                simdata: baseJson.data.simdata,
+                papdata: baseJson.data.papdata,
+                hotspots: baseJson.data.hotspots
+              });
+            } else {
+              console.error('Baseline run failed to load:', baseRes.status);
+            }
+          } catch (e) {
+            if ((e as Error).name !== 'AbortError') {
+              console.error('Failed to load baseline run:', e);
+            }
+          }
+        }
       } catch (e) {
         if ((e as Error).name === 'AbortError') {
           return;
@@ -166,7 +242,7 @@ export default function SimulatorRun() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run_id, router.replace, setHotspots, setPapData, setRunName, setSettings, setSimData]);
+  }, [run_id, baselineId, router.replace, setHotspots, setPapData, setRunName, setSettings, setSimData]);
 
   const handleMarkerClick = ({
     id,
@@ -293,17 +369,61 @@ export default function SimulatorRun() {
               )}
             </span>
           </div>
+          {baselineId != null && (
+            <ComparisonSummary
+              interventionSimId={interventionSimId}
+              baselineSimId={baselineId}
+            />
+          )}
+          {baselineId != null && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-(--color-text-muted)">
+                Map view:
+              </span>
+              <div className="inline-flex rounded-md border border-(--color-border-light) overflow-hidden">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 text-sm transition-colors ${
+                    activeView === 'intervention'
+                      ? 'bg-(--color-primary-blue) text-(--color-text-light)'
+                      : 'bg-(--color-bg-ivory) hover:brightness-95'
+                  }`}
+                  onClick={() => showRun('intervention')}
+                >
+                  With interventions
+                </button>
+                <button
+                  type="button"
+                  disabled={!baselinePayload}
+                  className={`px-3 py-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    activeView === 'baseline'
+                      ? 'bg-(--color-primary-blue) text-(--color-text-light)'
+                      : 'bg-(--color-bg-ivory) hover:brightness-95'
+                  }`}
+                  onClick={() => showRun('baseline')}
+                >
+                  {baselinePayload ? 'Baseline' : 'Baseline (loading…)'}
+                </button>
+              </div>
+            </div>
+          )}
           <ModelMap
+            key={activeSimId}
             selectedZone={selectedZone}
-            simId={sim_id ?? Number(run_id)}
+            simId={activeSimId}
             onMarkerClick={handleMarkerClick}
           />
-          <PersonPathPanel simId={sim_id ?? Number(run_id)} />
+          <PersonPathPanel simId={activeSimId} />
         </div>
 
         <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
 
-        <OutputGraphs selected_loc={selectedLoc} onReset={onReset} />
+        <OutputGraphs
+          simId={interventionSimId}
+          baselineSimId={baselineId}
+          selected_loc={selectedLoc}
+          onReset={onReset}
+        />
       </div>
       <Button
         className='w-32'
