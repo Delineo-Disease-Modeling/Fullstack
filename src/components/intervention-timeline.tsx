@@ -74,7 +74,7 @@ export default function InterventionTimeline() {
     setError(null);
   };
 
-  const onTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onTrackPointerDown = (e: React.PointerEvent<HTMLFieldSetElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
     const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
@@ -99,9 +99,8 @@ export default function InterventionTimeline() {
 
   return (
     <div className="flex flex-col w-full max-w-250 gap-4">
-      <div
+      <fieldset
         className="iv_timeline_track"
-        role="group"
         aria-label="New intervention timeline"
         onPointerDown={onTrackPointerDown}
       >
@@ -133,7 +132,7 @@ export default function InterventionTimeline() {
           }}
           aria-label="New intervention hour"
         />
-      </div>
+      </fieldset>
 
       <div className="iv_intervention_label">
         <span className="iv_intervention_index">New Intervention</span>

@@ -41,6 +41,7 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
     previousUserIdRef.current = userId;
   }, [userId, setSettings]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: userId is an intentional re-run trigger — a login/logout change must refetch zones and rebuild the SSE connection, even though userId is not read in the effect body.
   useEffect(() => {
     let active = true;
     let es: EventSource | null = null;
