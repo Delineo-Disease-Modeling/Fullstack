@@ -32,7 +32,6 @@ import {
 import {
   applyAlpha,
   CLUSTER_COLOR_EXPRESSION,
-  HEATMAP_MODES,
   PEOPLE_MAP_PREFETCH_STEPS,
   PERSON_STATUS_DOT_RADIUS,
   PLAYBACK_INTERVAL_MS,
@@ -40,44 +39,12 @@ import {
   RECOVERED_DOT_COLOR,
   type HeatmapMode
 } from '@/features/model-map/map-constants';
-
-function getMapStorageKey(simId: number | null | undefined, field: string) {
-  return `delineo:model-map:${simId ?? 'unknown'}:${field}`;
-}
-
-function getStoredHeatmapMode(
-  simId: number | null | undefined,
-  fallback: HeatmapMode
-) {
-  if (typeof window === 'undefined' || !window.sessionStorage) {
-    return fallback;
-  }
-
-  const stored = window.sessionStorage.getItem(
-    getMapStorageKey(simId, 'heatmap-mode')
-  );
-  return HEATMAP_MODES.includes(stored as HeatmapMode)
-    ? (stored as HeatmapMode)
-    : fallback;
-}
-
-function getStoredCurrentTime(
-  simId: number | null | undefined,
-  fallback: number
-) {
-  if (typeof window === 'undefined' || !window.sessionStorage) {
-    return fallback;
-  }
-
-  const stored = Number.parseFloat(
-    window.sessionStorage.getItem(getMapStorageKey(simId, 'current-time')) ?? ''
-  );
-  return Number.isFinite(stored) && stored >= 1 ? stored : fallback;
-}
-
-function getPeopleMapCacheKey(simId: number, timestep: number) {
-  return `${simId}:${timestep}`;
-}
+import {
+  getMapStorageKey,
+  getPeopleMapCacheKey,
+  getStoredCurrentTime,
+  getStoredHeatmapMode
+} from '@/features/model-map/map-storage';
 
 type PointFeatureProperties = {
   cluster?: boolean;
