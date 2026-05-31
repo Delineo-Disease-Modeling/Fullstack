@@ -156,3 +156,73 @@ export type PoiFeatureCollection = {
   type: 'FeatureCollection';
   features: PoiFeature[];
 };
+
+// Structural MapLibre map-instance and event shapes used by the model-map
+// rendering components. Intentionally narrow (only the surface the component
+// actually calls) rather than the full maplibre-gl types.
+export type PointFeatureProperties = {
+  cluster?: boolean;
+  cluster_id?: number;
+  description?: string;
+  icon?: string;
+  id?: string | number;
+  infected?: number | string;
+  infection_ratio?: number | string;
+  label?: string;
+  point_count?: number | string;
+  population?: number | string;
+  type?: string;
+};
+
+export type RenderedPointFeature = {
+  properties?: PointFeatureProperties;
+  geometry: {
+    coordinates: [number, number];
+  };
+};
+
+export type MapSourceApi = {
+  setData?: (data: unknown) => void;
+  getClusterExpansionZoom?: (clusterId: number) => Promise<number>;
+};
+
+export type ModelMapInstance = {
+  easeTo: (options: {
+    center: [number, number];
+    zoom: number;
+    duration: number;
+  }) => void;
+  fitBounds: (
+    bounds: [[number, number], [number, number]],
+    options: { padding: number; duration: number; maxZoom: number }
+  ) => void;
+  getContainer: () => HTMLElement;
+  getLayer: (id: string) => unknown;
+  getSource: (id: string) => MapSourceApi | undefined;
+  getZoom: () => number;
+  off: (eventName: 'render', listener: () => void) => void;
+  on: (eventName: 'render', listener: () => void) => void;
+  project: (coordinate: [number, number]) => { x: number; y: number };
+  queryRenderedFeatures: (
+    geometry?: unknown,
+    options?: { source?: string; layers?: string[] }
+  ) => RenderedPointFeature[];
+  setLayoutProperty: (id: string, name: string, value: string) => void;
+};
+
+export type PopupInfo = {
+  coordinates: [number, number];
+  description: string;
+  icon: string;
+  id: string;
+  label: string;
+};
+
+export type MapLoadEvent = {
+  target: unknown;
+};
+
+export type MapClickEvent = {
+  target: unknown;
+  features?: unknown[];
+};

@@ -45,73 +45,13 @@ import {
   getStoredCurrentTime,
   getStoredHeatmapMode
 } from '@/features/model-map/map-storage';
-
-type PointFeatureProperties = {
-  cluster?: boolean;
-  cluster_id?: number;
-  description?: string;
-  icon?: string;
-  id?: string | number;
-  infected?: number | string;
-  infection_ratio?: number | string;
-  label?: string;
-  point_count?: number | string;
-  population?: number | string;
-  type?: string;
-};
-
-type RenderedPointFeature = {
-  properties?: PointFeatureProperties;
-  geometry: {
-    coordinates: [number, number];
-  };
-};
-
-type MapSourceApi = {
-  setData?: (data: unknown) => void;
-  getClusterExpansionZoom?: (clusterId: number) => Promise<number>;
-};
-
-type ModelMapInstance = {
-  easeTo: (options: {
-    center: [number, number];
-    zoom: number;
-    duration: number;
-  }) => void;
-  fitBounds: (
-    bounds: [[number, number], [number, number]],
-    options: { padding: number; duration: number; maxZoom: number }
-  ) => void;
-  getContainer: () => HTMLElement;
-  getLayer: (id: string) => unknown;
-  getSource: (id: string) => MapSourceApi | undefined;
-  getZoom: () => number;
-  off: (eventName: 'render', listener: () => void) => void;
-  on: (eventName: 'render', listener: () => void) => void;
-  project: (coordinate: [number, number]) => { x: number; y: number };
-  queryRenderedFeatures: (
-    geometry?: unknown,
-    options?: { source?: string; layers?: string[] }
-  ) => RenderedPointFeature[];
-  setLayoutProperty: (id: string, name: string, value: string) => void;
-};
-
-type PopupInfo = {
-  coordinates: [number, number];
-  description: string;
-  icon: string;
-  id: string;
-  label: string;
-};
-
-type MapLoadEvent = {
-  target: unknown;
-};
-
-type MapClickEvent = {
-  target: unknown;
-  features?: unknown[];
-};
+import type {
+  MapClickEvent,
+  MapLoadEvent,
+  ModelMapInstance,
+  PopupInfo,
+  RenderedPointFeature
+} from '@/features/model-map/map-types';
 
 function EmojiOverlay({
   map,
