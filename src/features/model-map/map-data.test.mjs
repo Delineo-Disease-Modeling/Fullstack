@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   makePeopleDotGeoJSON,
   makePersonStatusDotGeoJSON,
+  makePoiFootprintGeoJSON,
   pointInGeometry,
   resetModelMapLayoutCaches,
   samplePointsInFootprint,
@@ -128,6 +129,53 @@ test('makePersonStatusDotGeoJSON keeps person dots stable inside place footprint
     const [lng, lat] = feature.geometry.coordinates;
     assert.equal(pointInGeometry(lng, lat, square), true);
   }
+});
+
+test('makePoiFootprintGeoJSON exposes only place footprints', () => {
+  const footprints = makePoiFootprintGeoJSON([
+    {
+      type: 'homes',
+      id: 'h1',
+      latitude: 0.5,
+      longitude: 0.5,
+      label: 'Home #h1',
+      description: '5 people\n1 infected',
+      footprint: square,
+      icon: '🏠',
+      population: 5,
+      infected: 1
+    },
+    {
+      type: 'places',
+      id: 'p1',
+      latitude: 0.5,
+      longitude: 0.5,
+      label: 'Clinic',
+      description: '3 people\n2 infected',
+      footprint: square,
+      icon: '🏥',
+      population: 3,
+      infected: 2
+    },
+    {
+      type: 'places',
+      id: 'p2',
+      latitude: 0.25,
+      longitude: 0.25,
+      label: 'Office',
+      description: '0 people\n0 infected',
+      footprint: null,
+      icon: '🏢',
+      population: 0,
+      infected: 0
+    }
+  ]);
+
+  assert.equal(footprints.features.length, 1);
+  assert.equal(footprints.features[0].properties.id, 'p1');
+  assert.equal(footprints.features[0].properties.label, 'Clinic');
+  assert.equal(footprints.features[0].properties.infection_ratio, 2 / 3);
+  assert.deepEqual(footprints.features[0].geometry, square);
 });
 
 test('updateIcons coerces cached coordinate strings and formats hotspot text', () => {

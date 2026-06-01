@@ -5,6 +5,18 @@ export type GeoJSONGeometry = {
   coordinates?: unknown;
 };
 
+type GeoJSONPosition = number[];
+
+export type GeoJSONPolygonGeometry =
+  | {
+      type: 'Polygon';
+      coordinates: GeoJSONPosition[][];
+    }
+  | {
+      type: 'MultiPolygon';
+      coordinates: GeoJSONPosition[][][];
+    };
+
 export type GeoJSONFeature = {
   type?: string;
   properties?: Record<string, unknown>;
@@ -46,6 +58,7 @@ export type MapPoi = {
   latitude: number;
   longitude: number;
   label: string;
+  top_category?: string;
   description: string;
   footprint: GeoJSONGeometry | null;
   icon: string;
@@ -157,6 +170,19 @@ export type PoiFeatureCollection = {
   features: PoiFeature[];
 };
 
+export type PoiFootprintFeature = {
+  type: 'Feature';
+  properties: MapPoi & {
+    infection_ratio: number;
+  };
+  geometry: GeoJSONPolygonGeometry;
+};
+
+export type PoiFootprintFeatureCollection = {
+  type: 'FeatureCollection';
+  features: PoiFootprintFeature[];
+};
+
 // Structural MapLibre map-instance and event shapes used by the model-map
 // rendering components. Intentionally narrow (only the surface the component
 // actually calls) rather than the full maplibre-gl types.
@@ -169,8 +195,11 @@ export type PointFeatureProperties = {
   infected?: number | string;
   infection_ratio?: number | string;
   label?: string;
+  latitude?: number | string;
+  longitude?: number | string;
   point_count?: number | string;
   population?: number | string;
+  top_category?: string;
   type?: string;
 };
 
@@ -178,6 +207,13 @@ export type RenderedPointFeature = {
   properties?: PointFeatureProperties;
   geometry: {
     coordinates: [number, number];
+  };
+};
+
+export type RenderedMapFeature = {
+  properties?: PointFeatureProperties;
+  geometry?: {
+    coordinates?: unknown;
   };
 };
 
@@ -212,10 +248,13 @@ export type ModelMapInstance = {
 
 export type PopupInfo = {
   coordinates: [number, number];
-  description: string;
   icon: string;
   id: string;
   label: string;
+  category?: string;
+  population: number;
+  infected: number;
+  infectionRatio: number;
 };
 
 export type MapLoadEvent = {
