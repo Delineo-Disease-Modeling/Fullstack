@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'About' };
 const SECTIONS = [
   {
     eyebrow: '01 · Algorithms',
-    image: '/images/about/algosAboutPagePic.png',
+    image: '/images/about/algos_01.png',
     title: 'Convenience Zone Generation & Pre-Computation',
     lede: 'Our team specializes in designing innovative algorithms that lay the foundation for accurate and detailed simulations.',
     points: [
@@ -23,7 +23,7 @@ const SECTIONS = [
   },
   {
     eyebrow: '02 · Simulator',
-    image: '/images/about/simulatorAboutPagePic.png',
+    image: '/images/about/dmp_01.png',
     title: 'Simulation & DMP',
     lede: 'Our simulation framework is at the heart of understanding disease dynamics in communities.',
     points: [
@@ -39,7 +39,7 @@ const SECTIONS = [
   },
   {
     eyebrow: '03 · Fullstack',
-    image: '/images/about/fullstackAboutPagePic.png',
+    image: '/images/about/fullstack_01.png',
     title: 'Fullstack & Visualizations',
     lede: 'Our platform brings complex simulations to life with intuitive and impactful visualizations seen on this very website.',
     points: [
