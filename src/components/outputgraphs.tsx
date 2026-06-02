@@ -43,8 +43,6 @@ const CHART_TYPE_OPTIONS = [
     label: 'Infectiousness',
     heading: 'Infectiousness over time'
   },
-  { value: 'ages', label: 'Ages', heading: 'Infected age groups' },
-  { value: 'sexes', label: 'Gender', heading: 'Infection gender' },
   { value: 'states', label: 'States', heading: 'Disease states' }
 ] as const;
 
@@ -61,6 +59,12 @@ type SeriesDef = {
   strokeOpacity?: number;
   strokeWidth: number;
   halo?: boolean;
+};
+
+type SplitChart = {
+  key: ScenarioKey;
+  title: string;
+  data: DataPoint[];
 };
 
 const SCENARIOS: Record<
@@ -98,6 +102,90 @@ const SCENARIOS: Record<
     halo: true
   }
 };
+
+function ChartLines({
+  data,
+  seriesDefs,
+  hiddenLines
+}: {
+  data: DataPoint[];
+  seriesDefs: SeriesDef[];
+  hiddenLines: Set<string>;
+}) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart
+        data={data}
+        margin={{ top: 16, right: 18, bottom: 22, left: 14 }}
+      >
+        <CartesianGrid
+          stroke="rgba(47, 53, 64, 0.14)"
+          strokeDasharray="2 6"
+          vertical={false}
+        />
+        <XAxis
+          label={{ value: 'Time (h)', position: 'bottom', offset: 4 }}
+          type="number"
+          dataKey="time"
+          tickCount={10}
+          domain={['dataMin', 'dataMax']}
+          tickLine={false}
+          axisLine={{ stroke: 'rgba(47, 53, 64, 0.28)' }}
+        />
+        <YAxis
+          label={{
+            value: 'People',
+            angle: -90,
+            position: 'insideLeft'
+          }}
+          tickFormatter={formatCount}
+          allowDecimals={false}
+          tickLine={false}
+          axisLine={{ stroke: 'rgba(47, 53, 64, 0.28)' }}
+        />
+        <Tooltip content={CustomTooltip} />
+        {seriesDefs
+          .filter((series) => series.halo)
+          .map((series) => (
+            <Line
+              type="monotone"
+              key={`${series.key}-halo`}
+              dataKey={series.key}
+              stroke="var(--color-bg-ivory)"
+              strokeDasharray={series.strokeDasharray}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeOpacity={0.96}
+              strokeWidth={series.strokeWidth + 3.5}
+              dot={false}
+              activeDot={false}
+              isAnimationActive={false}
+              legendType="none"
+              hide={hiddenLines.has(series.key)}
+            />
+          ))}
+        {seriesDefs.map((series) => (
+          <Line
+            type="monotone"
+            key={series.key}
+            name={series.label}
+            dataKey={series.key}
+            stroke={series.color}
+            strokeDasharray={series.strokeDasharray}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity={series.strokeOpacity ?? 1}
+            strokeWidth={series.strokeWidth}
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 2 }}
+            isAnimationActive={false}
+            hide={hiddenLines.has(series.key)}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
 
 interface OutputGraphsProps {
   simId: number | null;
@@ -292,9 +380,10 @@ export default function OutputGraphs({
     (option) => option.value === chartType
   );
 
-  const { mergedData, seriesDefs } = useMemo<{
+  const { mergedData, seriesDefs, splitCharts } = useMemo<{
     mergedData: DataPoint[];
     seriesDefs: SeriesDef[];
+    splitCharts: SplitChart[];
   }>(() => {
     const primarySeries = chartData?.[chartType] ?? [];
     const baselineSeries = hasBaseline ? (baselineData?.[chartType] ?? []) : [];
@@ -310,18 +399,52 @@ export default function OutputGraphs({
       baseKeys.map((key, index) => [key, COLORS[index % COLORS.length]])
     );
     const colorOf = (key: string) => colorByKey.get(key) ?? COLORS[0];
+    const selectedSeriesDefs = baseKeys.map((key) => ({
+      key,
+      metricKey: key,
+      label: key,
+      scenario: 'selected' as const,
+      color: colorOf(key),
+      strokeWidth: SCENARIOS.selected.strokeWidth
+    }));
+
+    if (chartType === 'states' && hasComparisons) {
+      const splitCharts: SplitChart[] = [];
+
+      if (hasBaseline) {
+        splitCharts.push({
+          key: 'baseline',
+          title: SCENARIOS.baseline.label,
+          data: baselineSeries
+        });
+      }
+
+      splitCharts.push({
+        key: 'selected',
+        title: 'Interventions',
+        data: primarySeries
+      });
+
+      if (hasDisabledPoi) {
+        splitCharts.push({
+          key: 'disabledPoi',
+          title: SCENARIOS.disabledPoi.label,
+          data: disabledPoiSeries
+        });
+      }
+
+      return {
+        mergedData: [],
+        seriesDefs: selectedSeriesDefs,
+        splitCharts
+      };
+    }
 
     if (!hasComparisons) {
       return {
         mergedData: primarySeries,
-        seriesDefs: baseKeys.map((key) => ({
-          key,
-          metricKey: key,
-          label: key,
-          scenario: 'selected',
-          color: colorOf(key),
-          strokeWidth: SCENARIOS.selected.strokeWidth
-        }))
+        seriesDefs: selectedSeriesDefs,
+        splitCharts: []
       };
     }
 
@@ -382,7 +505,7 @@ export default function OutputGraphs({
           : []
       )
     ];
-    return { mergedData, seriesDefs };
+    return { mergedData, seriesDefs, splitCharts: [] };
   }, [
     chartType,
     chartData,
@@ -403,7 +526,10 @@ export default function OutputGraphs({
               {selected_loc && <span> for {selected_loc.label}</span>}
             </h6>
             <div className="outputgraph_run_chips">
-              <RunChip label="Selected run" color={COLORS[0]} />
+              <RunChip
+                label={hasComparisons ? 'Interventions' : 'Selected run'}
+                color={COLORS[0]}
+              />
               {hasBaseline && (
                 <RunChip label="Baseline" color={COLORS[0]} dashed />
               )}
@@ -455,79 +581,30 @@ export default function OutputGraphs({
           </div>
         ) : (
           <>
-            <div className="outputgraph_plot">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={mergedData}
-                  margin={{ top: 16, right: 18, bottom: 22, left: 14 }}
-                >
-                  <CartesianGrid
-                    stroke="rgba(47, 53, 64, 0.14)"
-                    strokeDasharray="2 6"
-                    vertical={false}
-                  />
-                  <XAxis
-                    label={{ value: 'Time (h)', position: 'bottom', offset: 4 }}
-                    type="number"
-                    dataKey="time"
-                    tickCount={10}
-                    domain={['dataMin', 'dataMax']}
-                    tickLine={false}
-                    axisLine={{ stroke: 'rgba(47, 53, 64, 0.28)' }}
-                  />
-                  <YAxis
-                    label={{
-                      value: 'People',
-                      angle: -90,
-                      position: 'insideLeft'
-                    }}
-                    tickFormatter={formatCount}
-                    allowDecimals={false}
-                    tickLine={false}
-                    axisLine={{ stroke: 'rgba(47, 53, 64, 0.28)' }}
-                  />
-                  <Tooltip content={CustomTooltip} />
-                  {seriesDefs
-                    .filter((series) => series.halo)
-                    .map((series) => (
-                      <Line
-                        type="monotone"
-                        key={`${series.key}-halo`}
-                        dataKey={series.key}
-                        stroke="var(--color-bg-ivory)"
-                        strokeDasharray={series.strokeDasharray}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeOpacity={0.96}
-                        strokeWidth={series.strokeWidth + 3.5}
-                        dot={false}
-                        activeDot={false}
-                        isAnimationActive={false}
-                        legendType="none"
-                        hide={hiddenLines.has(series.key)}
+            {splitCharts.length > 0 ? (
+              <div className="outputgraph_split_grid">
+                {splitCharts.map((chart) => (
+                  <section className="outputgraph_split_panel" key={chart.key}>
+                    <h3 className="outputgraph_split_title">{chart.title}</h3>
+                    <div className="outputgraph_split_plot">
+                      <ChartLines
+                        data={chart.data}
+                        seriesDefs={seriesDefs}
+                        hiddenLines={hiddenLines}
                       />
-                    ))}
-                  {seriesDefs.map((series) => (
-                    <Line
-                      type="monotone"
-                      key={series.key}
-                      name={series.label}
-                      dataKey={series.key}
-                      stroke={series.color}
-                      strokeDasharray={series.strokeDasharray}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeOpacity={series.strokeOpacity ?? 1}
-                      strokeWidth={series.strokeWidth}
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2 }}
-                      isAnimationActive={false}
-                      hide={hiddenLines.has(series.key)}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="outputgraph_plot">
+                <ChartLines
+                  data={mergedData}
+                  seriesDefs={seriesDefs}
+                  hiddenLines={hiddenLines}
+                />
+              </div>
+            )}
             <SeriesLegend
               seriesDefs={seriesDefs}
               hiddenLines={hiddenLines}
