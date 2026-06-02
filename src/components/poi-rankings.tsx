@@ -68,18 +68,10 @@ function HotspotSwitch({
       aria-checked={checked}
       aria-label={checked ? `Enable ${label}` : `Disable ${label}`}
       disabled={!onToggle}
-      className={`relative h-5 w-9 shrink-0 overflow-hidden rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked
-          ? 'border-gray-950 bg-gray-950'
-          : 'border-(--color-border-light) bg-white'
-      }`}
+      className={`hotspot_switch ${checked ? 'is-checked' : ''}`}
       onClick={onToggle}
     >
-      <span
-        className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
-      />
+      <span />
     </button>
   );
 }
@@ -104,7 +96,7 @@ function RankingViewToggle({
     <div
       role="tablist"
       aria-label="Hotspot ranking type"
-      className="inline-flex overflow-hidden rounded-md border border-(--color-border-light) bg-white text-xs font-semibold"
+      className="hotspot_view_toggle"
     >
       {options.map((option) => {
         const selected = activeView === option.id;
@@ -116,17 +108,13 @@ function RankingViewToggle({
             role="tab"
             aria-selected={selected}
             aria-label={`${option.label} (${option.count})`}
-            className={`px-3 py-1.5 transition-colors ${
-              selected
-                ? 'bg-(--color-primary-blue) text-(--color-text-light)'
-                : 'text-(--color-text-main) hover:bg-gray-50'
+            className={`hotspot_view_toggle_button ${
+              selected ? 'is-active' : ''
             }`}
             onClick={() => onChange(option.id)}
           >
             {option.label}
-            <span className="ml-1 tabular-nums opacity-75">
-              {option.count}
-            </span>
+            <span>{option.count}</span>
           </button>
         );
       })}
@@ -150,19 +138,17 @@ function RankingTable({
   const maxValue = Math.max(0, ...rows.map((row) => row.value));
 
   return (
-    <div className="overflow-hidden rounded-md border border-(--color-border-light) bg-white">
-      <div className="grid grid-cols-[2rem_2.25rem_minmax(0,1fr)_4.75rem] items-center gap-2 bg-white/80 px-3 py-2 text-[10px] font-bold uppercase text-(--color-text-muted) sm:grid-cols-[2.5rem_2.75rem_minmax(0,1fr)_5.5rem]">
-        <span className="text-center">#</span>
+    <div className="hotspot_table">
+      <div className="hotspot_table_header">
+        <span>#</span>
         <span className="sr-only">Disable</span>
         <span>Hotspot</span>
-        <span className="text-right">Peak</span>
+        <span className="hotspot_table_header_peak">Peak</span>
       </div>
       {rows.length === 0 ? (
-        <div className="flex h-40 items-center justify-center border-t border-(--color-border-light) text-sm text-(--color-text-muted)">
-          No infections recorded.
-        </div>
+        <div className="hotspot_empty">No infections recorded.</div>
       ) : (
-        <div className="divide-y divide-(--color-border-light)">
+        <div className="hotspot_table_body">
           {rows.map((row, index) => {
             const disabled = isDisabled(row);
             const width =
@@ -191,20 +177,10 @@ function RankingTable({
             return (
               <div
                 key={row.id}
-                className={`grid grid-cols-[2rem_2.25rem_minmax(0,1fr)_4.75rem] items-center gap-2 px-3 py-2.5 transition-colors sm:grid-cols-[2.5rem_2.75rem_minmax(0,1fr)_5.5rem] ${
-                  disabled ? 'bg-white' : 'bg-white/70 hover:bg-white'
-                }`}
+                className={`hotspot_row ${disabled ? 'is-disabled' : ''}`}
               >
-                <span
-                  className={`text-center text-xs font-semibold tabular-nums ${
-                    disabled
-                      ? 'text-gray-950'
-                      : 'text-(--color-text-muted)'
-                  }`}
-                >
-                  {index + 1}
-                </span>
-                <div className="flex justify-center">
+                <span className="hotspot_rank">{index + 1}</span>
+                <div className="hotspot_switch_cell">
                   <HotspotSwitch
                     checked={disabled}
                     label={row.fullLabel}
@@ -214,22 +190,18 @@ function RankingTable({
                 {onSelectRow ? (
                   <button
                     type="button"
-                    className="min-w-0 cursor-pointer text-left hover:underline"
+                    className="hotspot_name_button"
                     title={row.fullLabel}
                     onClick={() => onSelectRow(row)}
                   >
                     {content}
                   </button>
                 ) : (
-                  <div className="min-w-0" title={row.fullLabel}>
+                  <div className="hotspot_name" title={row.fullLabel}>
                     {content}
                   </div>
                 )}
-                <div className="text-right">
-                  <span className="block text-sm font-bold tabular-nums leading-none">
-                    {row.value.toLocaleString()}
-                  </span>
-                </div>
+                <div className="hotspot_peak">{row.value.toLocaleString()}</div>
               </div>
             );
           })}
@@ -344,7 +316,9 @@ export default function PoiRankings({
 
   const activeRows = activeView === 'pois' ? poiRows : typeRows;
   const activeTitle =
-    activeView === 'pois' ? 'Most infectious POIs' : 'Most infectious POI types';
+    activeView === 'pois'
+      ? 'Most infectious POIs'
+      : 'Most infectious POI types';
   const activeIsDisabled =
     activeView === 'pois'
       ? (row: RankRow) => disabledPoiIds.has(row.id)
@@ -368,29 +342,26 @@ export default function PoiRankings({
       : undefined;
   const activeDetail =
     activeView === 'pois'
-      ? (row: RankRow) =>
-          `${row.population.toLocaleString()} present at peak`
+      ? (row: RankRow) => `${row.population.toLocaleString()} present at peak`
       : (row: RankRow) =>
           `${formatPoiCount(row.poiCount ?? 0)}, ${row.population.toLocaleString()} present at peaks`;
 
   return (
-    <div className="flex w-[760px] max-w-full flex-col gap-3">
-      <div className="text-center">
-        <h5 className="font-bold">Infection Hotspots</h5>
-        <p className="-mt-1 text-xs text-(--color-text-muted)">
-          Ranked over the whole run by peak simultaneous infections.
-        </p>
-      </div>
-      <div className="rounded-md border-2 border-(--color-primary-blue) bg-(--color-bg-ivory) p-3">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h6 className="text-sm font-bold">{activeTitle}</h6>
-          <RankingViewToggle
-            activeView={activeView}
-            poiCount={poiRows.length}
-            typeCount={typeRows.length}
-            onChange={setActiveView}
-          />
+    <section className="poi_rankings_panel">
+      <div className="poi_rankings_header">
+        <div>
+          <span className="sim_run_section_kicker">Hotspots</span>
+          <h2 className="sim_run_section_title">Infection hotspots</h2>
         </div>
+        <RankingViewToggle
+          activeView={activeView}
+          poiCount={poiRows.length}
+          typeCount={typeRows.length}
+          onChange={setActiveView}
+        />
+      </div>
+      <div className="poi_rankings_body">
+        <h3 className="poi_rankings_subtitle">{activeTitle}</h3>
         <RankingTable
           rows={activeRows}
           isDisabled={activeIsDisabled}
@@ -400,11 +371,11 @@ export default function PoiRankings({
         />
       </div>
       {onRunDisabledComparison && (
-        <div className="flex flex-col gap-2 rounded-md border border-(--color-border-light) bg-white/60 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-(--color-text-muted)">
+        <div className="poi_comparison_action">
+          <div className="poi_comparison_action_top">
+            <span>
               {effectiveDisabledPoiCount === 0
-                ? 'Toggle POIs or types above to disable them, then re-run.'
+                ? 'No POIs disabled for a comparison run.'
                 : `${effectiveDisabledPoiCount.toLocaleString()} POI${
                     effectiveDisabledPoiCount === 1 ? '' : 's'
                   } disabled — rerouted to their homes.`}
@@ -415,7 +386,7 @@ export default function PoiRankings({
               disabled={
                 effectiveDisabledPoiCount === 0 || disabledComparisonRunning
               }
-              className="shrink-0 rounded-md bg-(--color-primary-blue) px-3 py-1.5 text-sm font-semibold text-(--color-text-light) transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="poi_comparison_button"
             >
               {disabledComparisonRunning
                 ? 'Running…'
@@ -423,10 +394,10 @@ export default function PoiRankings({
             </button>
           </div>
           {disabledComparisonRunning && (
-            <div className="flex flex-col gap-1">
-              <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+            <div className="poi_comparison_progress">
+              <div className="poi_comparison_progress_track">
                 <div
-                  className="h-full rounded-full bg-(--color-primary-blue) transition-[width]"
+                  className="poi_comparison_progress_fill"
                   style={{
                     width: `${Math.min(
                       100,
@@ -436,19 +407,17 @@ export default function PoiRankings({
                 />
               </div>
               {disabledComparisonMessage && (
-                <span className="text-[11px] text-(--color-text-muted)">
-                  {disabledComparisonMessage}
-                </span>
+                <span>{disabledComparisonMessage}</span>
               )}
             </div>
           )}
           {disabledComparisonError && (
-            <span className="text-[11px] text-red-600">
+            <span className="poi_comparison_error">
               {disabledComparisonError}
             </span>
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

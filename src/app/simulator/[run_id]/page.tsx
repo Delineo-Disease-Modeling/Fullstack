@@ -1,11 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ComparisonSummary from '@/components/comparison-summary';
 import EditDeleteActions from '@/components/edit-delete-actions';
-import InstructionBanner from '@/components/instruction-banner';
 import LoginModal from '@/components/login-modal';
 import OutputGraphs from '@/components/outputgraphs';
 import PersonPathPanel from '@/components/person-path-panel';
@@ -41,6 +41,19 @@ interface SimRunData {
 }
 
 type RunView = 'intervention' | 'baseline' | 'disabled';
+
+const RUN_VIEW_LABELS: Record<RunView, string> = {
+  intervention: 'With interventions',
+  baseline: 'Baseline',
+  disabled: 'Disabled POIs'
+};
+
+function formatRunDate(value?: string | null) {
+  if (!value) {
+    return 'Unknown date';
+  }
+  return new Date(value).toLocaleDateString();
+}
 
 function getDisabledPoiIdsFromMetadata(metadata: unknown) {
   if (!metadata || typeof metadata !== 'object') {
@@ -202,6 +215,8 @@ export default function SimulatorRun() {
       : activeView === 'baseline' && baselineId != null
         ? baselineId
         : interventionSimId;
+  const hasComparisonRuns = baselineId != null || disabledSimId != null;
+  const activeViewLabel = RUN_VIEW_LABELS[activeView];
 
   // Swap which run drives the map. setSimData merges by default, so clear it
   // first to guarantee a clean replace rather than a union of both timelines.
@@ -589,18 +604,18 @@ export default function SimulatorRun() {
 
   if (loading) {
     return (
-      <div className="sim_container">
-        <div className="flex flex-col items-center gap-4 my-auto">
-          <div className="text-lg">Loading simulation data...</div>
-          <div className="w-72 rounded-full h-2 bg-(--color-bg-dark)">
+      <div className="sim_container sim_run_container">
+        <div className="sim_run_status">
+          <p className="sim_run_status_label">Loading simulation data</p>
+          <div className="sim_run_status_track">
             <div
-              className="bg-(--color-primary-blue) h-2 rounded-full transition-all duration-100"
+              className="sim_run_status_fill"
               style={{ width: `${Math.max(progress, 2)}%` }}
             />
-            <p className="text-sm text-center mt-2">
-              {progress > 0 ? `${progress}%` : 'Starting...'}
-            </p>
           </div>
+          <p className="sim_run_status_detail">
+            {progress > 0 ? `${progress}%` : 'Starting...'}
+          </p>
         </div>
       </div>
     );
@@ -608,43 +623,52 @@ export default function SimulatorRun() {
 
   if (error) {
     return (
-      <div className="sim_container">
-        <div className="flex flex-col items-center justify-center gap-4 mt-20">
-          <div className="text-red-500 text-lg">{error}</div>
-          <button
+      <div className="sim_container sim_run_container">
+        <div className="sim_run_status">
+          <p className="sim_run_status_label is-error">{error}</p>
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => router.push('/simulator')}
-            className="bg-(--color-bg-dark) text-(--color-text-light) w-32 h-12 p-3 rounded-md transition-[200ms] ease-in-out hover:scale-105 cursor-pointer active:brightness-75"
+            className="sim_return_button"
           >
-            Return
-          </button>
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>New setup</span>
+          </Button>
         </div>
       </div>
     );
   }
 
   if (!selectedZone) {
-    return <div className="sim_container">Loading...</div>;
+    return (
+      <div className="sim_container sim_run_container">
+        <div className="sim_run_status">
+          <p className="sim_run_status_label">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="sim_container">
-      <div className="sim_output px-4">
-        <InstructionBanner text="Tip: Click on a marker in the map below to view its population and infection stats in the charts on the bottom." />
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between">
-            <span className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold">{selectedZone.name}</h2>
-              <p className="text-sm italic text-gray-600">
-                Created on:{' '}
-                {new Date(selectedZone.created_at).toLocaleDateString()}
-              </p>
-            </span>
+    <div className="sim_container sim_run_container">
+      <div className="sim_output sim_run_shell">
+        <header className="sim_run_header">
+          <div className="sim_run_title_group">
+            <span className="sim_run_kicker">Simulation Result</span>
+            <h1 className="sim_run_title">{selectedZone.name}</h1>
+            <div className="sim_run_meta">
+              <span>{runName || 'Untitled Run'}</span>
+              <span>Created {formatRunDate(selectedZone.created_at)}</span>
+              <span>Viewing {activeViewLabel}</span>
+            </div>
+          </div>
 
-            <span className="flex flex-col gap-1 items-end">
-              <h3 className="text-md font-semibold text-(--color-text-dark)">
+          <div className="sim_run_header_actions">
+            <div className="sim_run_edit_actions">
+              <span className="sim_run_edit_label">
                 {runName || 'Untitled Run'}
-              </h3>
+              </span>
               {user ? (
                 <EditDeleteActions
                   align="right"
@@ -686,15 +710,26 @@ export default function SimulatorRun() {
               ) : (
                 <button
                   type="button"
-                  className="text-xs text-(--color-text-muted) hover:underline cursor-pointer"
+                  className="sim_login_edit_button"
                   onClick={() => setLoginOpen(true)}
                 >
                   Login to edit or delete this run
                 </button>
               )}
-            </span>
+            </div>
+            <Button
+              variant="secondary"
+              className="sim_return_button"
+              onClick={() => router.push('/simulator')}
+            >
+              <ArrowLeft size={16} aria-hidden="true" />
+              <span>New setup</span>
+            </Button>
           </div>
-          {(baselineId != null || disabledSimId != null) && (
+        </header>
+
+        {hasComparisonRuns && (
+          <section className="sim_run_panel sim_run_comparison_panel">
             <ComparisonSummary
               referenceSimId={interventionSimId}
               referenceLabel="Interventions"
@@ -707,19 +742,24 @@ export default function SimulatorRun() {
                   : [])
               ]}
             />
-          )}
-          {(baselineId != null || disabledSimId != null) && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm text-(--color-text-muted)">
-                Map view:
-              </span>
-              <div className="inline-flex rounded-md border border-(--color-border-light) overflow-hidden">
+          </section>
+        )}
+
+        <section className="sim_run_panel sim_run_map_panel">
+          <div className="sim_run_section_header">
+            <div>
+              <span className="sim_run_section_kicker">Map</span>
+              <h2 className="sim_run_section_title">
+                Movement and exposure over time
+              </h2>
+            </div>
+            {hasComparisonRuns && (
+              <fieldset className="sim_view_switcher">
+                <legend className="sr-only">Map view</legend>
                 <button
                   type="button"
-                  className={`px-3 py-1.5 text-sm transition-colors ${
-                    activeView === 'intervention'
-                      ? 'bg-(--color-primary-blue) text-(--color-text-light)'
-                      : 'bg-(--color-bg-ivory) hover:brightness-95'
+                  className={`sim_view_switcher_button ${
+                    activeView === 'intervention' ? 'is-active' : ''
                   }`}
                   onClick={() => showRun('intervention')}
                 >
@@ -729,10 +769,8 @@ export default function SimulatorRun() {
                   <button
                     type="button"
                     disabled={!baselinePayload}
-                    className={`px-3 py-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      activeView === 'baseline'
-                        ? 'bg-(--color-primary-blue) text-(--color-text-light)'
-                        : 'bg-(--color-bg-ivory) hover:brightness-95'
+                    className={`sim_view_switcher_button ${
+                      activeView === 'baseline' ? 'is-active' : ''
                     }`}
                     onClick={() => showRun('baseline')}
                   >
@@ -743,10 +781,8 @@ export default function SimulatorRun() {
                   <button
                     type="button"
                     disabled={!disabledPayload}
-                    className={`px-3 py-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      activeView === 'disabled'
-                        ? 'bg-(--color-primary-blue) text-(--color-text-light)'
-                        : 'bg-(--color-bg-ivory) hover:brightness-95'
+                    className={`sim_view_switcher_button ${
+                      activeView === 'disabled' ? 'is-active' : ''
                     }`}
                     onClick={() => showRun('disabled')}
                   >
@@ -755,9 +791,9 @@ export default function SimulatorRun() {
                       : 'Disabled POIs (loading...)'}
                   </button>
                 )}
-              </div>
-            </div>
-          )}
+              </fieldset>
+            )}
+          </div>
           <ModelMap
             key={activeSimId}
             selectedZone={selectedZone}
@@ -765,10 +801,7 @@ export default function SimulatorRun() {
             disabledPoiIds={effectiveDisabledPoiIds}
             onMarkerClick={handleMarkerClick}
           />
-          <PersonPathPanel simId={activeSimId} />
-        </div>
-
-        <InstructionBanner text="Use the time slider or play button to navigate through the simulation timeline." />
+        </section>
 
         <OutputGraphs
           simId={interventionSimId}
@@ -777,6 +810,8 @@ export default function SimulatorRun() {
           selected_loc={selectedLoc}
           onReset={onReset}
         />
+
+        <PersonPathPanel simId={activeSimId} />
 
         <PoiRankings
           onSelectPoi={handleMarkerClick}
@@ -791,10 +826,18 @@ export default function SimulatorRun() {
           disabledComparisonMessage={disabledRunMessage}
           disabledComparisonError={disabledRunError}
         />
+
+        <div className="sim_run_bottom_actions">
+          <Button
+            variant="secondary"
+            className="sim_return_button"
+            onClick={() => router.push('/simulator')}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Return to simulator setup</span>
+          </Button>
+        </div>
       </div>
-      <Button className="w-32" onClick={() => router.push('/simulator')}>
-        Return
-      </Button>
       <LoginModal
         isOpen={loginOpen}
         onRequestClose={() => setLoginOpen(false)}

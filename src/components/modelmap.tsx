@@ -370,7 +370,7 @@ export default function ModelMap({
   }, [maxHours, sim_data]);
 
   return (
-    <div>
+    <div className="modelmap_panel">
       <div className="heatmap-toggle">
         <MapLegend icon_lookup={iconLookup} />
         <div className="heatmap-toggle-group">
@@ -426,7 +426,7 @@ export default function ModelMap({
         peopleDotColor={peopleDotColor}
         personStatusDotGeoJSON={personStatusDotGeoJSON}
       />
-      <div className="mt-3 text-center w-full">
+      <div className="modelmap_current_time">
         {new Date(
           new Date(selectedZone.start_date).getTime() +
             currentTime * 60 * 60 * 1000
@@ -440,11 +440,12 @@ export default function ModelMap({
           timeZone: 'UTC'
         })}
       </div>
-      <div className="flex items-center justify-center gap-3 mt-3">
+      <div className="modelmap_timeline_controls">
         <Button
           variant="primary"
-          className="py-1!"
+          className="modelmap_play_button py-1!"
           onClick={() => setIsPlaying(!isPlaying)}
+          aria-label={isPlaying ? 'Pause timeline' : 'Play timeline'}
         >
           {isPlaying ? (
             <Pause size={14} fill="currentColor" />
@@ -453,16 +454,14 @@ export default function ModelMap({
           )}
         </Button>
         <Slider
-          className="w-full max-w-[90vw]"
+          className="modelmap_slider"
           min={1}
           max={maxHours}
           value={currentTime}
           onChange={(e) => setCurrentTime(parseInt(e.target.value, 10))}
         />
-      </div>
-      <div className="flex justify-center mt-3">
         <input
-          className="w-[10%] px-1 bg-(--color-bg-ivory) outline-solid outline-2 outline-(--color-primary-blue)"
+          className="modelmap_time_input"
           type="number"
           min={1}
           max={maxHours}
