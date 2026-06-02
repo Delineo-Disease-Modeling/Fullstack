@@ -70,23 +70,17 @@ type Row = { label: string; value: string; delta: Delta | null };
 
 function MetricCard({ title, rows }: { title: string; rows: Row[] }) {
   return (
-    <div className="rounded-lg border border-(--color-border-light) bg-(--color-bg-ivory) p-4 flex flex-col gap-3">
-      <span className={`text-xs uppercase tracking-wide ${MUTED_TONE}`}>
-        {title}
-      </span>
-      <div className="flex flex-col gap-2 text-sm">
+    <div className="comparison_metric_card">
+      <span className="comparison_metric_title">{title}</span>
+      <div className="comparison_metric_rows">
         {rows.map((row, i) => (
-          <div key={row.label} className="flex flex-col">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className={i === 0 ? 'font-medium' : MUTED_TONE}>
-                {row.label}
-              </span>
-              <span className="font-semibold tabular-nums whitespace-nowrap">
-                {row.value}
-              </span>
+          <div key={row.label} className="comparison_metric_row">
+            <div>
+              <span className={i === 0 ? 'is-reference' : ''}>{row.label}</span>
+              <span className="comparison_metric_value">{row.value}</span>
             </div>
             <span
-              className={`text-xs font-medium text-right whitespace-nowrap ${
+              className={`comparison_metric_delta ${
                 row.delta ? row.delta.tone : MUTED_TONE
               }`}
             >
@@ -104,7 +98,7 @@ export default function ComparisonSummary({
   referenceLabel = 'Interventions',
   scenarios,
   title = 'Scenario comparison',
-  note = 'Tip: for a clean comparison, disable “Random Seed” before running so every scenario shares the same seed — otherwise some of the difference is stochastic noise rather than the change you made.'
+  note = null
 }: ComparisonSummaryProps) {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -218,32 +212,38 @@ export default function ComparisonSummary({
     : [];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-md font-semibold">{title}</h3>
+    <div className="comparison_summary">
+      <div className="comparison_summary_header">
+        <div>
+          <span className="sim_run_section_kicker">Comparison</span>
+          <h2 className="sim_run_section_title">{title}</h2>
+        </div>
         {!data && !error && (
-          <span className={`text-xs ${MUTED_TONE}`}>Loading comparison…</span>
+          <span className={`comparison_loading ${MUTED_TONE}`}>
+            Loading comparison…
+          </span>
         )}
       </div>
 
       {error ? (
-        <p className={`text-sm ${MUTED_TONE}`}>{error}</p>
+        <p className={`comparison_error ${MUTED_TONE}`}>{error}</p>
       ) : data ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="comparison_metric_grid">
             {cards.map((card) => (
-              <MetricCard key={card.title} title={card.title} rows={card.rows} />
+              <MetricCard
+                key={card.title}
+                title={card.title}
+                rows={card.rows}
+              />
             ))}
           </div>
-          {note && <p className={`text-xs italic ${MUTED_TONE}`}>{note}</p>}
+          {note && <p className={`comparison_note ${MUTED_TONE}`}>{note}</p>}
         </>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="comparison_metric_grid">
           {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="rounded-lg border border-(--color-border-light) bg-(--color-bg-ivory) h-28 animate-pulse"
-            />
+            <div key={i} className="comparison_metric_skeleton" />
           ))}
         </div>
       )}

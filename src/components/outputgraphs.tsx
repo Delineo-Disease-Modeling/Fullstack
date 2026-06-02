@@ -213,6 +213,17 @@ function getSeriesKeys(series: DataPoint[]) {
   return [...keys];
 }
 
+function hasSeriesData(data: DataPoint[], key: string) {
+  return data.some((point) => {
+    const value = point[key];
+    return typeof value === 'number' && Number.isFinite(value);
+  });
+}
+
+function getPlottedSeriesDefs(data: DataPoint[], seriesDefs: SeriesDef[]) {
+  return seriesDefs.filter((series) => hasSeriesData(data, series.key));
+}
+
 function lineSampleStyle(color: string): CSSProperties {
   return { '--series-color': color } as CSSProperties;
 }
@@ -246,6 +257,10 @@ function SeriesLegend({
   hiddenLines: Set<string>;
   onToggle: (key: string) => void;
 }) {
+  if (seriesDefs.length === 0) {
+    return null;
+  }
+
   return (
     <fieldset className="outputgraph_legend">
       <legend className="sr-only">Chart series</legend>
@@ -516,11 +531,22 @@ export default function OutputGraphs({
     hasDisabledPoi
   ]);
 
+  const legendSeriesDefs = useMemo(() => {
+    if (splitCharts.length > 0) {
+      return seriesDefs.filter((series) =>
+        splitCharts.some((chart) => hasSeriesData(chart.data, series.key))
+      );
+    }
+
+    return getPlottedSeriesDefs(mergedData, seriesDefs);
+  }, [mergedData, seriesDefs, splitCharts]);
+
   return (
     <div className="outputgraphs_container">
-      <div className="relative outputgraph_chart">
+      <section className="outputgraph_chart">
         <div className="outputgraph_header">
           <div className="min-w-0">
+            <span className="sim_run_section_kicker">Outcomes</span>
             <h6 className="outputgraph_title">
               {activeChart?.heading ?? 'Infection chart'}
               {selected_loc && <span> for {selected_loc.label}</span>}
@@ -569,7 +595,7 @@ export default function OutputGraphs({
             <p className="text-lg text-red-500">{chartError}</p>
           </div>
         ) : !chartData ? (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center gap-2">
+          <div className="outputgraph_loading">
             <p className="text-md">
               {processing ? 'Processing simulation chart data' : 'Loading...'}
             </p>
@@ -583,41 +609,53 @@ export default function OutputGraphs({
           <>
             {splitCharts.length > 0 ? (
               <div className="outputgraph_split_grid">
-                {splitCharts.map((chart) => (
-                  <section className="outputgraph_split_panel" key={chart.key}>
-                    <h3 className="outputgraph_split_title">{chart.title}</h3>
-                    <div className="outputgraph_split_plot">
-                      <ChartLines
-                        data={chart.data}
-                        seriesDefs={seriesDefs}
-                        hiddenLines={hiddenLines}
-                      />
-                    </div>
-                  </section>
-                ))}
+                {splitCharts.map((chart) => {
+                  const chartSeriesDefs = getPlottedSeriesDefs(
+                    chart.data,
+                    seriesDefs
+                  );
+
+                  return (
+                    <section
+                      className="outputgraph_split_panel"
+                      key={chart.key}
+                    >
+                      <h3 className="outputgraph_split_title">
+                        {chart.title}
+                      </h3>
+                      <div className="outputgraph_split_plot">
+                        <ChartLines
+                          data={chart.data}
+                          seriesDefs={chartSeriesDefs}
+                          hiddenLines={hiddenLines}
+                        />
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
             ) : (
               <div className="outputgraph_plot">
                 <ChartLines
                   data={mergedData}
-                  seriesDefs={seriesDefs}
+                  seriesDefs={legendSeriesDefs}
                   hiddenLines={hiddenLines}
                 />
               </div>
             )}
             <SeriesLegend
-              seriesDefs={seriesDefs}
+              seriesDefs={legendSeriesDefs}
               hiddenLines={hiddenLines}
               onToggle={handleLegendToggle}
             />
           </>
         )}
-      </div>
+      </section>
       {selected_loc && (
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+        <div className="outputgraph_reset">
           <Button
             variant="destructive"
-            className="px-4! py-2! mt-4"
+            className="px-4! py-2!"
             onClick={onReset}
           >
             Reset Selection

@@ -134,9 +134,7 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
     } catch (e) {
       console.error(e);
       setPathData(null);
-      setError(
-        e instanceof Error ? e.message : 'Failed to load person path.'
-      );
+      setError(e instanceof Error ? e.message : 'Failed to load person path.');
     } finally {
       setIsLoading(false);
     }
@@ -147,17 +145,17 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
   };
 
   return (
-    <div className="w-full rounded-md border-2 border-(--color-primary-blue) bg-(--color-bg-ivory) px-3 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Person Movement Explorer</h3>
-        <span className="text-xs text-gray-600">
-          Load a person timeline by simulation person ID.
-        </span>
+    <section className="person_path_panel">
+      <div className="person_path_header">
+        <div>
+          <span className="sim_run_section_kicker">Movement</span>
+          <h2 className="sim_run_section_title">Person path explorer</h2>
+        </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="person_path_controls">
         <input
-          className="w-44 rounded px-2 py-1 text-sm bg-white outline-solid outline-2 outline-(--color-primary-blue)"
+          className="person_path_input"
           type="number"
           min={0}
           step={1}
@@ -172,6 +170,7 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
         />
         <Button
           variant="primary"
+          className="person_path_button"
           onClick={() => void handleLoad()}
           disabled={isLoading || !simId}
         >
@@ -181,7 +180,7 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
           <select
             value={selectedDay}
             onChange={(e) => setSelectedDay(e.target.value)}
-            className="rounded px-2 py-1 text-xs bg-white outline-solid outline-2 outline-(--color-primary-blue)"
+            className="person_path_select"
           >
             <option value="all">All Days</option>
             {pathData.days.map((day) => (
@@ -193,29 +192,28 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
         ) : null}
       </div>
 
-      {error ? <div className="mt-2 text-xs text-red-600">{error}</div> : null}
+      {error ? <div className="person_path_error">{error}</div> : null}
 
       {pathData ? (
-        <div className="mt-3 max-h-96 space-y-3 overflow-y-scroll rounded-md border-2 border-(--color-primary-blue) p-3 pr-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:mr-1 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
-          <div className="text-xs text-gray-700">
-            <span className="font-semibold">Person #{pathData.person_id}</span>
+        <div className="person_path_results">
+          <div className="person_path_summary">
+            <span>Person #{pathData.person_id}</span>
             {pathData.person ? (
               <>
                 {' '}
-                | Age {pathData.person.age ?? '-'} | {pathData.person.sex} | Home #
-                {pathData.person.home ?? '-'}
+                | Age {pathData.person.age ?? '-'} | {pathData.person.sex} |
+                Home #{pathData.person.home ?? '-'}
               </>
-            ) : null}
-            {' '}
+            ) : null}{' '}
             | {pathData.total_hours}h tracked | {pathData.days.length} day(s)
           </div>
 
           {filteredDays.length === 0 ? (
-            <div className="text-xs text-gray-600">
+            <div className="person_path_empty">
               No movement segments found for this person.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="person_path_days">
               {filteredDays.map((day) => {
                 const isExpanded = Boolean(expandedDays[day.day_index]);
                 const visibleStops = isExpanded
@@ -223,27 +221,24 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
                   : day.stops.slice(0, MAX_VISIBLE_STOPS);
 
                 return (
-                  <div
-                    key={day.day_index}
-                    className="rounded border border-[#d7e8f1] bg-white p-2"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-1 text-xs">
-                      <div className="font-semibold">
+                  <div key={day.day_index} className="person_path_day">
+                    <div className="person_path_day_header">
+                      <div>
                         Day {day.day_index} - {formatDayLabel(day.day_date_iso)}
                       </div>
-                      <div className="text-gray-600">{day.total_hours}h tracked</div>
+                      <div>{day.total_hours}h tracked</div>
                     </div>
 
-                    <div className="mt-2 space-y-1 text-xs">
+                    <div className="person_path_stop_list">
                       {visibleStops.map((stop) => (
                         <div
                           key={`${day.day_index}-${stop.location_type}-${stop.location_id}-${stop.start_minute}-${stop.end_time_iso}`}
-                          className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2 rounded px-2 py-1 odd:bg-[#f7fbfe]"
+                          className="person_path_stop"
                         >
                           <span>{formatDateTime(stop.start_time_iso)}</span>
                           <span>{formatDateTime(stop.end_time_iso)}</span>
                           <span>{stop.location_label}</span>
-                          <span className="font-semibold">
+                          <span className="person_path_stop_duration">
                             {formatDuration(stop.duration_minutes)}
                           </span>
                         </div>
@@ -253,7 +248,7 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
                     {day.stops.length > MAX_VISIBLE_STOPS ? (
                       <button
                         type="button"
-                        className="mt-2 text-xs text-[#2a6f92] underline"
+                        className="person_path_show_more"
                         onClick={() => toggleDayExpansion(day.day_index)}
                       >
                         {isExpanded
@@ -263,20 +258,21 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
                     ) : null}
 
                     {day.totals?.length ? (
-                      <div className="mt-2 border-t border-[#e6eef3] pt-2">
-                        <div className="mb-1 text-xs font-semibold">
+                      <div className="person_path_totals">
+                        <div className="person_path_totals_title">
                           Top locations by time
                         </div>
-                        <div className="grid gap-1 text-xs">
+                        <div className="person_path_totals_list">
                           {day.totals.slice(0, 5).map((total) => (
                             <div
                               key={`${day.day_index}-${total.location_type}-${total.location_id}`}
-                              className="flex justify-between gap-2"
+                              className="person_path_total_row"
                             >
                               <span>{total.location_label}</span>
                               <span>
                                 {formatDuration(total.duration_minutes)} (
-                                {total.visits} visit{total.visits === 1 ? '' : 's'})
+                                {total.visits} visit
+                                {total.visits === 1 ? '' : 's'})
                               </span>
                             </div>
                           ))}
@@ -290,6 +286,6 @@ export default function PersonPathPanel({ simId }: PersonPathPanelProps) {
           )}
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }
