@@ -42,15 +42,17 @@ export type SimSettings = {
   dmp_mode: DmpMode;
   model_path_by_variant: Record<string, string | null>;
   matrix_by_variant: Record<string, number | null>;
+  disabled_poi_ids: string[];
   interventions: Interventions[];
+  // Client-only: when true, the submit flow also runs a second, no-intervention
+  // baseline sim over the same zone so the results page can compare the two.
+  // Stripped from the request payload in buildSimulationRequest.
+  compareBaseline: boolean;
 };
 
 interface SimSettingsActions {
   setSettings: (new_settings: Partial<SimSettings>) => void;
-  addInterventions: (
-    time: number,
-    values?: InterventionValues
-  ) => void;
+  addInterventions: (time: number, values?: InterventionValues) => void;
   deleteInterventions: (time: number) => void;
 }
 
@@ -83,7 +85,9 @@ const default_settings: SimSettings = {
     Delta: 'variant.Delta.general'
   },
   matrix_by_variant: {},
-  interventions: [{ ...DEFAULT_INTERVENTIONS }]
+  disabled_poi_ids: [],
+  interventions: [{ ...DEFAULT_INTERVENTIONS }],
+  compareBaseline: false
 };
 
 const useSimSettings = create<SimSettingsStore>((set) => ({

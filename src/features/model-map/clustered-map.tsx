@@ -1,37 +1,40 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { MapRef } from 'react-map-gl/maplibre';
 import {
   Layer,
   Map as MapLibreMap,
   Popup,
   Source
 } from 'react-map-gl/maplibre';
-import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/modelmap.css';
+import EmojiOverlay from '@/features/model-map/emoji-overlay';
 import {
-  makeGeoJSON,
+  CLUSTER_COLOR_EXPRESSION,
+  type HeatmapMode,
+  PERSON_STATUS_DOT_RADIUS,
+  POINTS_CLUSTER_PROPERTIES,
+  RECOVERED_DOT_COLOR
+} from '@/features/model-map/map-constants';
+import {
   type GeoJSONData,
   type MapPoi,
+  makeGeoJSON,
+  makePoiFootprintGeoJSON,
   type PeopleDotFeatureCollection,
   type PersonStatusDotFeatureCollection
 } from '@/features/model-map/map-data';
-import {
-  CLUSTER_COLOR_EXPRESSION,
-  PERSON_STATUS_DOT_RADIUS,
-  POINTS_CLUSTER_PROPERTIES,
-  RECOVERED_DOT_COLOR,
-  type HeatmapMode
-} from '@/features/model-map/map-constants';
 import type {
   MapClickEvent,
   MapLoadEvent,
   ModelMapInstance,
   PopupInfo,
-  RenderedPointFeature
+  RenderedMapFeature
 } from '@/features/model-map/map-types';
-import EmojiOverlay from '@/features/model-map/emoji-overlay';
+
+const DISABLED_POI_COLOR = '#111827';
 
 interface ClusteredMapProps {
   currentTime: number;
@@ -44,6 +47,35 @@ interface ClusteredMapProps {
   peopleDotGeoJSON: PeopleDotFeatureCollection;
   peopleDotColor: string;
   personStatusDotGeoJSON: PersonStatusDotFeatureCollection;
+}
+
+function asPointCoordinate(value: unknown): [number, number] | null {
+  if (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === 'number' &&
+    typeof value[1] === 'number' &&
+    Number.isFinite(value[0]) &&
+    Number.isFinite(value[1])
+  ) {
+    return [value[0], value[1]];
+  }
+  return null;
+}
+
+function getFeaturePointCoordinate(
+  feature: RenderedMapFeature | undefined
+): [number, number] | null {
+  return asPointCoordinate(feature?.geometry?.coordinates);
+}
+
+function getPoiCenterFromProperties(
+  props: RenderedMapFeature['properties']
+): [number, number] | null {
+  const lat = Number(props?.latitude);
+  const lng = Number(props?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return [lng, lat];
 }
 
 export default function ClusteredMap({
@@ -118,9 +150,22 @@ export default function ClusteredMap({
     }
     const isPeople = heatmapMode === 'people';
     for (const id of [
+      'poi-footprint-fill',
+      'poi-footprint-outline',
+      'poi-footprint-labels'
+    ]) {
+      if (mapInstance.getLayer(id))
+        mapInstance.setLayoutProperty(
+          id,
+          'visibility',
+          isPeople ? 'visible' : 'none'
+        );
+    }
+    for (const id of [
       'person-status-uninfected',
       'person-status-recovered',
-      'person-status-infected'
+      'person-status-infected',
+      'person-status-disabled'
     ]) {
       if (mapInstance.getLayer(id))
         mapInstance.setLayoutProperty(
@@ -141,20 +186,39 @@ export default function ClusteredMap({
   }, []);
 
   const geojson = useMemo(() => makeGeoJSON(pois), [pois]);
+  const poiFootprintGeoJSON = useMemo(
+    () => makePoiFootprintGeoJSON(pois),
+    [pois]
+  );
+  const poiLabelGeoJSON = useMemo(
+    () => makeGeoJSON(pois.filter((poi) => poi.type === 'places')),
+    [pois]
+  );
+
+  // Hotspot hours for the open popup, read from the same `hotspots` prop the
+  // map renders from (minutes → hour), so the popup needn't re-bake them.
+  const popupHotspotHours = useMemo(() => {
+    if (!popupInfo) return null;
+    const hours = hotspots?.[popupInfo.id];
+    if (!hours || hours.length === 0) return null;
+    return hours.map((t) => Math.floor(t / 60)).join(', ');
+  }, [popupInfo, hotspots]);
 
   const handleClick = (event: MapClickEvent) => {
-    const feature = event.features?.[0] as RenderedPointFeature | undefined;
+    const feature = event.features?.[0] as RenderedMapFeature | undefined;
     if (!feature?.properties) return;
     const props = feature.properties;
     const map = event.target as ModelMapInstance;
     if (props.cluster) {
       const clusterId = props.cluster_id;
       if (clusterId === undefined) return;
+      const clusterCoordinates = getFeaturePointCoordinate(feature);
+      if (!clusterCoordinates) return;
       const source = map.getSource('points');
       if (!source?.getClusterExpansionZoom) return;
       source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
         map.easeTo({
-          center: feature.geometry.coordinates,
+          center: clusterCoordinates,
           zoom: zoom + 0.5,
           duration: 600
         });
@@ -170,7 +234,9 @@ export default function ClusteredMap({
       label: markerLabel,
       type: markerType
     });
-    const coords = feature.geometry.coordinates;
+    const coords =
+      getFeaturePointCoordinate(feature) ?? getPoiCenterFromProperties(props);
+    if (!coords) return;
     map.easeTo({
       center: coords,
       zoom: Math.max(map.getZoom(), 15),
@@ -182,15 +248,36 @@ export default function ClusteredMap({
         setPopupInfo({
           coordinates: coords,
           label: markerLabel,
-          description: props.description ?? '',
           icon: props.icon ?? '',
-          id: markerId
+          id: markerId,
+          category: props.top_category,
+          population: Number(props.population ?? 0),
+          infected: Number(props.infected ?? 0),
+          infectionRatio: Number(props.infection_ratio ?? 0)
         }),
       250
     );
   };
 
   const clusterColor = CLUSTER_COLOR_EXPRESSION;
+  const unclusteredPointColor = [
+    'case',
+    ['==', ['get', 'disabled'], true],
+    DISABLED_POI_COLOR,
+    clusterColor
+  ] as unknown as string;
+  const peopleDotPaintColor = [
+    'case',
+    ['==', ['get', 'disabled'], true],
+    DISABLED_POI_COLOR,
+    peopleDotColor
+  ] as unknown as string;
+  const footprintPaintColor = [
+    'case',
+    ['==', ['get', 'disabled'], true],
+    DISABLED_POI_COLOR,
+    '#0f766e'
+  ] as unknown as string;
 
   return (
     <div
@@ -213,7 +300,10 @@ export default function ClusteredMap({
         interactiveLayerIds={[
           'clusters',
           'unclustered-point-circle',
-          'unclustered-point-emoji'
+          'unclustered-point-emoji',
+          'poi-footprint-fill',
+          'poi-footprint-outline',
+          'poi-footprint-labels'
         ]}
         onClick={handleClick}
       >
@@ -287,15 +377,8 @@ export default function ClusteredMap({
             type="symbol"
             filter={['has', 'point_count']}
             layout={{
-              'text-field': [
-                'format',
-                ['get', 'population'],
-                { 'font-scale': 1.2 },
-                '\n',
-                ['concat', 'Inf: ', ['get', 'infected']],
-                { 'font-scale': 0.8 }
-              ],
-              'text-size': 12,
+              'text-field': ['get', 'population'],
+              'text-size': 13,
               'text-allow-overlap': true
             }}
             paint={{ 'text-color': '#fff', 'text-opacity': 1 }}
@@ -306,7 +389,7 @@ export default function ClusteredMap({
             filter={['!', ['has', 'point_count']]}
             paint={{
               'circle-radius': 14,
-              'circle-color': clusterColor,
+              'circle-color': unclusteredPointColor,
               'circle-opacity': 1,
               'circle-stroke-color': '#fff',
               'circle-stroke-width': 1
@@ -352,9 +435,66 @@ export default function ClusteredMap({
                 18,
                 6
               ] as const,
-              'circle-color': peopleDotColor,
+              'circle-color': peopleDotPaintColor,
               'circle-opacity': 0.72,
               'circle-stroke-width': 0
+            }}
+          />
+        </Source>
+        <Source id="poi-footprints" type="geojson" data={poiFootprintGeoJSON}>
+          <Layer
+            id="poi-footprint-fill"
+            type="fill"
+            minzoom={13}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'fill-color': footprintPaintColor,
+              'fill-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                13,
+                0.08,
+                16,
+                0.18
+              ] as const
+            }}
+          />
+          <Layer
+            id="poi-footprint-outline"
+            type="line"
+            minzoom={13}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'line-color': footprintPaintColor,
+              'line-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                13,
+                0.32,
+                16,
+                0.75
+              ] as const,
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                13,
+                0.6,
+                16,
+                1.4,
+                18,
+                2.2
+              ] as const
             }}
           />
         </Source>
@@ -419,6 +559,65 @@ export default function ClusteredMap({
               'circle-stroke-width': 0
             }}
           />
+          <Layer
+            id="person-status-disabled"
+            type="circle"
+            filter={['==', ['get', 'disabled'], true]}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-radius': PERSON_STATUS_DOT_RADIUS,
+              'circle-color': DISABLED_POI_COLOR,
+              'circle-opacity': 0.88,
+              'circle-stroke-width': 0
+            }}
+          />
+        </Source>
+        <Source id="poi-label-points" type="geojson" data={poiLabelGeoJSON}>
+          <Layer
+            id="poi-footprint-labels"
+            type="symbol"
+            minzoom={13.2}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none',
+                'text-field': ['get', 'label'],
+                'text-size': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  13.2,
+                  10.5,
+                  17,
+                  13
+                ],
+                'text-font': ['Open Sans Regular'],
+                'text-anchor': 'top',
+                'text-offset': [0, 1.1],
+                'text-max-width': 12,
+                'text-padding': 3,
+                'text-allow-overlap': false,
+                'text-ignore-placement': false
+              } as const
+            }
+            paint={{
+              'text-color': '#111827',
+              'text-halo-color': '#ffffff',
+              'text-halo-width': 1.6,
+              'text-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                13.2,
+                0,
+                13.8,
+                1
+              ] as const
+            }}
+          />
         </Source>
         {zoneGeoJSON?.features?.length ? (
           <Source
@@ -456,14 +655,34 @@ export default function ClusteredMap({
             onClose={() => setPopupInfo(null)}
             style={{ zIndex: 10, marginTop: '1rem' }}
           >
-            <div className="max-w-36 whitespace-pre-line font-[Poppins] text-center">
+            <div className="max-w-44 font-[Poppins] text-center">
               <div className="text-2xl mb-0.5 font-['Noto_Color_Emoji']">
                 {popupInfo.icon}
               </div>
-              <header className="text-sm font-bold mb-0.5">
+              <header className="text-sm font-bold leading-tight">
                 {popupInfo.label}
               </header>
-              <p className="text-xs">{popupInfo.description}</p>
+              {popupInfo.category && (
+                <p className="text-[11px] italic text-(--color-text-muted) mb-1">
+                  {popupInfo.category}
+                </p>
+              )}
+              <p className="text-xs">
+                {popupInfo.population}{' '}
+                {popupInfo.population === 1 ? 'person' : 'people'} ·{' '}
+                {popupInfo.infected} infected
+              </p>
+              {popupInfo.population > 0 && (
+                <p className="text-xs font-semibold">
+                  {Math.round(popupInfo.infectionRatio * 100)}% infected
+                </p>
+              )}
+              {popupHotspotHours && (
+                <p className="text-[11px] mt-1">
+                  Hotspot at hour{popupHotspotHours.includes(',') ? 's' : ''}:{' '}
+                  {popupHotspotHours}
+                </p>
+              )}
             </div>
           </Popup>
         )}

@@ -3,6 +3,7 @@ import type {
   GeoJSONData,
   GeoJSONFeature,
   GeoJSONGeometry,
+  GeoJSONPolygonGeometry,
   HotspotsByLocation,
   HouseholdCircleDraft,
   HouseholdCircleLayout,
@@ -17,6 +18,7 @@ import type {
   PersonStatusDotFeature,
   PersonStatusDotFeatureCollection,
   PoiFeatureCollection,
+  PoiFootprintFeatureCollection,
   SimTimeDataForMap
 } from './map-types';
 
@@ -25,6 +27,7 @@ export type {
   GeoJSONData,
   GeoJSONFeature,
   GeoJSONGeometry,
+  GeoJSONPolygonGeometry,
   HotspotsByLocation,
   MapLocation,
   MapPoi,
@@ -34,6 +37,7 @@ export type {
   PeopleMapData,
   PersonStatusDotFeatureCollection,
   PoiFeatureCollection,
+  PoiFootprintFeatureCollection,
   SimTimeDataForMap
 } from './map-types';
 
@@ -352,7 +356,8 @@ function computeDiskLayout(
   const offsetA = 1 + Math.floor(hashUnit(seed, 11) * 997);
   const offsetB = 1 + Math.floor(hashUnit(seed, 13) * 997);
   // Scale the disk radius with sqrt(count) so density stays roughly constant
-  const radius = NO_FOOTPRINT_DOT_JITTER_DEGREES * Math.max(1, Math.sqrt(count / 24));
+  const radius =
+    NO_FOOTPRINT_DOT_JITTER_DEGREES * Math.max(1, Math.sqrt(count / 24));
   const cos = Math.max(Math.cos((centerLat * Math.PI) / 180), 0.35);
   const out: Coordinate[] = new Array(count);
   for (let i = 0; i < count; i++) {
@@ -887,6 +892,7 @@ export function updateIcons(
         latitude: lat,
         longitude: lng,
         label,
+        top_category: type === 'places' ? data.top_category : undefined,
         description,
         footprint: type === 'places' ? (data.footprint ?? null) : null,
         icon:
@@ -977,7 +983,8 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
           id: `${poi.type}-${poi.id}-${i}`,
           loc_id: poi.id,
           loc_type: poi.type,
-          label: poi.label
+          label: poi.label,
+          disabled: Boolean(poi.disabled)
         },
         geometry: {
           type: 'Point',
@@ -1065,7 +1072,8 @@ export function makePersonStatusDotGeoJSON(
           label: poi.label,
           infected: person.infected,
           newly_infected: person.newly_infected,
-          recovered: person.recovered
+          recovered: person.recovered,
+          disabled: Boolean(poi.disabled)
         },
         geometry: {
           type: 'Point',
@@ -1079,6 +1087,39 @@ export function makePersonStatusDotGeoJSON(
     type: 'FeatureCollection',
     features
   } satisfies PersonStatusDotFeatureCollection;
+}
+
+function isFootprintGeometry(
+  geometry: GeoJSONGeometry | null | undefined
+): geometry is GeoJSONPolygonGeometry {
+  return (
+    !!geometry &&
+    (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') &&
+    Array.isArray(geometry.coordinates)
+  );
+}
+
+export function makePoiFootprintGeoJSON(pois: MapPoi[]) {
+  const features: PoiFootprintFeatureCollection['features'] = [];
+
+  for (const poi of pois) {
+    const footprint = poi.footprint;
+    if (poi.type !== 'places' || !isFootprintGeometry(footprint)) continue;
+
+    features.push({
+      type: 'Feature',
+      properties: {
+        ...poi,
+        infection_ratio: poi.population > 0 ? poi.infected / poi.population : 0
+      },
+      geometry: footprint
+    });
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features
+  } satisfies PoiFootprintFeatureCollection;
 }
 
 export function makeGeoJSON(pois: MapPoi[]) {

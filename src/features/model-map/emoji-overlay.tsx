@@ -39,13 +39,16 @@ export default function EmojiOverlay({
         const infectionRatio = Number.parseFloat(
           String(props.infection_ratio || 0)
         );
+        const isDisabled =
+          props.disabled === true || String(props.disabled) === 'true';
         const adjusted = Math.sqrt(infectionRatio);
-        let baseColor = '#4CAF50';
-        if (adjusted >= 0.5) baseColor = '#F44336';
-        else if (adjusted >= 0.35) baseColor = '#FF9800';
-        else if (adjusted >= 0.2) baseColor = '#FFEB3B';
+        let baseColor = isDisabled ? '#111827' : '#4CAF50';
+        if (!isDisabled && adjusted >= 0.5) baseColor = '#F44336';
+        else if (!isDisabled && adjusted >= 0.35) baseColor = '#FF9800';
+        else if (!isDisabled && adjusted >= 0.2) baseColor = '#FFEB3B';
         const size = 6 + zoom * 1.2;
         const isHotspot =
+          !isDisabled &&
           props.type === 'places' &&
           hotspots &&
           Object.keys(hotspots).includes(String(props.id ?? ''));
