@@ -70,7 +70,8 @@ test('makePeopleDotGeoJSON ignores homes and places dots inside place footprints
         footprint: square,
         icon: '🏥',
         population: 3,
-        infected: 2
+        infected: 2,
+        disabled: true
       }
     ],
     'population'
@@ -78,6 +79,7 @@ test('makePeopleDotGeoJSON ignores homes and places dots inside place footprints
 
   assert.equal(data.features.length, 3);
   assert.equal(data.features[0].properties.loc_id, 'p1');
+  assert.equal(data.features[0].properties.disabled, true);
   for (const feature of data.features) {
     const [lng, lat] = feature.geometry.coordinates;
     assert.equal(pointInGeometry(lng, lat, square), true);
@@ -96,7 +98,8 @@ test('makePersonStatusDotGeoJSON keeps person dots stable inside place footprint
       footprint: square,
       icon: '🏥',
       population: 3,
-      infected: 2
+      infected: 2,
+      disabled: true
     }
   ];
   const peopleMap = {
@@ -125,6 +128,7 @@ test('makePersonStatusDotGeoJSON keeps person dots stable inside place footprint
   assert.equal(first.features[1].properties.person_id, 'b');
   assert.equal(first.features[1].properties.infected, true);
   assert.equal(first.features[1].properties.newly_infected, true);
+  assert.equal(first.features[1].properties.disabled, true);
   for (const feature of first.features) {
     const [lng, lat] = feature.geometry.coordinates;
     assert.equal(pointInGeometry(lng, lat, square), true);

@@ -983,7 +983,8 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
           id: `${poi.type}-${poi.id}-${i}`,
           loc_id: poi.id,
           loc_type: poi.type,
-          label: poi.label
+          label: poi.label,
+          disabled: Boolean(poi.disabled)
         },
         geometry: {
           type: 'Point',
@@ -1071,7 +1072,8 @@ export function makePersonStatusDotGeoJSON(
           label: poi.label,
           infected: person.infected,
           newly_infected: person.newly_infected,
-          recovered: person.recovered
+          recovered: person.recovered,
+          disabled: Boolean(poi.disabled)
         },
         geometry: {
           type: 'Point',

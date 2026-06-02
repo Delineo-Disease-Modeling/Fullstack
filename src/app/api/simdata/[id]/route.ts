@@ -19,6 +19,14 @@ function getPublicZone<T extends { guest_claim_token_hash?: unknown }>(
   return publicZone;
 }
 
+function getRunMetadata(globalStats: unknown) {
+  if (!globalStats || typeof globalStats !== 'object') {
+    return null;
+  }
+  const metadata = (globalStats as Record<string, unknown>).metadata;
+  return metadata === undefined ? null : metadata;
+}
+
 /** Optionally gzip-compress a response body if the client accepts it. */
 function maybeCompress(
   body: BodyInit,
@@ -72,6 +80,7 @@ export async function GET(
   const fileId = simdata.file_id;
   const mapCachePath = `${DB_FOLDER}${fileId}.map.json`;
   const publicZone = getPublicZone(simdata.czone);
+  const metadata = getRunMetadata(simdata.global_stats);
 
   const acceptEncoding = request.headers.get('accept-encoding');
 
@@ -117,7 +126,8 @@ export async function GET(
           zone: publicZone,
           papdata: parsed.papdata,
           simdata: filteredSimdata,
-          hotspots: parsed.hotspots ?? {}
+          hotspots: parsed.hotspots ?? {},
+          metadata
         }
       });
 
@@ -128,7 +138,7 @@ export async function GET(
     }
 
     // Non-paginated: splice header + raw cache bytes + suffix (zero-parse)
-    const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(publicZone)}`;
+    const headerStr = `{"data":{"name":${JSON.stringify(simdata.name)},"length":${simdata.length},"zone":${JSON.stringify(publicZone)},"metadata":${JSON.stringify(metadata)}`;
 
     const body = Buffer.concat([
       Buffer.from(headerStr, 'utf8'),
@@ -155,8 +165,7 @@ export async function GET(
     {
       processing: true,
       progress,
-      message:
-        'Simulation data is still being processed. Please retry shortly.'
+      message: 'Simulation data is still being processed. Please retry shortly.'
     },
     { status: 202 }
   );
@@ -198,10 +207,7 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
-      return Response.json(
-        { message: parsed.error.message },
-        { status: 400 }
-      );
+      return Response.json({ message: parsed.error.message }, { status: 400 });
     }
 
     const { name } = parsed.data;

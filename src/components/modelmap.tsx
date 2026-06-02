@@ -5,37 +5,38 @@ import useMapData from '@/stores/mapdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/modelmap.css';
-import MapLegend from './maplegend';
-import Slider from '@/components/ui/slider';
-import Button from '@/components/ui/button';
 import { Pause, Play } from 'lucide-react';
+import Button from '@/components/ui/button';
+import Slider from '@/components/ui/slider';
+import ClusteredMap from '@/features/model-map/clustered-map';
 import {
+  type HeatmapMode,
+  PEOPLE_MAP_PREFETCH_STEPS,
+  PLAYBACK_INTERVAL_MS
+} from '@/features/model-map/map-constants';
+import {
+  type GeoJSONData,
   iconLookup,
   makePeopleDotGeoJSON,
   makePersonStatusDotGeoJSON,
-  resetModelMapLayoutCaches,
-  updateIcons,
-  type GeoJSONData,
   type PeopleDotFeatureCollection,
   type PeopleMapData,
-  type PersonStatusDotFeatureCollection
+  type PersonStatusDotFeatureCollection,
+  resetModelMapLayoutCaches,
+  updateIcons
 } from '@/features/model-map/map-data';
-import {
-  PEOPLE_MAP_PREFETCH_STEPS,
-  PLAYBACK_INTERVAL_MS,
-  type HeatmapMode
-} from '@/features/model-map/map-constants';
 import {
   getMapStorageKey,
   getPeopleMapCacheKey,
   getStoredCurrentTime,
   getStoredHeatmapMode
 } from '@/features/model-map/map-storage';
-import ClusteredMap from '@/features/model-map/clustered-map';
+import MapLegend from './maplegend';
 
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
   simId?: number | null;
+  disabledPoiIds?: ReadonlySet<string>;
   selectedZone: {
     latitude: number;
     longitude: number;
@@ -47,6 +48,7 @@ interface ModelMapProps {
 
 export default function ModelMap({
   onMarkerClick,
+  disabledPoiIds,
   simId,
   selectedZone
 }: ModelMapProps) {
@@ -167,8 +169,30 @@ export default function ModelMap({
       selectedTimestep !== null
         ? sim_data?.[selectedTimestep.toString()]
         : null;
-    return updateIcons(mapCenter, dataForTime, pap_data, hotspots, zoneGeoJSON);
-  }, [hotspots, mapCenter, pap_data, sim_data, selectedTimestep, zoneGeoJSON]);
+    const nextPois = updateIcons(
+      mapCenter,
+      dataForTime,
+      pap_data,
+      hotspots,
+      zoneGeoJSON
+    );
+    if (!disabledPoiIds?.size) {
+      return nextPois;
+    }
+    return nextPois.map((poi) =>
+      poi.type === 'places' && disabledPoiIds.has(String(poi.id))
+        ? { ...poi, disabled: true }
+        : poi
+    );
+  }, [
+    disabledPoiIds,
+    hotspots,
+    mapCenter,
+    pap_data,
+    sim_data,
+    selectedTimestep,
+    zoneGeoJSON
+  ]);
 
   const loadPeopleMapData = useCallback(
     async (timestep: number) => {

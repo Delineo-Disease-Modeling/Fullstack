@@ -34,6 +34,8 @@ import type {
   RenderedMapFeature
 } from '@/features/model-map/map-types';
 
+const DISABLED_POI_COLOR = '#111827';
+
 interface ClusteredMapProps {
   currentTime: number;
   mapCenter: [number, number];
@@ -162,7 +164,8 @@ export default function ClusteredMap({
     for (const id of [
       'person-status-uninfected',
       'person-status-recovered',
-      'person-status-infected'
+      'person-status-infected',
+      'person-status-disabled'
     ]) {
       if (mapInstance.getLayer(id))
         mapInstance.setLayoutProperty(
@@ -257,6 +260,24 @@ export default function ClusteredMap({
   };
 
   const clusterColor = CLUSTER_COLOR_EXPRESSION;
+  const unclusteredPointColor = [
+    'case',
+    ['==', ['get', 'disabled'], true],
+    DISABLED_POI_COLOR,
+    clusterColor
+  ] as unknown as string;
+  const peopleDotPaintColor = [
+    'case',
+    ['==', ['get', 'disabled'], true],
+    DISABLED_POI_COLOR,
+    peopleDotColor
+  ] as unknown as string;
+  const footprintPaintColor = [
+    'case',
+    ['==', ['get', 'disabled'], true],
+    DISABLED_POI_COLOR,
+    '#0f766e'
+  ] as unknown as string;
 
   return (
     <div
@@ -368,7 +389,7 @@ export default function ClusteredMap({
             filter={['!', ['has', 'point_count']]}
             paint={{
               'circle-radius': 14,
-              'circle-color': clusterColor,
+              'circle-color': unclusteredPointColor,
               'circle-opacity': 1,
               'circle-stroke-color': '#fff',
               'circle-stroke-width': 1
@@ -414,7 +435,7 @@ export default function ClusteredMap({
                 18,
                 6
               ] as const,
-              'circle-color': peopleDotColor,
+              'circle-color': peopleDotPaintColor,
               'circle-opacity': 0.72,
               'circle-stroke-width': 0
             }}
@@ -431,7 +452,7 @@ export default function ClusteredMap({
               } as const
             }
             paint={{
-              'fill-color': '#0f766e',
+              'fill-color': footprintPaintColor,
               'fill-opacity': [
                 'interpolate',
                 ['linear'],
@@ -453,7 +474,7 @@ export default function ClusteredMap({
               } as const
             }
             paint={{
-              'line-color': '#0f766e',
+              'line-color': footprintPaintColor,
               'line-opacity': [
                 'interpolate',
                 ['linear'],
@@ -535,6 +556,22 @@ export default function ClusteredMap({
               'circle-radius': PERSON_STATUS_DOT_RADIUS,
               'circle-color': '#dc2626',
               'circle-opacity': 0.95,
+              'circle-stroke-width': 0
+            }}
+          />
+          <Layer
+            id="person-status-disabled"
+            type="circle"
+            filter={['==', ['get', 'disabled'], true]}
+            layout={
+              {
+                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-radius': PERSON_STATUS_DOT_RADIUS,
+              'circle-color': DISABLED_POI_COLOR,
+              'circle-opacity': 0.88,
               'circle-stroke-width': 0
             }}
           />

@@ -64,6 +64,7 @@ export type MapPoi = {
   icon: string;
   population: number;
   infected: number;
+  disabled?: boolean;
 };
 
 export type HouseholdCircleLayout = {
@@ -97,6 +98,7 @@ export type PeopleDotFeature = {
     loc_id: string | number;
     loc_type: MapPoiType;
     label: string;
+    disabled: boolean;
   };
   geometry: {
     type: 'Point';
@@ -142,6 +144,7 @@ export type PersonStatusDotFeature = {
     infected: boolean;
     newly_infected: boolean;
     recovered: boolean;
+    disabled: boolean;
   };
   geometry: {
     type: 'Point';
@@ -190,6 +193,7 @@ export type PointFeatureProperties = {
   cluster?: boolean;
   cluster_id?: number;
   description?: string;
+  disabled?: boolean | string;
   icon?: string;
   id?: string | number;
   infected?: number | string;

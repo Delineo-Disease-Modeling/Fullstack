@@ -7,110 +7,136 @@ import {
   type OutcomeStats
 } from '@/lib/chartdata-client';
 
-interface ComparisonSummaryProps {
-  interventionSimId: number;
-  baselineSimId: number;
+/** A scenario compared against the reference run (e.g. baseline, disabled POIs). */
+export interface ComparisonScenario {
+  simId: number;
+  label: string;
 }
 
-type Pair = { baseline: OutcomeStats; intervention: OutcomeStats };
+interface ComparisonSummaryProps {
+  /** The anchor run every other scenario is measured against (the current/intervention run). */
+  referenceSimId: number;
+  referenceLabel?: string;
+  scenarios: ComparisonScenario[];
+  title?: string;
+  note?: string | null;
+}
 
 type Delta = { text: string; tone: string };
 
+type LoadedStats = {
+  label: string;
+  stats: OutcomeStats;
+};
+
+type Loaded = {
+  reference: OutcomeStats;
+  scenarios: LoadedStats[];
+};
+
 const MUTED_TONE = 'text-(--color-text-muted)';
+// Green = the better epidemic outcome (fewer infections / a later, flatter peak);
+// amber = the worse one. Always read relative to the reference (intervention) run.
+const GOOD_TONE = 'text-green-600';
+const BAD_TONE = 'text-amber-600';
 
-function reductionPct(baseline: number, intervention: number): number | null {
-  if (baseline <= 0) return null;
-  return ((baseline - intervention) / baseline) * 100;
+/** Metrics where fewer is better (peak, total infected), measured vs. the reference run. */
+function lowerIsBetterDelta(referenceValue: number, value: number): Delta {
+  if (referenceValue <= 0) return { text: '—', tone: MUTED_TONE };
+  const pct = ((value - referenceValue) / referenceValue) * 100;
+  if (Math.abs(pct) < 0.5) return { text: 'about the same', tone: MUTED_TONE };
+  if (pct < 0)
+    return { text: `↓ ${Math.abs(pct).toFixed(0)}% lower`, tone: GOOD_TONE };
+  return { text: `↑ ${pct.toFixed(0)}% higher`, tone: BAD_TONE };
 }
 
-/** Metrics where a lower intervention value is the win (peak, total infected). */
-function betterWhenLower(
-  baseline: number,
-  intervention: number,
-  noun: string
-): Delta {
-  const r = reductionPct(baseline, intervention);
-  if (r === null) return { text: '—', tone: MUTED_TONE };
-  if (Math.abs(r) < 0.5) return { text: `About the same ${noun}`, tone: MUTED_TONE };
-  if (r > 0) {
-    return { text: `↓ ${r.toFixed(0)}% lower ${noun}`, tone: 'text-green-600' };
-  }
+/** Time-to-peak: a later peak (a flattened curve) is the win. */
+function peakTimingDelta(referenceHours: number, hours: number): Delta {
+  const deltaDays = (hours - referenceHours) / 24;
+  if (Math.abs(deltaDays) < 0.05)
+    return { text: 'same timing', tone: MUTED_TONE };
+  if (deltaDays > 0)
+    return { text: `${deltaDays.toFixed(1)} days later`, tone: GOOD_TONE };
   return {
-    text: `↑ ${Math.abs(r).toFixed(0)}% higher ${noun}`,
-    tone: 'text-amber-600'
-  };
-}
-
-/** Time-to-peak: a later intervention peak (a flattened curve) is the win. */
-function peakTimingDelta(baselineHours: number, interventionHours: number): Delta {
-  const deltaDays = (interventionHours - baselineHours) / 24;
-  if (Math.abs(deltaDays) < 0.05) return { text: 'Same timing', tone: MUTED_TONE };
-  if (deltaDays > 0) {
-    return { text: `Peak delayed ${deltaDays.toFixed(1)} days`, tone: 'text-green-600' };
-  }
-  return {
-    text: `Peak ${Math.abs(deltaDays).toFixed(1)} days earlier`,
-    tone: 'text-amber-600'
+    text: `${Math.abs(deltaDays).toFixed(1)} days earlier`,
+    tone: BAD_TONE
   };
 }
 
 const countFmt = (n: number) => Math.round(n).toLocaleString();
 const daysFmt = (hours: number) => `${(hours / 24).toFixed(1)} days`;
 
-function StatCard({
-  title,
-  baselineLabel,
-  interventionLabel,
-  delta
-}: {
-  title: string;
-  baselineLabel: string;
-  interventionLabel: string;
-  delta: Delta;
-}) {
+type Row = { label: string; value: string; delta: Delta | null };
+
+function MetricCard({ title, rows }: { title: string; rows: Row[] }) {
   return (
     <div className="rounded-lg border border-(--color-border-light) bg-(--color-bg-ivory) p-4 flex flex-col gap-3">
       <span className={`text-xs uppercase tracking-wide ${MUTED_TONE}`}>
         {title}
       </span>
-      <div className="flex flex-col gap-1 text-sm">
-        <div className="flex justify-between gap-3">
-          <span className={MUTED_TONE}>Baseline</span>
-          <span className="font-semibold tabular-nums">{baselineLabel}</span>
-        </div>
-        <div className="flex justify-between gap-3">
-          <span className={MUTED_TONE}>Interventions</span>
-          <span className="font-semibold tabular-nums">{interventionLabel}</span>
-        </div>
+      <div className="flex flex-col gap-2 text-sm">
+        {rows.map((row, i) => (
+          <div key={row.label} className="flex flex-col">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className={i === 0 ? 'font-medium' : MUTED_TONE}>
+                {row.label}
+              </span>
+              <span className="font-semibold tabular-nums whitespace-nowrap">
+                {row.value}
+              </span>
+            </div>
+            <span
+              className={`text-xs font-medium text-right whitespace-nowrap ${
+                row.delta ? row.delta.tone : MUTED_TONE
+              }`}
+            >
+              {row.delta ? row.delta.text : 'reference'}
+            </span>
+          </div>
+        ))}
       </div>
-      <span className={`text-sm font-medium ${delta.tone}`}>{delta.text}</span>
     </div>
   );
 }
 
 export default function ComparisonSummary({
-  interventionSimId,
-  baselineSimId
+  referenceSimId,
+  referenceLabel = 'Interventions',
+  scenarios,
+  title = 'Scenario comparison',
+  note = 'Tip: for a clean comparison, disable “Random Seed” before running so every scenario shares the same seed — otherwise some of the difference is stochastic noise rather than the change you made.'
 }: ComparisonSummaryProps) {
-  const [pair, setPair] = useState<Pair | null>(null);
+  const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Primitive keys so the effect only refetches when the set of runs changes,
+  // not on every parent re-render (scenarios is a fresh array each render).
+  const idsKey = [referenceSimId, ...scenarios.map((s) => s.simId)].join(',');
+  const labelsKey = scenarios.map((s) => s.label).join('|');
+
   useEffect(() => {
+    if (referenceSimId == null || scenarios.length === 0) {
+      return;
+    }
+
     const controller = new AbortController();
     const { signal } = controller;
-    setPair(null);
+    setData(null);
     setError(null);
 
     (async () => {
       try {
-        const [interventionStats, baselineStats] = await Promise.all([
-          fetchChartData(interventionSimId, null, signal),
-          fetchChartData(baselineSimId, null, signal)
-        ]);
+        const ids = [referenceSimId, ...scenarios.map((s) => s.simId)];
+        const charts = await Promise.all(
+          ids.map((id) => fetchChartData(id, null, signal))
+        );
         if (signal.aborted) return;
-        setPair({
-          intervention: computeOutcomeStats(interventionStats),
-          baseline: computeOutcomeStats(baselineStats)
+        setData({
+          reference: computeOutcomeStats(charts[0]),
+          scenarios: scenarios.map((s, i) => ({
+            label: s.label,
+            stats: computeOutcomeStats(charts[i + 1])
+          }))
         });
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
@@ -120,57 +146,91 @@ export default function ComparisonSummary({
     })();
 
     return () => controller.abort();
-  }, [interventionSimId, baselineSimId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey, labelsKey]);
+
+  if (referenceSimId == null || scenarios.length === 0) {
+    return null;
+  }
+
+  const cards: { title: string; rows: Row[] }[] = data
+    ? [
+        {
+          title: 'Peak infections',
+          rows: [
+            {
+              label: referenceLabel,
+              value: countFmt(data.reference.peakInfected),
+              delta: null
+            },
+            ...data.scenarios.map((s) => ({
+              label: s.label,
+              value: countFmt(s.stats.peakInfected),
+              delta: lowerIsBetterDelta(
+                data.reference.peakInfected,
+                s.stats.peakInfected
+              )
+            }))
+          ]
+        },
+        {
+          title: 'Time to peak',
+          rows: [
+            {
+              label: referenceLabel,
+              value: daysFmt(data.reference.peakTimeHours),
+              delta: null
+            },
+            ...data.scenarios.map((s) => ({
+              label: s.label,
+              value: daysFmt(s.stats.peakTimeHours),
+              delta: peakTimingDelta(
+                data.reference.peakTimeHours,
+                s.stats.peakTimeHours
+              )
+            }))
+          ]
+        },
+        {
+          title: 'Total infected',
+          rows: [
+            {
+              label: referenceLabel,
+              value: countFmt(data.reference.totalInfected),
+              delta: null
+            },
+            ...data.scenarios.map((s) => ({
+              label: s.label,
+              value: countFmt(s.stats.totalInfected),
+              delta: lowerIsBetterDelta(
+                data.reference.totalInfected,
+                s.stats.totalInfected
+              )
+            }))
+          ]
+        }
+      ]
+    : [];
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-md font-semibold">Interventions vs. baseline</h3>
-        {!pair && !error && (
+        <h3 className="text-md font-semibold">{title}</h3>
+        {!data && !error && (
           <span className={`text-xs ${MUTED_TONE}`}>Loading comparison…</span>
         )}
       </div>
 
       {error ? (
         <p className={`text-sm ${MUTED_TONE}`}>{error}</p>
-      ) : pair ? (
+      ) : data ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard
-              title="Peak infections"
-              baselineLabel={countFmt(pair.baseline.peakInfected)}
-              interventionLabel={countFmt(pair.intervention.peakInfected)}
-              delta={betterWhenLower(
-                pair.baseline.peakInfected,
-                pair.intervention.peakInfected,
-                'peak'
-              )}
-            />
-            <StatCard
-              title="Time to peak"
-              baselineLabel={daysFmt(pair.baseline.peakTimeHours)}
-              interventionLabel={daysFmt(pair.intervention.peakTimeHours)}
-              delta={peakTimingDelta(
-                pair.baseline.peakTimeHours,
-                pair.intervention.peakTimeHours
-              )}
-            />
-            <StatCard
-              title="Total infected"
-              baselineLabel={countFmt(pair.baseline.totalInfected)}
-              interventionLabel={countFmt(pair.intervention.totalInfected)}
-              delta={betterWhenLower(
-                pair.baseline.totalInfected,
-                pair.intervention.totalInfected,
-                'total'
-              )}
-            />
+            {cards.map((card) => (
+              <MetricCard key={card.title} title={card.title} rows={card.rows} />
+            ))}
           </div>
-          <p className={`text-xs italic ${MUTED_TONE}`}>
-            Tip: for a clean paired comparison, disable “Random Seed” before
-            running so both runs share the same seed — otherwise some of the
-            difference is stochastic noise rather than the interventions.
-          </p>
+          {note && <p className={`text-xs italic ${MUTED_TONE}`}>{note}</p>}
         </>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
