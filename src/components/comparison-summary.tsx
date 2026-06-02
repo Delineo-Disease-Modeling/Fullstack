@@ -111,11 +111,17 @@ export default function ComparisonSummary({
 
   // Primitive keys so the effect only refetches when the set of runs changes,
   // not on every parent re-render (scenarios is a fresh array each render).
-  const idsKey = [referenceSimId, ...scenarios.map((s) => s.simId)].join(',');
-  const labelsKey = scenarios.map((s) => s.label).join('|');
+  const scenariosKey = JSON.stringify(
+    scenarios.map((scenario) => ({
+      simId: scenario.simId,
+      label: scenario.label
+    }))
+  );
 
   useEffect(() => {
-    if (referenceSimId == null || scenarios.length === 0) {
+    const scenarioEntries = JSON.parse(scenariosKey) as ComparisonScenario[];
+
+    if (referenceSimId == null || scenarioEntries.length === 0) {
       return;
     }
 
@@ -126,14 +132,14 @@ export default function ComparisonSummary({
 
     (async () => {
       try {
-        const ids = [referenceSimId, ...scenarios.map((s) => s.simId)];
+        const ids = [referenceSimId, ...scenarioEntries.map((s) => s.simId)];
         const charts = await Promise.all(
           ids.map((id) => fetchChartData(id, null, signal))
         );
         if (signal.aborted) return;
         setData({
           reference: computeOutcomeStats(charts[0]),
-          scenarios: scenarios.map((s, i) => ({
+          scenarios: scenarioEntries.map((s, i) => ({
             label: s.label,
             stats: computeOutcomeStats(charts[i + 1])
           }))
@@ -146,8 +152,7 @@ export default function ComparisonSummary({
     })();
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey, labelsKey]);
+  }, [referenceSimId, scenariosKey]);
 
   if (referenceSimId == null || scenarios.length === 0) {
     return null;
