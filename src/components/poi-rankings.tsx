@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import useMapData from '@/stores/mapdata';
 
 const TOP_N = 10;
-const LABEL_MAX = 34;
+const LABEL_MAX = 44;
 const EMPTY_SET: ReadonlySet<string> = new Set();
+
+type RankingView = 'pois' | 'types';
 
 type PoiStat = {
   id: string;
@@ -46,6 +48,10 @@ function truncate(label: string) {
     : label;
 }
 
+function formatPoiCount(count: number) {
+  return `${count.toLocaleString()} POI${count === 1 ? '' : 's'}`;
+}
+
 function HotspotSwitch({
   checked,
   label,
@@ -62,7 +68,7 @@ function HotspotSwitch({
       aria-checked={checked}
       aria-label={checked ? `Enable ${label}` : `Disable ${label}`}
       disabled={!onToggle}
-      className={`relative h-6 w-11 shrink-0 overflow-hidden rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`relative h-5 w-9 shrink-0 overflow-hidden rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         checked
           ? 'border-gray-950 bg-gray-950'
           : 'border-(--color-border-light) bg-white'
@@ -70,23 +76,71 @@ function HotspotSwitch({
       onClick={onToggle}
     >
       <span
-        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-5' : 'translate-x-0'
+        className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? 'translate-x-4' : 'translate-x-0'
         }`}
       />
     </button>
   );
 }
 
-function RankingList({
-  title,
+function RankingViewToggle({
+  activeView,
+  poiCount,
+  typeCount,
+  onChange
+}: {
+  activeView: RankingView;
+  poiCount: number;
+  typeCount: number;
+  onChange: (view: RankingView) => void;
+}) {
+  const options: Array<{ id: RankingView; label: string; count: number }> = [
+    { id: 'pois', label: 'POIs', count: poiCount },
+    { id: 'types', label: 'Types', count: typeCount }
+  ];
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Hotspot ranking type"
+      className="inline-flex overflow-hidden rounded-md border border-(--color-border-light) bg-white text-xs font-semibold"
+    >
+      {options.map((option) => {
+        const selected = activeView === option.id;
+
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-label={`${option.label} (${option.count})`}
+            className={`px-3 py-1.5 transition-colors ${
+              selected
+                ? 'bg-(--color-primary-blue) text-(--color-text-light)'
+                : 'text-(--color-text-main) hover:bg-gray-50'
+            }`}
+            onClick={() => onChange(option.id)}
+          >
+            {option.label}
+            <span className="ml-1 tabular-nums opacity-75">
+              {option.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function RankingTable({
   rows,
   isDisabled,
   onToggle,
   onSelectRow,
   getDetail
 }: {
-  title: string;
   rows: RankRow[];
   isDisabled: (row: RankRow) => boolean;
   onToggle?: (row: RankRow) => void;
@@ -96,71 +150,85 @@ function RankingList({
   const maxValue = Math.max(0, ...rows.map((row) => row.value));
 
   return (
-    <div className="flex min-h-72 flex-col rounded-md border-2 border-(--color-primary-blue) bg-(--color-bg-ivory) p-4">
-      <h6 className="mb-3 text-center text-sm font-bold">{title}</h6>
+    <div className="overflow-hidden rounded-md border border-(--color-border-light) bg-white">
+      <div className="grid grid-cols-[2rem_2.25rem_minmax(0,1fr)_4.75rem] items-center gap-2 bg-white/80 px-3 py-2 text-[10px] font-bold uppercase text-(--color-text-muted) sm:grid-cols-[2.5rem_2.75rem_minmax(0,1fr)_5.5rem]">
+        <span className="text-center">#</span>
+        <span className="sr-only">Disable</span>
+        <span>Hotspot</span>
+        <span className="text-right">Peak</span>
+      </div>
       {rows.length === 0 ? (
-        <div className="flex h-40 items-center justify-center text-sm text-(--color-text-muted)">
+        <div className="flex h-40 items-center justify-center border-t border-(--color-border-light) text-sm text-(--color-text-muted)">
           No infections recorded.
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {rows.map((row) => {
+        <div className="divide-y divide-(--color-border-light)">
+          {rows.map((row, index) => {
             const disabled = isDisabled(row);
             const width =
               maxValue > 0
                 ? `${Math.max(4, (row.value / maxValue) * 100)}%`
                 : '0%';
-
-            return (
-              <div
-                key={row.id}
-                className={`rounded-md border p-2.5 transition-colors ${
-                  disabled
-                    ? 'border-gray-950 bg-white'
-                    : 'border-(--color-border-light) bg-white/70'
-                }`}
-              >
-                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
-                  <HotspotSwitch
-                    checked={disabled}
-                    label={row.fullLabel}
-                    onToggle={onToggle ? () => onToggle(row) : undefined}
-                  />
-                  {onSelectRow ? (
-                    <button
-                      type="button"
-                      className="min-w-0 cursor-pointer text-left hover:underline"
-                      title={row.fullLabel}
-                      onClick={() => onSelectRow(row)}
-                    >
-                      <span className="block truncate text-sm font-semibold">
-                        {row.label}
-                      </span>
-                      <span className="block truncate text-[11px] text-(--color-text-muted)">
-                        {getDetail(row)}
-                      </span>
-                    </button>
-                  ) : (
-                    <div className="min-w-0" title={row.fullLabel}>
-                      <span className="block truncate text-sm font-semibold">
-                        {row.label}
-                      </span>
-                      <span className="block truncate text-[11px] text-(--color-text-muted)">
-                        {getDetail(row)}
-                      </span>
-                    </div>
-                  )}
-                  <span className="text-xs font-semibold tabular-nums">
-                    {row.value.toLocaleString()}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200">
+            const content = (
+              <>
+                <span className="block truncate text-sm font-semibold leading-tight">
+                  {row.label}
+                </span>
+                <span className="block truncate text-[11px] leading-tight text-(--color-text-muted)">
+                  {getDetail(row)}
+                </span>
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gray-200">
                   <div
                     className={`h-full rounded-full ${
                       disabled ? 'bg-gray-950' : 'bg-(--color-primary-blue)'
                     }`}
                     style={{ width }}
                   />
+                </div>
+              </>
+            );
+
+            return (
+              <div
+                key={row.id}
+                className={`grid grid-cols-[2rem_2.25rem_minmax(0,1fr)_4.75rem] items-center gap-2 px-3 py-2.5 transition-colors sm:grid-cols-[2.5rem_2.75rem_minmax(0,1fr)_5.5rem] ${
+                  disabled ? 'bg-white' : 'bg-white/70 hover:bg-white'
+                }`}
+              >
+                <span
+                  className={`text-center text-xs font-semibold tabular-nums ${
+                    disabled
+                      ? 'text-gray-950'
+                      : 'text-(--color-text-muted)'
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <div className="flex justify-center">
+                  <HotspotSwitch
+                    checked={disabled}
+                    label={row.fullLabel}
+                    onToggle={onToggle ? () => onToggle(row) : undefined}
+                  />
+                </div>
+                {onSelectRow ? (
+                  <button
+                    type="button"
+                    className="min-w-0 cursor-pointer text-left hover:underline"
+                    title={row.fullLabel}
+                    onClick={() => onSelectRow(row)}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className="min-w-0" title={row.fullLabel}>
+                    {content}
+                  </div>
+                )}
+                <div className="text-right">
+                  <span className="block text-sm font-bold tabular-nums leading-none">
+                    {row.value.toLocaleString()}
+                  </span>
                 </div>
               </div>
             );
@@ -184,6 +252,7 @@ export default function PoiRankings({
   disabledComparisonMessage = null,
   disabledComparisonError = null
 }: PoiRankingsProps) {
+  const [activeView, setActiveView] = useState<RankingView>('pois');
   const simdata = useMapData((s) => s.simdata);
   const papdata = useMapData((s) => s.papdata);
 
@@ -273,48 +342,65 @@ export default function PoiRankings({
 
   if (poiStats.length === 0) return null;
 
+  const activeRows = activeView === 'pois' ? poiRows : typeRows;
+  const activeTitle =
+    activeView === 'pois' ? 'Most infectious POIs' : 'Most infectious POI types';
+  const activeIsDisabled =
+    activeView === 'pois'
+      ? (row: RankRow) => disabledPoiIds.has(row.id)
+      : (row: RankRow) => disabledCategories.has(row.id);
+  const activeToggle =
+    activeView === 'pois'
+      ? onTogglePoi
+        ? (row: RankRow) => onTogglePoi(row.id)
+        : undefined
+      : onToggleCategory
+        ? (row: RankRow) => onToggleCategory(row.id)
+        : undefined;
+  const activeSelect =
+    activeView === 'pois' && onSelectPoi
+      ? (row: RankRow) =>
+          onSelectPoi({
+            id: row.id,
+            label: row.fullLabel,
+            type: 'places'
+          })
+      : undefined;
+  const activeDetail =
+    activeView === 'pois'
+      ? (row: RankRow) =>
+          `${row.population.toLocaleString()} present at peak`
+      : (row: RankRow) =>
+          `${formatPoiCount(row.poiCount ?? 0)}, ${row.population.toLocaleString()} present at peaks`;
+
   return (
-    <div className="flex w-[900px] max-w-full flex-col gap-3">
+    <div className="flex w-[760px] max-w-full flex-col gap-3">
       <div className="text-center">
         <h5 className="font-bold">Infection Hotspots</h5>
         <p className="-mt-1 text-xs text-(--color-text-muted)">
           Ranked over the whole run by peak simultaneous infections.
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <RankingList
-          title="Most infectious POIs"
-          rows={poiRows}
-          isDisabled={(row) => disabledPoiIds.has(row.id)}
-          onToggle={onTogglePoi ? (row) => onTogglePoi(row.id) : undefined}
-          onSelectRow={
-            onSelectPoi
-              ? (row) =>
-                  onSelectPoi({
-                    id: row.id,
-                    label: row.fullLabel,
-                    type: 'places'
-                  })
-              : undefined
-          }
-          getDetail={(row) =>
-            `${row.infected.toLocaleString()} infected peak, ${row.population.toLocaleString()} present`
-          }
-        />
-        <RankingList
-          title="Most infectious POI types"
-          rows={typeRows}
-          isDisabled={(row) => disabledCategories.has(row.id)}
-          onToggle={
-            onToggleCategory ? (row) => onToggleCategory(row.id) : undefined
-          }
-          getDetail={(row) =>
-            `${row.poiCount?.toLocaleString() ?? 0} POIs, ${row.population.toLocaleString()} present at peaks`
-          }
+      <div className="rounded-md border-2 border-(--color-primary-blue) bg-(--color-bg-ivory) p-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h6 className="text-sm font-bold">{activeTitle}</h6>
+          <RankingViewToggle
+            activeView={activeView}
+            poiCount={poiRows.length}
+            typeCount={typeRows.length}
+            onChange={setActiveView}
+          />
+        </div>
+        <RankingTable
+          rows={activeRows}
+          isDisabled={activeIsDisabled}
+          onToggle={activeToggle}
+          onSelectRow={activeSelect}
+          getDetail={activeDetail}
         />
       </div>
       {onRunDisabledComparison && (
-        <div className="flex flex-col gap-2 border-t border-(--color-border-light) pt-3">
+        <div className="flex flex-col gap-2 rounded-md border border-(--color-border-light) bg-white/60 p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-(--color-text-muted)">
               {effectiveDisabledPoiCount === 0
