@@ -174,54 +174,81 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     const time = +skey / 60;
     matchedTimesteps++;
 
-    // === MAP CACHE: build infected set, homes/places arrays ===
+    // === MAP CACHE: per-location [count, infected] arrays ===
+    // The SoA engine emits these directly as { h: [...], p: [...] } (numeric
+    // format), already aligned to homeIds/placeIds order — use them as-is.
+    // Older runs emit { homes/places: {id: [pids]} }, computed here.
     let tStage = nowMs();
-    const curinfected = new Set<string>();
-    for (const people of Object.values(svalue)) {
-      for (const key of Object.keys(people as Record<string, unknown>)) {
-        curinfected.add(key);
-      }
-    }
-    accum('processSimulation/build_infected_set', tStage);
+    let homesArray: number[];
+    let placesArray: number[];
+    const numericPattern = Array.isArray(
+      (pvalue as unknown as { h?: unknown }).h
+    );
 
-    tStage = nowMs();
-    const homesArray: number[] = [];
-    for (const id of homeIds) {
-      const pop: string[] | undefined = pvalue.homes?.[id];
-      if (pop) {
-        let inf = 0;
-        for (const v of pop) {
-          if (curinfected.has(v)) inf++;
-        }
-        homesArray.push(pop.length, inf);
-      } else {
-        homesArray.push(0, 0);
-      }
-    }
-    accum('processSimulation/build_homes_array', tStage);
-
-    tStage = nowMs();
-    const placesArray: number[] = [];
-    for (const id of placeIds) {
-      const pop: string[] | undefined = pvalue.places?.[id];
-      if (pop) {
-        let inf = 0;
-        for (const v of pop) {
-          if (curinfected.has(v)) inf++;
-        }
-        placesArray.push(pop.length, inf);
+    if (numericPattern) {
+      const np = pvalue as unknown as { h: number[]; p: number[] };
+      homesArray = np.h;
+      placesArray = np.p;
+      // Hotspot tracking from the numeric places array (inf at index 2*i+1).
+      for (let i = 0; i < placeIds.length; i++) {
+        const id = placeIds[i];
+        const inf = placesArray[i * 2 + 1] || 0;
         const prevInf = prevInfected[id] || 0;
         if (inf > 0 && prevInf > 0 && inf >= prevInf * 5) {
           if (!hotspots[id]) hotspots[id] = [];
           hotspots[id].push(Number(skey));
         }
         prevInfected[id] = inf;
-      } else {
-        placesArray.push(0, 0);
-        prevInfected[id] = 0;
       }
+      accum('processSimulation/numeric_passthrough', tStage);
+    } else {
+      const curinfected = new Set<string>();
+      for (const people of Object.values(svalue)) {
+        for (const key of Object.keys(people as Record<string, unknown>)) {
+          curinfected.add(key);
+        }
+      }
+      accum('processSimulation/build_infected_set', tStage);
+
+      tStage = nowMs();
+      homesArray = [];
+      for (const id of homeIds) {
+        const pop: string[] | undefined = pvalue.homes?.[id];
+        if (pop) {
+          let inf = 0;
+          for (const v of pop) {
+            if (curinfected.has(v)) inf++;
+          }
+          homesArray.push(pop.length, inf);
+        } else {
+          homesArray.push(0, 0);
+        }
+      }
+      accum('processSimulation/build_homes_array', tStage);
+
+      tStage = nowMs();
+      placesArray = [];
+      for (const id of placeIds) {
+        const pop: string[] | undefined = pvalue.places?.[id];
+        if (pop) {
+          let inf = 0;
+          for (const v of pop) {
+            if (curinfected.has(v)) inf++;
+          }
+          placesArray.push(pop.length, inf);
+          const prevInf = prevInfected[id] || 0;
+          if (inf > 0 && prevInf > 0 && inf >= prevInf * 5) {
+            if (!hotspots[id]) hotspots[id] = [];
+            hotspots[id].push(Number(skey));
+          }
+          prevInfected[id] = inf;
+        } else {
+          placesArray.push(0, 0);
+          prevInfected[id] = 0;
+        }
+      }
+      accum('processSimulation/build_places_array', tStage);
     }
-    accum('processSimulation/build_places_array', tStage);
 
     tStage = nowMs();
     if (!first) cacheParts.push(',');
