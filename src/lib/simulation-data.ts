@@ -66,8 +66,26 @@ export type PapData = {
 export type LocationOccupancy = Record<string, string[]>;
 
 export type PatternTimestep = {
+  // Legacy pid-list shape (pre-SoA-engine runs).
   homes?: LocationOccupancy;
   places?: LocationOccupancy;
+  // SoA-engine numeric shape: per-location [count, infected] arrays (h/p) and
+  // the per-person location stream (loc[personIdx] = locationIdx, -1 unplaced).
+  // Decoded via the file's one-time `meta` entry (see PatternMeta).
+  h?: number[];
+  p?: number[];
+  loc?: number[];
+};
+
+/**
+ * One-time decode tables emitted by the SoA engine under the non-timestep
+ * `meta` key of the patterns file. Lets per-person consumers reconstruct
+ * who-is-where from the compact numeric `loc` stream.
+ */
+export type PatternMeta = {
+  pids: string[]; // person index -> person id
+  loc_ids: string[]; // location index -> location id (homes first, then places)
+  n_homes: number; // loc index < n_homes is a home, otherwise a place
 };
 
 export type DiseaseStateTimestep = Record<string, Record<string, number>>;

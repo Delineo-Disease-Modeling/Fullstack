@@ -130,6 +130,7 @@ export type PeopleMapData = {
   total_people: number;
   returned_people: number;
   sample_rate: number;
+  source?: 'person' | 'aggregate';
   locations: PeopleMapLocation[];
 };
 
