@@ -36,12 +36,12 @@ export default function Simulator() {
   // its cached data into the map store and let the caller navigate.
   const reloadExistingRun = async (simId: number): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/simdata/${simId}`);
+      const res = await fetch(`/api/simdata/${simId}/map`);
       if (!res.ok) {
         throw new Error(`Invalid simdata response ${res.status}`);
       }
       const json = await res.json();
-      setSimData(json.data.simdata);
+      setSimData(null);
       setRunName(json.data.name);
       return true;
     } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useMapData from '@/stores/mapdata';
+import useMapData, { type SimData } from '@/stores/mapdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/modelmap.css';
@@ -33,6 +33,10 @@ import {
 } from '@/features/model-map/map-storage';
 import MapLegend from './maplegend';
 
+function getMapFrameCacheKey(simId: number, timestep: number) {
+  return `${simId}:${timestep}`;
+}
+
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
   simId?: number | null;
@@ -55,6 +59,8 @@ export default function ModelMap({
   const sim_data = useMapData((state) => state.simdata);
   const pap_data = useMapData((state) => state.papdata);
   const hotspots = useMapData((state) => state.hotspots) || {};
+  const timesteps = useMapData((state) => state.timesteps);
+  const setSimData = useMapData((state) => state.setSimData);
   const [zoneGeoJSON, setZoneGeoJSON] = useState<GeoJSONData | null>(null);
 
   const [maxHours, setMaxHours] = useState(1);
@@ -74,6 +80,8 @@ export default function ModelMap({
   const peopleMapRequests = useRef<Map<string, Promise<PeopleMapData>>>(
     new Map()
   );
+  const mapFrameRequests = useRef<Map<string, Promise<SimData>>>(new Map());
+  const [mapFrameError, setMapFrameError] = useState<string | null>(null);
 
   useEffect(() => {
     resetModelMapLayoutCaches();
@@ -85,6 +93,7 @@ export default function ModelMap({
     peopleMapDataSimId.current = null;
     setPeopleMapData(null);
     setPeopleMapError(null);
+    setMapFrameError(null);
   }, [simId]);
 
   useEffect(() => {
@@ -133,12 +142,15 @@ export default function ModelMap({
   }, [selectedZone]);
 
   const availableTimesteps = useMemo(() => {
+    if (timesteps?.length) {
+      return timesteps;
+    }
     if (!sim_data) return [];
     return Object.keys(sim_data)
       .map(Number)
       .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b);
-  }, [sim_data]);
+  }, [sim_data, timesteps]);
 
   const findNearestTimestep = useCallback(
     (targetMinutes: number) => {
@@ -163,6 +175,47 @@ export default function ModelMap({
     const targetMinutes = currentTime * 60;
     return findNearestTimestep(targetMinutes);
   }, [currentTime, findNearestTimestep]);
+
+  const loadMapFrameData = useCallback(
+    async (timestep: number) => {
+      if (!simId) {
+        throw new Error('Missing simulation id.');
+      }
+
+      const timestepKey = timestep.toString();
+      const currentSimData = useMapData.getState().simdata;
+      if (currentSimData?.[timestepKey]) {
+        return { [timestepKey]: currentSimData[timestepKey] } satisfies SimData;
+      }
+
+      const cacheKey = getMapFrameCacheKey(simId, timestep);
+      const existingRequest = mapFrameRequests.current.get(cacheKey);
+      if (existingRequest) {
+        return existingRequest;
+      }
+
+      const request = fetch(`/api/simdata/${simId}/map?time=${timestep}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`Map frame request failed: ${response.status}`);
+          }
+          return response.json() as Promise<{ data?: { simdata?: SimData } }>;
+        })
+        .then((json) => {
+          if (!json.data?.simdata) {
+            throw new Error('Map frame response did not include simdata.');
+          }
+          return json.data.simdata;
+        })
+        .finally(() => {
+          mapFrameRequests.current.delete(cacheKey);
+        });
+
+      mapFrameRequests.current.set(cacheKey, request);
+      return request;
+    },
+    [simId]
+  );
 
   const pois = useMemo(() => {
     const dataForTime =
@@ -192,6 +245,90 @@ export default function ModelMap({
     sim_data,
     selectedTimestep,
     zoneGeoJSON
+  ]);
+
+  const selectedMapFrameLoaded =
+    selectedTimestep !== null && Boolean(sim_data?.[selectedTimestep]);
+
+  useEffect(() => {
+    if (!simId || selectedTimestep === null || selectedMapFrameLoaded) {
+      return;
+    }
+
+    let active = true;
+    setMapFrameError(null);
+
+    loadMapFrameData(selectedTimestep)
+      .then((nextSimData) => {
+        if (active) {
+          setSimData(nextSimData);
+        }
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        console.warn('Failed to load map frame data:', error);
+        setMapFrameError('Map frame is still loading.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    loadMapFrameData,
+    selectedMapFrameLoaded,
+    selectedTimestep,
+    setSimData,
+    simId
+  ]);
+
+  useEffect(() => {
+    if (
+      !simId ||
+      selectedTimestep === null ||
+      availableTimesteps.length === 0 ||
+      !selectedMapFrameLoaded
+    ) {
+      return;
+    }
+
+    const selectedIndex = availableTimesteps.indexOf(selectedTimestep);
+    if (selectedIndex === -1) {
+      return;
+    }
+
+    const upcomingTimesteps = availableTimesteps.slice(
+      selectedIndex + 1,
+      selectedIndex + 1 + PEOPLE_MAP_PREFETCH_STEPS
+    );
+
+    let active = true;
+    const preloadUpcoming = async () => {
+      for (const timestep of upcomingTimesteps) {
+        if (!active) return;
+        try {
+          const nextSimData = await loadMapFrameData(timestep);
+          if (active) {
+            setSimData(nextSimData);
+          }
+        } catch (error) {
+          console.warn('Failed to preload map frame data:', error);
+        }
+      }
+    };
+
+    preloadUpcoming();
+    return () => {
+      active = false;
+    };
+  }, [
+    availableTimesteps,
+    loadMapFrameData,
+    selectedMapFrameLoaded,
+    selectedTimestep,
+    setSimData,
+    simId
   ]);
 
   const loadPeopleMapData = useCallback(
@@ -264,12 +401,32 @@ export default function ModelMap({
     };
   }, [heatmapMode, loadPeopleMapData, selectedTimestep, simId]);
 
+  const selectedPeopleMapData = useMemo(() => {
+    if (heatmapMode !== 'people' || !simId || selectedTimestep === null) {
+      return null;
+    }
+
+    if (
+      peopleMapDataSimId.current === simId &&
+      peopleMapData?.requested_time === selectedTimestep
+    ) {
+      return peopleMapData;
+    }
+
+    return (
+      peopleMapCache.current.get(
+        getPeopleMapCacheKey(simId, selectedTimestep)
+      ) ?? null
+    );
+  }, [heatmapMode, peopleMapData, selectedTimestep, simId]);
+
   useEffect(() => {
     if (
       heatmapMode !== 'people' ||
       !simId ||
       selectedTimestep === null ||
-      availableTimesteps.length === 0
+      availableTimesteps.length === 0 ||
+      !selectedPeopleMapData
     ) {
       return;
     }
@@ -284,15 +441,27 @@ export default function ModelMap({
       selectedIndex + 1 + PEOPLE_MAP_PREFETCH_STEPS
     );
 
-    for (const timestep of upcomingTimesteps) {
-      loadPeopleMapData(timestep).catch((error) => {
-        console.warn('Failed to preload person-level map data:', error);
-      });
-    }
+    let active = true;
+    const preloadUpcoming = async () => {
+      for (const timestep of upcomingTimesteps) {
+        if (!active) return;
+        try {
+          await loadPeopleMapData(timestep);
+        } catch (error) {
+          console.warn('Failed to preload person-level map data:', error);
+        }
+      }
+    };
+
+    preloadUpcoming();
+    return () => {
+      active = false;
+    };
   }, [
     availableTimesteps,
     heatmapMode,
     loadPeopleMapData,
+    selectedPeopleMapData,
     selectedTimestep,
     simId
   ]);
@@ -316,33 +485,24 @@ export default function ModelMap({
     return () => clearInterval(interval);
   }, [isPlaying, availableTimesteps]);
 
+  const peopleMapLoading =
+    heatmapMode === 'people' &&
+    !!simId &&
+    selectedTimestep !== null &&
+    !selectedPeopleMapData &&
+    !peopleMapError;
+
   const peopleDotColor = heatmapMode === 'infection' ? '#dc2626' : '#2563eb';
 
   const peopleDotGeoJSON = useMemo<PeopleDotFeatureCollection>(() => {
+    if (peopleMapLoading) {
+      return makePeopleDotGeoJSON(pois, 'population');
+    }
     if (heatmapMode !== 'population' && heatmapMode !== 'infection') {
       return { type: 'FeatureCollection', features: [] };
     }
     return makePeopleDotGeoJSON(pois, heatmapMode);
-  }, [pois, heatmapMode]);
-
-  const selectedPeopleMapData = useMemo(() => {
-    if (heatmapMode !== 'people' || !simId || selectedTimestep === null) {
-      return null;
-    }
-
-    if (
-      peopleMapDataSimId.current === simId &&
-      peopleMapData?.requested_time === selectedTimestep
-    ) {
-      return peopleMapData;
-    }
-
-    return (
-      peopleMapCache.current.get(
-        getPeopleMapCacheKey(simId, selectedTimestep)
-      ) ?? null
-    );
-  }, [heatmapMode, peopleMapData, selectedTimestep, simId]);
+  }, [pois, heatmapMode, peopleMapLoading]);
 
   const personStatusDotGeoJSON = useMemo<PersonStatusDotFeatureCollection>(
     () =>
@@ -353,21 +513,18 @@ export default function ModelMap({
   );
 
   useEffect(() => {
-    if (sim_data) {
-      const keys = Object.keys(sim_data)
-        .map(Number)
-        .filter((n) => !Number.isNaN(n));
-      setMaxHours(keys.length > 0 ? Math.max(...keys) / 60 : 1);
-    }
-  }, [sim_data]);
+    setMaxHours(
+      availableTimesteps.length > 0 ? Math.max(...availableTimesteps) / 60 : 1
+    );
+  }, [availableTimesteps]);
 
   useEffect(() => {
-    if (!sim_data || maxHours <= 1) return;
+    if (availableTimesteps.length === 0 || maxHours <= 1) return;
     setCurrentTime((prev) => {
       if (!Number.isFinite(prev)) return 1;
       return Math.min(Math.max(prev, 1), maxHours);
     });
-  }, [maxHours, sim_data]);
+  }, [availableTimesteps.length, maxHours]);
 
   return (
     <div className="modelmap_panel">
@@ -409,8 +566,17 @@ export default function ModelMap({
               sampled 1 in {selectedPeopleMapData.sample_rate}
             </span>
           )}
+          {selectedPeopleMapData?.source === 'aggregate' && (
+            <span className="people-map-key-note">aggregate cases</span>
+          )}
           {peopleMapError && (
             <span className="people-map-key-note">{peopleMapError}</span>
+          )}
+          {mapFrameError && (
+            <span className="people-map-key-note">{mapFrameError}</span>
+          )}
+          {peopleMapLoading && (
+            <span className="people-map-key-note">Loading cases...</span>
           )}
         </div>
       )}

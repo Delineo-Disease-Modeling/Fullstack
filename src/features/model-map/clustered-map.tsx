@@ -94,6 +94,12 @@ export default function ClusteredMap({
   const [mapInstance, setMapInstance] = useState<ModelMapInstance | null>(null);
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
   const hasFitBounds = useRef(false);
+  const showPeopleDotLayer =
+    heatmapMode === 'population' ||
+    heatmapMode === 'infection' ||
+    (heatmapMode === 'people' &&
+      personStatusDotGeoJSON.features.length === 0 &&
+      peopleDotGeoJSON.features.length > 0);
 
   useEffect(() => {
     if (!mapInstance || !pois.length || hasFitBounds.current) return;
@@ -139,13 +145,12 @@ export default function ClusteredMap({
           isMarkers ? 'visible' : 'none'
         );
     }
-    const isDots = heatmapMode === 'population' || heatmapMode === 'infection';
     for (const id of ['people-dots-places']) {
       if (mapInstance.getLayer(id))
         mapInstance.setLayoutProperty(
           id,
           'visibility',
-          isDots ? 'visible' : 'none'
+          showPeopleDotLayer ? 'visible' : 'none'
         );
     }
     const isPeople = heatmapMode === 'people';
@@ -174,7 +179,7 @@ export default function ClusteredMap({
           isPeople ? 'visible' : 'none'
         );
     }
-  }, [heatmapMode, mapInstance]);
+  }, [heatmapMode, mapInstance, showPeopleDotLayer]);
 
   const handleMapLoad = (event: MapLoadEvent) => {
     const map = event.target as ModelMapInstance;
@@ -415,10 +420,7 @@ export default function ClusteredMap({
             filter={['!=', ['get', 'loc_type'], 'homes']}
             layout={
               {
-                visibility:
-                  heatmapMode === 'population' || heatmapMode === 'infection'
-                    ? 'visible'
-                    : 'none'
+                visibility: showPeopleDotLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
