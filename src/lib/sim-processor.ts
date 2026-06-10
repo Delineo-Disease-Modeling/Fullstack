@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { getCachedPapdata } from './papdata-cache';
+import { writeDotsFile } from './people-map-cache';
 import {
   AGE_RANGE_LABELS,
   ALL_STATE_NAMES,
@@ -38,6 +39,34 @@ interface ProcessOpts {
 
 /** In-memory progress tracker for active processing jobs (simDataId -> 0-100). */
 export const processingProgress = new Map<number, number>();
+export const processingStatus = new Map<
+  number,
+  { progress: number; message: string }
+>();
+
+export function setProcessingStatus(
+  simDataId: number,
+  progress: number,
+  message: string
+) {
+  const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+  processingProgress.set(simDataId, clamped);
+  processingStatus.set(simDataId, { progress: clamped, message });
+}
+
+export function clearProcessingStatus(simDataId: number) {
+  processingProgress.delete(simDataId);
+  processingStatus.delete(simDataId);
+}
+
+export function getProcessingStatus(simDataId: number) {
+  return (
+    processingStatus.get(simDataId) ?? {
+      progress: processingProgress.get(simDataId) ?? 0,
+      message: 'Processing simulation data...'
+    }
+  );
+}
 
 /**
  * Single-pass processor that streams simdata + patterns files once and produces:
@@ -56,7 +85,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     mapCachePath,
     totalLength
   } = opts;
-  processingProgress.set(simDataId, 0);
+  setProcessingStatus(simDataId, 0, 'Processing simulation results...');
 
   // Load papdata from shared cache (avoids redundant gunzip)
   let stageStart = nowMs();
@@ -300,9 +329,10 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     accum('processSimulation/global_stats_aggregation', tStage);
 
     if (totalLength > 0) {
-      processingProgress.set(
+      setProcessingStatus(
         simDataId,
-        Math.min(99, Math.round((+skey / totalLength) * 100))
+        Math.min(84, Math.round((+skey / totalLength) * 84)),
+        'Processing simulation results...'
       );
     }
   }
@@ -315,8 +345,6 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       console.info(`[perf] ${label}: ${(perfAccum[label] / 1000).toFixed(3)}s`);
     }
   }
-
-  processingProgress.delete(simDataId);
 
   // Finalize map cache.
   //
@@ -332,9 +360,32 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   cacheParts.push(`},"hotspots":${JSON.stringify(hotspots)}`);
   stageStart = nowMs();
   const tmpMapCachePath = `${mapCachePath}.tmp`;
+  setProcessingStatus(simDataId, 85, 'Writing map cache...');
   await writeFile(tmpMapCachePath, cacheParts.join(''));
   await rename(tmpMapCachePath, mapCachePath);
   logPerfTiming('processSimulation map cache write', stageStart);
+
+  // Pre-bake compact per-timestep dot frames ({fileId}.dots.json) so Cases
+  // playback serves frames instantly instead of re-streaming the .pat file on
+  // every request. Best-effort: on failure the route lazily generates them on
+  // first open.
+  stageStart = nowMs();
+  setProcessingStatus(simDataId, 92, 'Writing case map frames...');
+  const dotsFileId = mapCachePath
+    .split('/')
+    .pop()
+    ?.replace(/\.map\.json$/, '');
+  if (dotsFileId) {
+    try {
+      await writeDotsFile(dotsFileId, simData, patData, placeIds);
+    } catch (dotsError) {
+      console.warn('processSimulation: dot frame pre-bake failed:', dotsError);
+    }
+  }
+  logPerfTiming('processSimulation dot frame pre-bake', stageStart);
+
+  setProcessingStatus(simDataId, 100, 'Finalizing simulation...');
+  clearProcessingStatus(simDataId);
   logPerfTiming('processSimulation total', totalStart);
 
   return globalStats;

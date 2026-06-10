@@ -241,8 +241,14 @@ export type ModelMapInstance = {
   getLayer: (id: string) => unknown;
   getSource: (id: string) => MapSourceApi | undefined;
   getZoom: () => number;
-  off: (eventName: 'render', listener: () => void) => void;
-  on: (eventName: 'render', listener: () => void) => void;
+  off: (
+    eventName: 'render' | 'zoom' | 'moveend',
+    listener: () => void
+  ) => void;
+  on: (
+    eventName: 'render' | 'zoom' | 'moveend',
+    listener: () => void
+  ) => void;
   project: (coordinate: [number, number]) => { x: number; y: number };
   queryRenderedFeatures: (
     geometry?: unknown,

@@ -12,6 +12,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/modelmap.css';
 import EmojiOverlay from '@/features/model-map/emoji-overlay';
 import {
+  CASE_CLUSTER_MAX_ZOOM,
+  CASE_DETAIL_MIN_ZOOM,
   CLUSTER_COLOR_EXPRESSION,
   type HeatmapMode,
   PERSON_STATUS_DOT_RADIUS,
@@ -47,6 +49,7 @@ interface ClusteredMapProps {
   peopleDotGeoJSON: PeopleDotFeatureCollection;
   peopleDotColor: string;
   personStatusDotGeoJSON: PersonStatusDotFeatureCollection;
+  onCaseDotsVisibilityChange?: (visible: boolean) => void;
 }
 
 function asPointCoordinate(value: unknown): [number, number] | null {
@@ -88,16 +91,25 @@ export default function ClusteredMap({
   heatmapMode,
   peopleDotGeoJSON,
   peopleDotColor,
-  personStatusDotGeoJSON
+  personStatusDotGeoJSON,
+  onCaseDotsVisibilityChange
 }: ClusteredMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [mapInstance, setMapInstance] = useState<ModelMapInstance | null>(null);
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
+  const [caseDotsZoom, setCaseDotsZoom] = useState(false);
+  const [caseDetailZoom, setCaseDetailZoom] = useState(false);
   const hasFitBounds = useRef(false);
+  // Cases view tiers: clustered infection bubbles when zoomed out, individual
+  // person dots once past CASE_CLUSTER_MAX_ZOOM, and POI footprints/labels once
+  // past CASE_DETAIL_MIN_ZOOM.
+  const showCaseClusterLayer = heatmapMode === 'people' && !caseDotsZoom;
+  const showCaseDotsLayer = heatmapMode === 'people' && caseDotsZoom;
+  const showCaseDetailLayer = heatmapMode === 'people' && caseDetailZoom;
   const showPeopleDotLayer =
     heatmapMode === 'population' ||
     heatmapMode === 'infection' ||
-    (heatmapMode === 'people' &&
+    (showCaseDotsLayer &&
       personStatusDotGeoJSON.features.length === 0 &&
       peopleDotGeoJSON.features.length > 0);
 
@@ -130,6 +142,35 @@ export default function ClusteredMap({
 
   useEffect(() => {
     if (!mapInstance) return;
+
+    const updateCaseZoom = () => {
+      const zoom = mapInstance.getZoom();
+      const nextDots = zoom >= CASE_CLUSTER_MAX_ZOOM;
+      const nextDetail = zoom >= CASE_DETAIL_MIN_ZOOM;
+      setCaseDotsZoom((previous) => (previous === nextDots ? previous : nextDots));
+      setCaseDetailZoom((previous) =>
+        previous === nextDetail ? previous : nextDetail
+      );
+    };
+
+    updateCaseZoom();
+    mapInstance.on('zoom', updateCaseZoom);
+    mapInstance.on('moveend', updateCaseZoom);
+
+    return () => {
+      mapInstance.off('zoom', updateCaseZoom);
+      mapInstance.off('moveend', updateCaseZoom);
+    };
+  }, [mapInstance]);
+
+  // Notify the parent of dots-visibility from an effect (not inside the zoom
+  // setState updater) so we never call ModelMap's setState mid-render.
+  useEffect(() => {
+    onCaseDotsVisibilityChange?.(caseDotsZoom);
+  }, [caseDotsZoom, onCaseDotsVisibilityChange]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
     const markerLayers = [
       'clusters',
       'cluster-count',
@@ -153,7 +194,18 @@ export default function ClusteredMap({
           showPeopleDotLayer ? 'visible' : 'none'
         );
     }
-    const isPeople = heatmapMode === 'people';
+    for (const id of [
+      'case-clusters-circle',
+      'case-clusters-count',
+      'case-clusters-point'
+    ]) {
+      if (mapInstance.getLayer(id))
+        mapInstance.setLayoutProperty(
+          id,
+          'visibility',
+          showCaseClusterLayer ? 'visible' : 'none'
+        );
+    }
     for (const id of [
       'poi-footprint-fill',
       'poi-footprint-outline',
@@ -163,7 +215,7 @@ export default function ClusteredMap({
         mapInstance.setLayoutProperty(
           id,
           'visibility',
-          isPeople ? 'visible' : 'none'
+          showCaseDetailLayer ? 'visible' : 'none'
         );
     }
     for (const id of [
@@ -176,10 +228,17 @@ export default function ClusteredMap({
         mapInstance.setLayoutProperty(
           id,
           'visibility',
-          isPeople ? 'visible' : 'none'
+          showCaseDotsLayer ? 'visible' : 'none'
         );
     }
-  }, [heatmapMode, mapInstance, showPeopleDotLayer]);
+  }, [
+    heatmapMode,
+    mapInstance,
+    showCaseClusterLayer,
+    showCaseDetailLayer,
+    showCaseDotsLayer,
+    showPeopleDotLayer
+  ]);
 
   const handleMapLoad = (event: MapLoadEvent) => {
     const map = event.target as ModelMapInstance;
@@ -219,7 +278,9 @@ export default function ClusteredMap({
       if (clusterId === undefined) return;
       const clusterCoordinates = getFeaturePointCoordinate(feature);
       if (!clusterCoordinates) return;
-      const source = map.getSource('points');
+      const source = map.getSource(
+        heatmapMode === 'people' ? 'case-clusters' : 'points'
+      );
       if (!source?.getClusterExpansionZoom) return;
       source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
         map.easeTo({
@@ -306,6 +367,8 @@ export default function ClusteredMap({
           'clusters',
           'unclustered-point-circle',
           'unclustered-point-emoji',
+          'case-clusters-circle',
+          'case-clusters-point',
           'poi-footprint-fill',
           'poi-footprint-outline',
           'poi-footprint-labels'
@@ -347,6 +410,91 @@ export default function ClusteredMap({
             />
           </Source>
         ) : null}
+        <Source
+          id="case-clusters"
+          type="geojson"
+          data={geojson}
+          cluster={true}
+          clusterMaxZoom={14}
+          clusterRadius={60}
+          clusterMinPoints={2}
+          clusterProperties={POINTS_CLUSTER_PROPERTIES}
+        >
+          <Layer
+            id="case-clusters-circle"
+            type="circle"
+            filter={['has', 'point_count']}
+            maxzoom={CASE_CLUSTER_MAX_ZOOM}
+            layout={
+              {
+                visibility: showCaseClusterLayer ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-color': clusterColor,
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['sqrt', ['to-number', ['get', 'population']]],
+                0,
+                8,
+                10,
+                16,
+                40,
+                26,
+                100,
+                38
+              ] as const,
+              'circle-opacity': 0.85,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#fff'
+            }}
+          />
+          <Layer
+            id="case-clusters-count"
+            type="symbol"
+            filter={['has', 'point_count']}
+            maxzoom={CASE_CLUSTER_MAX_ZOOM}
+            layout={
+              {
+                visibility: showCaseClusterLayer ? 'visible' : 'none',
+                'text-field': ['get', 'population'],
+                'text-size': 12,
+                'text-allow-overlap': true,
+                'text-font': ['Open Sans Regular']
+              } as const
+            }
+            paint={{ 'text-color': '#fff', 'text-opacity': 0.95 }}
+          />
+          <Layer
+            id="case-clusters-point"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            maxzoom={CASE_CLUSTER_MAX_ZOOM}
+            layout={
+              {
+                visibility: showCaseClusterLayer ? 'visible' : 'none'
+              } as const
+            }
+            paint={{
+              'circle-color': clusterColor,
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['sqrt', ['to-number', ['get', 'population']]],
+                0,
+                4,
+                10,
+                7,
+                40,
+                11
+              ] as const,
+              'circle-opacity': 0.85,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#fff'
+            }}
+          />
+        </Source>
         <Source
           id="points"
           type="geojson"
@@ -417,6 +565,7 @@ export default function ClusteredMap({
           <Layer
             id="people-dots-places"
             type="circle"
+            minzoom={CASE_CLUSTER_MAX_ZOOM}
             filter={['!=', ['get', 'loc_type'], 'homes']}
             layout={
               {
@@ -447,10 +596,10 @@ export default function ClusteredMap({
           <Layer
             id="poi-footprint-fill"
             type="fill"
-            minzoom={13}
+            minzoom={CASE_DETAIL_MIN_ZOOM}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+                visibility: showCaseDetailLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
@@ -469,10 +618,10 @@ export default function ClusteredMap({
           <Layer
             id="poi-footprint-outline"
             type="line"
-            minzoom={13}
+            minzoom={CASE_DETAIL_MIN_ZOOM}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+                visibility: showCaseDetailLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
@@ -508,6 +657,7 @@ export default function ClusteredMap({
           <Layer
             id="person-status-uninfected"
             type="circle"
+            minzoom={CASE_CLUSTER_MAX_ZOOM}
             filter={[
               'all',
               ['==', ['get', 'infected'], false],
@@ -515,7 +665,7 @@ export default function ClusteredMap({
             ]}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+                visibility: showCaseDotsLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
@@ -528,6 +678,7 @@ export default function ClusteredMap({
           <Layer
             id="person-status-recovered"
             type="circle"
+            minzoom={CASE_CLUSTER_MAX_ZOOM}
             filter={[
               'all',
               ['==', ['get', 'infected'], false],
@@ -535,7 +686,7 @@ export default function ClusteredMap({
             ]}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+                visibility: showCaseDotsLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
@@ -548,10 +699,11 @@ export default function ClusteredMap({
           <Layer
             id="person-status-infected"
             type="circle"
+            minzoom={CASE_CLUSTER_MAX_ZOOM}
             filter={['==', ['get', 'infected'], true]}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+                visibility: showCaseDotsLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
@@ -564,10 +716,11 @@ export default function ClusteredMap({
           <Layer
             id="person-status-disabled"
             type="circle"
+            minzoom={CASE_CLUSTER_MAX_ZOOM}
             filter={['==', ['get', 'disabled'], true]}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none'
+                visibility: showCaseDotsLayer ? 'visible' : 'none'
               } as const
             }
             paint={{
@@ -582,10 +735,10 @@ export default function ClusteredMap({
           <Layer
             id="poi-footprint-labels"
             type="symbol"
-            minzoom={13.2}
+            minzoom={CASE_DETAIL_MIN_ZOOM}
             layout={
               {
-                visibility: heatmapMode === 'people' ? 'visible' : 'none',
+                visibility: showCaseDetailLayer ? 'visible' : 'none',
                 'text-field': ['get', 'label'],
                 'text-size': [
                   'interpolate',

@@ -8,6 +8,7 @@ import {
   placesFromNumeric
 } from '@/lib/numeric-movement';
 import { getCachedPapdata } from '@/lib/papdata-cache';
+import { ensureDotsFile, readDotsPayload } from '@/lib/people-map-cache';
 import { prisma } from '@/lib/prisma';
 import type {
   DiseaseStateTimestep,
@@ -451,12 +452,38 @@ export async function GET(
     );
   }
 
+  const fileId = simdata.file_id;
+  const papdataId = simdata.czone.papdata_id;
+  const requested = Math.round(requestedTime);
+
   try {
-    const data = await buildPeopleMapPayload(
-      simdata.file_id,
-      Math.round(requestedTime),
-      simdata.czone.papdata_id
-    );
+    // Fast path: serve a pre-baked per-timestep dot frame, generating the
+    // `{fileId}.dots.json` file once (deduped) on first request. This replaces
+    // re-streaming + parsing the whole .pat file on every frame.
+    if (papdataId) {
+      try {
+        const papdata = (await getCachedPapdata(papdataId)) as {
+          places?: Record<string, unknown>;
+        };
+        const placeIds = Object.keys(papdata.places ?? {});
+        if (placeIds.length > 0) {
+          await ensureDotsFile(fileId, placeIds);
+        }
+      } catch (bakeError) {
+        console.warn('people-map: dot frame generation failed:', bakeError);
+      }
+      const baked = await readDotsPayload(fileId, requested);
+      if (baked) {
+        return Response.json(
+          { data: baked },
+          { headers: { 'Cache-Control': 'private, max-age=30' } }
+        );
+      }
+    }
+
+    // Fallback: live per-request computation (counts-only runs, or if baking
+    // is unavailable).
+    const data = await buildPeopleMapPayload(fileId, requested, papdataId);
     return Response.json(
       { data },
       { headers: { 'Cache-Control': 'private, max-age=30' } }
