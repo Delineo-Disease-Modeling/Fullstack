@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { DB_FOLDER } from '@/lib/db-files';
 import { loadMapCacheFrame, loadMapCacheManifest } from '@/lib/map-cache';
 import { prisma } from '@/lib/prisma';
-import { processingProgress } from '@/lib/sim-processor';
+import { getProcessingStatus, processingStatus } from '@/lib/sim-processor';
 import { jsonMessage } from '@/server/api/responses';
 import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
 
@@ -45,6 +45,17 @@ export async function GET(
   }
 
   const mapCachePath = `${DB_FOLDER}${simdata.file_id}.map.json`;
+  const activeStatus = processingStatus.get(id.value);
+  if (activeStatus) {
+    return Response.json(
+      {
+        processing: true,
+        progress: activeStatus.progress,
+        message: activeStatus.message
+      },
+      { status: 202 }
+    );
+  }
 
   try {
     const requestedTime = request.nextUrl.searchParams.get('time');
@@ -88,13 +99,12 @@ export async function GET(
       console.error('Map cache read error:', error);
     }
 
-    const progress = processingProgress.get(id.value) ?? 0;
+    const status = getProcessingStatus(id.value);
     return Response.json(
       {
         processing: true,
-        progress,
-        message:
-          'Simulation map data is still being processed. Please retry shortly.'
+        progress: status.progress,
+        message: status.message
       },
       { status: 202 }
     );
