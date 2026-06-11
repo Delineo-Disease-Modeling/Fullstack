@@ -21,6 +21,14 @@ export async function resolveDbDataPath(
     return { path: gzPath, gzipped: true };
   } catch {}
 
+  // Binary patterns (DLNOPAT) are stored raw under `.bin` — already
+  // zstd-compressed, so served as-is (not gunzipped).
+  const binPath = `${basePath}.bin`;
+  try {
+    await access(binPath, constants.F_OK);
+    return { path: binPath, gzipped: false };
+  } catch {}
+
   await access(basePath, constants.F_OK);
   return { path: basePath, gzipped: false };
 }
