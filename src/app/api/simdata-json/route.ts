@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Prisma } from '@/generated/prisma/client';
 import { DB_FOLDER } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
-import { processingProgress, processSimulation } from '@/lib/sim-processor';
+import { clearProcessingStatus, processSimulation } from '@/lib/sim-processor';
 
 export const maxDuration = 300;
 
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       )
       .catch((error) => {
         console.error('Simulation processing failed:', error);
-        processingProgress.delete(simData.id);
+        clearProcessingStatus(simData.id);
         prisma.simData
           .update({
             where: { id: simData.id },

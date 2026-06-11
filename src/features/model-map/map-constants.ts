@@ -64,6 +64,11 @@ export type HeatmapMode = 'markers' | 'people' | 'population' | 'infection';
 export const HEATMAP_MODES: HeatmapMode[] = ['markers', 'people'];
 export const PLAYBACK_INTERVAL_MS = 750;
 export const PEOPLE_MAP_PREFETCH_STEPS = 4;
+export const CASE_DETAIL_MIN_ZOOM = 12.8;
+// Cases view hands off from clustered infection bubbles (zoomed out) to
+// individual person dots at this zoom; POI footprints/labels appear later, at
+// CASE_DETAIL_MIN_ZOOM.
+export const CASE_CLUSTER_MAX_ZOOM = 12.0;
 
 export function applyAlpha(hex: string, alpha: number) {
   const bigint = parseInt(hex.replace('#', ''), 16);

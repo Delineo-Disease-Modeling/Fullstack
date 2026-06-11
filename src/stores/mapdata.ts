@@ -30,16 +30,28 @@ export type SimData = {
   };
 };
 
+export type PoiPeaks = Record<
+  string,
+  {
+    infected: number;
+    population: number;
+  }
+>;
+
 interface MapDataStore {
   name: string;
   simdata: SimData | null;
   papdata: PapData | null;
   hotspots: { [key: string]: number[] } | null;
+  timesteps: number[] | null;
+  poiPeaks: PoiPeaks | null;
 
   setName: (name: string) => void;
   setSimData: (simdata: SimData | null) => void;
   setPapData: (papdata: PapData | null) => void;
   setHotspots: (hotspots: { [key: string]: number[] }) => void;
+  setTimesteps: (timesteps: number[] | null) => void;
+  setPoiPeaks: (poiPeaks: PoiPeaks | null) => void;
 }
 
 const useMapData = create<MapDataStore>((set) => ({
@@ -47,6 +59,8 @@ const useMapData = create<MapDataStore>((set) => ({
   simdata: null,
   papdata: null,
   hotspots: null,
+  timesteps: null,
+  poiPeaks: null,
 
   setName: (name) => {
     set({ name });
@@ -54,7 +68,7 @@ const useMapData = create<MapDataStore>((set) => ({
 
   setSimData: (newSimData) => {
     if (newSimData === null) {
-      set({ simdata: null, hotspots: null });
+      set({ simdata: null, hotspots: null, timesteps: null, poiPeaks: null });
       return;
     }
     set((state) => ({
@@ -70,6 +84,14 @@ const useMapData = create<MapDataStore>((set) => ({
 
   setHotspots: (hotspots) => {
     set({ hotspots });
+  },
+
+  setTimesteps: (timesteps) => {
+    set({ timesteps });
+  },
+
+  setPoiPeaks: (poiPeaks) => {
+    set({ poiPeaks });
   }
 }));
 

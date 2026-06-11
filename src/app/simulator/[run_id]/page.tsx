@@ -15,7 +15,11 @@ import {
   type ProgressUpdate,
   runSimulation
 } from '@/lib/simulation-runner-client';
-import useMapData, { type PapData, type SimData } from '@/stores/mapdata';
+import useMapData, {
+  type PapData,
+  type PoiPeaks,
+  type SimData
+} from '@/stores/mapdata';
 import useSimSettings, {
   type SimSettings as SimSettingsState
 } from '@/stores/simsettings';
@@ -37,6 +41,8 @@ interface SimRunData {
   simdata: SimData | null;
   papdata: PapData | null;
   hotspots: { [key: string]: number[] } | null;
+  timesteps: number[] | null;
+  poiPeaks: PoiPeaks | null;
   metadata?: unknown;
 }
 
@@ -165,6 +171,8 @@ export default function SimulatorRun() {
   const setSimData = useMapData((state) => state.setSimData);
   const setPapData = useMapData((state) => state.setPapData);
   const setHotspots = useMapData((state) => state.setHotspots);
+  const setTimesteps = useMapData((state) => state.setTimesteps);
+  const setPoiPeaks = useMapData((state) => state.setPoiPeaks);
   const setRunName = useMapData((state) => state.setName);
 
   const { data: session } = useSession();
@@ -231,6 +239,8 @@ export default function SimulatorRun() {
       setSimData(null);
       setSimData(payload.simdata);
       setHotspots(payload.hotspots ?? {});
+      setTimesteps(payload.timesteps);
+      setPoiPeaks(payload.poiPeaks);
       setPapData(payload.papdata);
       setActiveView(view);
     },
@@ -239,8 +249,10 @@ export default function SimulatorRun() {
       disabledPayload,
       interventionPayload,
       setHotspots,
+      setPoiPeaks,
       setPapData,
-      setSimData
+      setSimData,
+      setTimesteps
     ]
   );
 
@@ -308,6 +320,8 @@ export default function SimulatorRun() {
       setProgress(0);
       setSimData(null);
       setPapData(null);
+      setTimesteps(null);
+      setPoiPeaks(null);
       setError(null);
       setInterventionPayload(null);
       setBaselinePayload(null);
@@ -320,7 +334,7 @@ export default function SimulatorRun() {
         // Poll until the map cache is ready (API returns 202 with progress while processing)
         let response: Response;
         while (true) {
-          response = await fetch(`/api/simdata/${run_id}`, { signal });
+          response = await fetch(`/api/simdata/${run_id}/map`, { signal });
           if (response.status !== 202) break;
           const status = await response.json();
           if (typeof status.progress === 'number') {
@@ -330,64 +344,17 @@ export default function SimulatorRun() {
         }
         if (!response.ok) throw new Error('Run not found');
 
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No response body');
-        const decoder = new TextDecoder();
-
-        let totalSteps = 0;
-        let fullJsonString = '';
-        let maxTimestamp = 0;
-        let tail = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          fullJsonString += chunk;
-
-          const textToScan = tail + chunk;
-          tail = chunk.slice(-50);
-
-          if (totalSteps === 0) {
-            const lengthMatch = textToScan.match(/"length":\s*(\d+)/);
-            if (lengthMatch) {
-              totalSteps = parseInt(lengthMatch[1], 10);
-            }
-          }
-
-          if (totalSteps > 0) {
-            const matches = [...textToScan.matchAll(/"(\d+)":\{"(?:h|p)"/g)];
-
-            for (const match of matches) {
-              const ts = parseInt(match[1], 10);
-              if (!Number.isNaN(ts)) {
-                maxTimestamp = Math.max(maxTimestamp, ts);
-              }
-            }
-
-            if (maxTimestamp > 0) {
-              const currentProgress = Math.min(
-                100,
-                Math.round((maxTimestamp / totalSteps) * 100)
-              );
-              setProgress((old) => Math.max(old, currentProgress));
-            }
-          }
-        }
-
         setProgress(100);
 
-        const simJson = JSON.parse(fullJsonString);
         const {
-          simdata,
           name,
           zone: zoneData,
           hotspots,
           papdata,
+          timesteps,
+          poiPeaks,
           metadata
-        } = simJson.data;
+        } = (await response.json()).data;
 
         setSettings({
           sim_id: +run_id,
@@ -396,11 +363,20 @@ export default function SimulatorRun() {
         });
 
         setSelectedZone(zoneData);
-        setSimData(simdata);
+        setSimData(null);
         setRunName(name);
         setHotspots(hotspots);
         setPapData(papdata);
-        setInterventionPayload({ simdata, papdata, hotspots, metadata });
+        setTimesteps(timesteps);
+        setPoiPeaks(poiPeaks);
+        setInterventionPayload({
+          simdata: null,
+          papdata,
+          hotspots,
+          timesteps,
+          poiPeaks,
+          metadata
+        });
 
         const loadComparisonPayload = async (
           comparisonId: number,
@@ -409,7 +385,7 @@ export default function SimulatorRun() {
           try {
             let comparisonRes: Response;
             while (true) {
-              comparisonRes = await fetch(`/api/simdata/${comparisonId}`, {
+              comparisonRes = await fetch(`/api/simdata/${comparisonId}/map`, {
                 signal
               });
               if (comparisonRes.status !== 202) break;
@@ -418,9 +394,11 @@ export default function SimulatorRun() {
             if (comparisonRes.ok) {
               const comparisonJson = await comparisonRes.json();
               return {
-                simdata: comparisonJson.data.simdata,
+                simdata: null,
                 papdata: comparisonJson.data.papdata,
                 hotspots: comparisonJson.data.hotspots,
+                timesteps: comparisonJson.data.timesteps,
+                poiPeaks: comparisonJson.data.poiPeaks,
                 metadata: comparisonJson.data.metadata
               };
             }
@@ -471,10 +449,12 @@ export default function SimulatorRun() {
     disabledSimId,
     router.replace,
     setHotspots,
+    setPoiPeaks,
     setPapData,
     setRunName,
     setSettings,
-    setSimData
+    setSimData,
+    setTimesteps
   ]);
 
   const handleTogglePoi = useCallback(
@@ -701,6 +681,8 @@ export default function SimulatorRun() {
 
                     setSimData(null);
                     setPapData(null);
+                    setTimesteps(null);
+                    setPoiPeaks(null);
                     setRunName('');
                     setSettings({ sim_id: null });
                     router.push('/simulator');

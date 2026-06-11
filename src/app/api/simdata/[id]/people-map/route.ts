@@ -1,5 +1,14 @@
 import type { NextRequest } from 'next/server';
-import { readDbJson } from '@/lib/db-files';
+import { resolveDbDataPath } from '@/lib/db-files';
+import { streamJsonObjectEntries } from '@/lib/json-stream';
+import {
+  getPatternMeta,
+  isNumericTimestep,
+  type PatternMeta,
+  placesFromNumeric
+} from '@/lib/numeric-movement';
+import { getCachedPapdata } from '@/lib/papdata-cache';
+import { ensureDotsFile, readDotsPayload } from '@/lib/people-map-cache';
 import { prisma } from '@/lib/prisma';
 import type {
   DiseaseStateTimestep,
@@ -12,7 +21,6 @@ const ACTIVE_INFECTION_MASK = 1 | 2 | 4 | 8;
 const RECOVERED_MASK = 16;
 const MAX_PEOPLE_DOTS = 12_000;
 const CACHE_LIMIT = 160;
-const RAW_RUN_CACHE_LIMIT = 1;
 
 type PeopleMapPerson = {
   id: string;
@@ -33,23 +41,17 @@ type PeopleMapPayload = {
   total_people: number;
   returned_people: number;
   sample_rate: number;
+  source: 'person' | 'aggregate';
   locations: PeopleMapLocation[];
 };
 
-type TimeKey = {
+type SelectedTimestep<T> = {
   time: number;
   key: string;
-};
-
-type RawRunData = {
-  simData: Record<string, DiseaseStateTimestep>;
-  patternData: Record<string, PatternTimestep>;
-  simTimes: TimeKey[];
-  patternTimes: TimeKey[];
+  value: T;
 };
 
 const responseCache = new Map<string, PeopleMapPayload>();
-const rawRunCache = new Map<string, RawRunData>();
 
 function cachePayload(key: string, payload: PeopleMapPayload) {
   responseCache.set(key, payload);
@@ -60,18 +62,6 @@ function cachePayload(key: string, payload: PeopleMapPayload) {
   const oldestKey = responseCache.keys().next().value;
   if (oldestKey) {
     responseCache.delete(oldestKey);
-  }
-}
-
-function cacheRawRunData(fileId: string, data: RawRunData) {
-  rawRunCache.set(fileId, data);
-  if (rawRunCache.size <= RAW_RUN_CACHE_LIMIT) {
-    return;
-  }
-
-  const oldestKey = rawRunCache.keys().next().value;
-  if (oldestKey) {
-    rawRunCache.delete(oldestKey);
   }
 }
 
@@ -118,55 +108,6 @@ function buildRecoveredSet(timestep: DiseaseStateTimestep | null) {
   return recovered;
 }
 
-function getSortedTimeKeys(data: Record<string, unknown>) {
-  return Object.keys(data)
-    .map((key) => ({ key, time: Number(key) }))
-    .filter((entry) => Number.isFinite(entry.time))
-    .sort((left, right) => left.time - right.time);
-}
-
-async function loadRawRunData(fileId: string) {
-  const cached = rawRunCache.get(fileId);
-  if (cached) {
-    rawRunCache.delete(fileId);
-    rawRunCache.set(fileId, cached);
-    return cached;
-  }
-
-  const [simData, patternData] = await Promise.all([
-    readDbJson<Record<string, DiseaseStateTimestep>>(fileId, '.sim'),
-    readDbJson<Record<string, PatternTimestep>>(fileId, '.pat')
-  ]);
-
-  const data = {
-    simData,
-    patternData,
-    simTimes: getSortedTimeKeys(simData),
-    patternTimes: getSortedTimeKeys(patternData)
-  } satisfies RawRunData;
-
-  cacheRawRunData(fileId, data);
-  return data;
-}
-
-function findTimeIndexAtOrBefore(times: TimeKey[], targetTime: number) {
-  let low = 0;
-  let high = times.length - 1;
-  let best = -1;
-
-  while (low <= high) {
-    const middle = Math.floor((low + high) / 2);
-    if (times[middle].time <= targetTime) {
-      best = middle;
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
-  }
-
-  return best;
-}
-
 function shouldIncludePerson(
   personId: string,
   infected: boolean,
@@ -181,9 +122,193 @@ function shouldIncludePerson(
   return hashString(personId) % sampleRate === 0;
 }
 
+function toNonNegativeCount(value: unknown) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count <= 0) {
+    return 0;
+  }
+  return Math.trunc(count);
+}
+
+function hasAggregatePlacesOnly(
+  patternValue: PatternTimestep
+): patternValue is PatternTimestep & { p: number[] } {
+  return (
+    Array.isArray(patternValue.p) &&
+    !Array.isArray(patternValue.loc) &&
+    Object.keys(patternValue.places ?? {}).length === 0
+  );
+}
+
+async function loadSortedPlaceIds(papdataId: string) {
+  const papdata = await getCachedPapdata(papdataId);
+  return Object.keys(papdata.places).sort((a, b) => Number(a) - Number(b));
+}
+
+function addAggregatePeople(
+  people: PeopleMapPerson[],
+  placeId: string,
+  status: 'i' | 'u',
+  count: number
+) {
+  const infected = status === 'i';
+  for (let index = 0; index < count; index += 1) {
+    people.push({
+      id: `agg:${placeId}:${status}:${index}`,
+      infected,
+      newly_infected: false,
+      recovered: false
+    });
+  }
+}
+
+async function buildAggregatePeopleMapPayload(
+  patternTime: SelectedTimestep<PatternTimestep & { p: number[] }>,
+  requestedTime: number,
+  papdataId: string
+): Promise<PeopleMapPayload> {
+  const placeIds = await loadSortedPlaceIds(papdataId);
+  const countsByPlace: {
+    placeId: string;
+    population: number;
+    infected: number;
+  }[] = [];
+
+  let totalPeople = 0;
+  const placeCount = Math.min(
+    placeIds.length,
+    Math.floor(patternTime.value.p.length / 2)
+  );
+  for (let index = 0; index < placeCount; index += 1) {
+    const population = toNonNegativeCount(patternTime.value.p[index * 2]);
+    if (population === 0) {
+      continue;
+    }
+
+    const infected = Math.min(
+      population,
+      toNonNegativeCount(patternTime.value.p[index * 2 + 1])
+    );
+    totalPeople += population;
+    countsByPlace.push({
+      placeId: placeIds[index],
+      population,
+      infected
+    });
+  }
+
+  const sampleRate = Math.max(1, Math.ceil(totalPeople / MAX_PEOPLE_DOTS));
+  let returnedPeople = 0;
+  const locations: PeopleMapLocation[] = [];
+
+  for (const { placeId, population, infected } of countsByPlace) {
+    const uninfected = population - infected;
+    const infectedSamples =
+      infected > 0
+        ? Math.min(infected, Math.max(1, Math.ceil(infected / sampleRate)))
+        : 0;
+    const uninfectedSamples =
+      uninfected > 0
+        ? Math.min(
+            uninfected,
+            Math.max(1, Math.ceil(uninfected / sampleRate))
+          )
+        : 0;
+    const sampledPeople: PeopleMapPerson[] = [];
+
+    addAggregatePeople(sampledPeople, placeId, 'i', infectedSamples);
+    addAggregatePeople(sampledPeople, placeId, 'u', uninfectedSamples);
+
+    if (sampledPeople.length > 0) {
+      returnedPeople += sampledPeople.length;
+      locations.push({
+        type: 'places',
+        id: placeId,
+        people: sampledPeople
+      });
+    }
+  }
+
+  return {
+    time: patternTime.time,
+    requested_time: requestedTime,
+    total_people: totalPeople,
+    returned_people: returnedPeople,
+    sample_rate: sampleRate,
+    source: 'aggregate',
+    locations
+  } satisfies PeopleMapPayload;
+}
+
+async function loadSelectedSimTimestep(fileId: string, requestedTime: number) {
+  const { path, gzipped } = await resolveDbDataPath(fileId, '.sim');
+  const entries = streamJsonObjectEntries<DiseaseStateTimestep>(path, gzipped);
+  let current: SelectedTimestep<DiseaseStateTimestep> | null = null;
+  let previous: SelectedTimestep<DiseaseStateTimestep> | null = null;
+
+  for await (const { key, value } of entries) {
+    const time = Number(key);
+    if (!Number.isFinite(time)) {
+      continue;
+    }
+
+    if (time > requestedTime && current) {
+      break;
+    }
+
+    if (time <= requestedTime) {
+      previous = current;
+      current = { key, time, value };
+    }
+  }
+
+  if (!current) {
+    throw new Error('No simulation timestep found.');
+  }
+
+  return { current, previous };
+}
+
+async function loadSelectedPatternTimestep(fileId: string, targetTime: number) {
+  const { path, gzipped } = await resolveDbDataPath(fileId, '.pat');
+  const entries = streamJsonObjectEntries<PatternTimestep | PatternMeta>(
+    path,
+    gzipped
+  );
+  let current: SelectedTimestep<PatternTimestep> | null = null;
+  let meta: PatternMeta | null = null;
+
+  for await (const { key, value } of entries) {
+    if (key === 'meta') {
+      meta = getPatternMeta({ meta: value });
+      continue;
+    }
+
+    const time = Number(key);
+    if (!Number.isFinite(time)) {
+      continue;
+    }
+
+    if (time > targetTime && current) {
+      break;
+    }
+
+    if (time <= targetTime) {
+      current = { key, time, value: value as PatternTimestep };
+    }
+  }
+
+  if (!current) {
+    throw new Error('No movement timestep found.');
+  }
+
+  return { current, meta };
+}
+
 async function buildPeopleMapPayload(
   fileId: string,
-  requestedTime: number
+  requestedTime: number,
+  papdataId: string | null
 ): Promise<PeopleMapPayload> {
   const cacheKey = `${fileId}:${requestedTime}`;
   const cached = responseCache.get(cacheKey);
@@ -191,40 +316,52 @@ async function buildPeopleMapPayload(
     return cached;
   }
 
-  const rawRunData = await loadRawRunData(fileId);
-  const simTimeIndex = findTimeIndexAtOrBefore(
-    rawRunData.simTimes,
-    requestedTime
-  );
-  if (simTimeIndex < 0) {
-    throw new Error('No simulation timestep found.');
+  let { current: patternTime, meta: patternMeta } =
+    await loadSelectedPatternTimestep(fileId, requestedTime);
+
+  if (hasAggregatePlacesOnly(patternTime.value)) {
+    if (!papdataId) {
+      throw new Error('No papdata file is available for aggregate places.');
+    }
+    const payload = await buildAggregatePeopleMapPayload(
+      patternTime as SelectedTimestep<PatternTimestep & { p: number[] }>,
+      requestedTime,
+      papdataId
+    );
+    cachePayload(cacheKey, payload);
+    return payload;
   }
 
-  const simTime = rawRunData.simTimes[simTimeIndex];
-  const patternTimeIndex = findTimeIndexAtOrBefore(
-    rawRunData.patternTimes,
-    simTime.time
+  const { current: simTime, previous } = await loadSelectedSimTimestep(
+    fileId,
+    patternTime.time
   );
-  if (patternTimeIndex < 0) {
-    throw new Error('No movement timestep found.');
+
+  if (simTime.time !== patternTime.time) {
+    const alignedPattern = await loadSelectedPatternTimestep(
+      fileId,
+      simTime.time
+    );
+    patternTime = alignedPattern.current;
+    patternMeta = alignedPattern.meta ?? patternMeta;
   }
 
-  const previousSimTime =
-    simTimeIndex > 0 ? rawRunData.simTimes[simTimeIndex - 1] : null;
-  const patternTime = rawRunData.patternTimes[patternTimeIndex];
-  const simValue = rawRunData.simData[simTime.key];
-  const previousSimValue = previousSimTime
-    ? rawRunData.simData[previousSimTime.key]
-    : null;
-  const patternValue = rawRunData.patternData[patternTime.key];
-  if (!simValue || !patternValue) {
-    throw new Error('Missing timestep data.');
-  }
+  const simValue = simTime.value;
+  const previousSimValue = previous?.value ?? null;
+  const patternValue = patternTime.value;
 
   const infectedNow = buildActiveInfectedSet(simValue);
   const infectedBefore = buildActiveInfectedSet(previousSimValue);
   const recoveredNow = buildRecoveredSet(simValue);
-  const places = patternValue.places ?? {};
+  // SoA-engine runs ship per-location occupancy as the compact numeric `loc`
+  // stream; reconstruct the {placeId: [pids]} shape this view expects. Legacy
+  // runs already carry `places` directly.
+  let places = patternValue.places ?? {};
+  if (Object.keys(places).length === 0 && isNumericTimestep(patternValue)) {
+    if (patternMeta) {
+      places = placesFromNumeric(patternValue.loc, patternMeta);
+    }
+  }
   let totalPeople = 0;
   for (const people of Object.values(places)) {
     totalPeople += Array.isArray(people) ? people.length : 0;
@@ -281,6 +418,7 @@ async function buildPeopleMapPayload(
     total_people: totalPeople,
     returned_people: returnedPeople,
     sample_rate: sampleRate,
+    source: 'person',
     locations
   } satisfies PeopleMapPayload;
 
@@ -305,7 +443,7 @@ export async function GET(
 
   const simdata = await prisma.simData.findUnique({
     where: { id: id.value },
-    select: { file_id: true }
+    select: { file_id: true, czone: { select: { papdata_id: true } } }
   });
   if (!simdata) {
     return Response.json(
@@ -314,11 +452,38 @@ export async function GET(
     );
   }
 
+  const fileId = simdata.file_id;
+  const papdataId = simdata.czone.papdata_id;
+  const requested = Math.round(requestedTime);
+
   try {
-    const data = await buildPeopleMapPayload(
-      simdata.file_id,
-      Math.round(requestedTime)
-    );
+    // Fast path: serve a pre-baked per-timestep dot frame, generating the
+    // `{fileId}.dots.json` file once (deduped) on first request. This replaces
+    // re-streaming + parsing the whole .pat file on every frame.
+    if (papdataId) {
+      try {
+        const papdata = (await getCachedPapdata(papdataId)) as {
+          places?: Record<string, unknown>;
+        };
+        const placeIds = Object.keys(papdata.places ?? {});
+        if (placeIds.length > 0) {
+          await ensureDotsFile(fileId, placeIds);
+        }
+      } catch (bakeError) {
+        console.warn('people-map: dot frame generation failed:', bakeError);
+      }
+      const baked = await readDotsPayload(fileId, requested);
+      if (baked) {
+        return Response.json(
+          { data: baked },
+          { headers: { 'Cache-Control': 'private, max-age=30' } }
+        );
+      }
+    }
+
+    // Fallback: live per-request computation (counts-only runs, or if baking
+    // is unavailable).
+    const data = await buildPeopleMapPayload(fileId, requested, papdataId);
     return Response.json(
       { data },
       { headers: { 'Cache-Control': 'private, max-age=30' } }
