@@ -37,6 +37,10 @@ function getMapFrameCacheKey(simId: number, timestep: number) {
   return `${simId}:${timestep}`;
 }
 
+// Stable empty default so the `pois` memo isn't invalidated by a fresh `{}`
+// reference on every render while hotspots are still loading.
+const EMPTY_HOTSPOTS: Record<string, number[]> = {};
+
 // Max consecutive playback ticks to wait for an unloaded Cases frame before
 // advancing anyway, so a missing/broken frame can't freeze playback. At
 // PLAYBACK_INTERVAL_MS (750ms) this caps a stall at ~7.5s.
@@ -63,7 +67,7 @@ export default function ModelMap({
 }: ModelMapProps) {
   const sim_data = useMapData((state) => state.simdata);
   const pap_data = useMapData((state) => state.papdata);
-  const hotspots = useMapData((state) => state.hotspots) || {};
+  const hotspots = useMapData((state) => state.hotspots) ?? EMPTY_HOTSPOTS;
   const timesteps = useMapData((state) => state.timesteps);
   const setSimData = useMapData((state) => state.setSimData);
   const [zoneGeoJSON, setZoneGeoJSON] = useState<GeoJSONData | null>(null);
@@ -225,14 +229,19 @@ export default function ModelMap({
     [simId]
   );
 
+  // Only the *current* frame's data feeds the icons. Depending on this slice
+  // rather than the whole `sim_data` object keeps prefetching/merging future
+  // frames — which replaces the `sim_data` reference on every store write —
+  // from needlessly recomputing the current frame's POIs.
+  const currentFrameData =
+    selectedTimestep !== null
+      ? (sim_data?.[selectedTimestep.toString()] ?? null)
+      : null;
+
   const pois = useMemo(() => {
-    const dataForTime =
-      selectedTimestep !== null
-        ? sim_data?.[selectedTimestep.toString()]
-        : null;
     const nextPois = updateIcons(
       mapCenter,
-      dataForTime,
+      currentFrameData,
       pap_data,
       hotspots,
       zoneGeoJSON
@@ -250,8 +259,7 @@ export default function ModelMap({
     hotspots,
     mapCenter,
     pap_data,
-    sim_data,
-    selectedTimestep,
+    currentFrameData,
     zoneGeoJSON
   ]);
 
@@ -339,16 +347,23 @@ export default function ModelMap({
 
     let active = true;
     const preloadUpcoming = async () => {
-      for (const timestep of upcomingTimesteps) {
-        if (!active) return;
-        try {
-          const nextSimData = await loadMapFrameData(timestep);
-          if (active) {
-            setSimData(nextSimData);
-          }
-        } catch (error) {
-          console.warn('Failed to preload map frame data:', error);
-        }
+      // Fetch the upcoming frames concurrently instead of serially, then merge
+      // them in a single store update.
+      const results = await Promise.all(
+        upcomingTimesteps.map((timestep) =>
+          loadMapFrameData(timestep).catch((error) => {
+            console.warn('Failed to preload map frame data:', error);
+            return null;
+          })
+        )
+      );
+      if (!active) return;
+      const merged: SimData = Object.assign(
+        {},
+        ...results.filter((r): r is SimData => r !== null)
+      );
+      if (Object.keys(merged).length > 0) {
+        setSimData(merged);
       }
     };
 
@@ -494,14 +509,16 @@ export default function ModelMap({
 
     let active = true;
     const preloadUpcoming = async () => {
-      for (const timestep of upcomingTimesteps) {
-        if (!active) return;
-        try {
-          await loadPeopleMapData(timestep);
-        } catch (error) {
-          console.warn('Failed to preload person-level map data:', error);
-        }
-      }
+      if (!active) return;
+      // Warm the cache for upcoming frames concurrently so the playback buffer
+      // (MAX_BUFFER_HOLDS) stops stalling on serial ~0.4-1.7s fetches.
+      await Promise.all(
+        upcomingTimesteps.map((timestep) =>
+          loadPeopleMapData(timestep).catch((error) => {
+            console.warn('Failed to preload person-level map data:', error);
+          })
+        )
+      );
     };
 
     preloadUpcoming();
