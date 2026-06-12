@@ -63,7 +63,10 @@ export type HeatmapMode = 'markers' | 'people' | 'population' | 'infection';
 // HeatmapMode values so the rendering paths remain available if reintroduced.
 export const HEATMAP_MODES: HeatmapMode[] = ['markers', 'people'];
 export const PLAYBACK_INTERVAL_MS = 750;
-export const PEOPLE_MAP_PREFETCH_STEPS = 4;
+// Prefetch this many upcoming Cases frames so playback never stalls waiting on a
+// fetch. Fetches are ~20ms now, so a deeper buffer is cheap and keeps the slider
+// advancing at a steady rate.
+export const PEOPLE_MAP_PREFETCH_STEPS = 8;
 export const CASE_DETAIL_MIN_ZOOM = 12.8;
 // Cases view hands off from clustered infection bubbles (zoomed out) to
 // individual person dots at this zoom; POI footprints/labels appear later, at

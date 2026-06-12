@@ -278,40 +278,6 @@ export async function ensureDotsFile(
   return pending;
 }
 
-/**
- * Bake the dots file in the background from already-parsed data, WITHOUT
- * blocking the caller. Registers the bake in the inflight map so a concurrent
- * `ensureDotsFile` (e.g. the user opening the Cases view) dedupes against it
- * instead of starting a second bake. Used by sim-processor so the run view can
- * unblock as soon as the charts + map cache are ready, while the (heavier) dot
- * frames finish a moment later in the background.
- */
-export function bakeDotsInBackground(
-  fileId: string,
-  simData: Record<string, DiseaseStateTimestep>,
-  patData: Record<string, PatternTimestep>,
-  placeIds: string[]
-): void {
-  if (inflightGeneration.has(fileId)) return;
-  // writeDotsFile's loop is synchronous CPU work, so calling it without await
-  // still blocks the caller until it finishes. Defer it to a later macrotask
-  // (setImmediate) so processSimulation returns and the run's stats/map persist
-  // first — the run view unblocks without waiting on the dot frames.
-  const pending = new Promise<boolean>((resolve) => {
-    setImmediate(() => {
-      writeDotsFile(fileId, simData, patData, placeIds)
-        .then(resolve)
-        .catch((err) => {
-          console.warn('bakeDotsInBackground: dot frame pre-bake failed:', err);
-          resolve(false);
-        });
-    });
-  }).finally(() => {
-    inflightGeneration.delete(fileId);
-  });
-  inflightGeneration.set(fileId, pending);
-}
-
 function cacheDots(filePath: string, entry: CachedDots) {
   dotsCache.set(filePath, entry);
   if (dotsCache.size <= DOTS_CACHE_LIMIT) {

@@ -42,9 +42,13 @@ function getMapFrameCacheKey(simId: number, timestep: number) {
 const EMPTY_HOTSPOTS: Record<string, number[]> = {};
 
 // Max consecutive playback ticks to wait for an unloaded Cases frame before
-// advancing anyway, so a missing/broken frame can't freeze playback. At
-// PLAYBACK_INTERVAL_MS (750ms) this caps a stall at ~7.5s.
-const MAX_BUFFER_HOLDS = 10;
+// advancing anyway. Per-frame people-map fetches are now ~20ms (the dots are
+// pre-baked + served from the in-memory cache), so the deep buffer this used to
+// need (for the old ~0.4-1.7s fetches) just produced long "spaced out" stalls.
+// With PREFETCH_STEPS keeping frames ready, hold at most 1 tick so playback
+// advances at a steady rate. At PLAYBACK_INTERVAL_MS (750ms) this caps a stall
+// at ~1.5s instead of ~7.5s.
+const MAX_BUFFER_HOLDS = 1;
 
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
