@@ -5,7 +5,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { DB_FOLDER } from '@/lib/db-files';
 import { saveFileStream } from '@/lib/filestream';
 import { prisma } from '@/lib/prisma';
-import { processingProgress, processSimulation } from '@/lib/sim-processor';
+import { clearProcessingStatus, processSimulation } from '@/lib/sim-processor';
 
 export const maxDuration = 300;
 
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         )
         .catch((e) => {
           console.error('Simulation processing failed:', e);
-          processingProgress.delete(simdata_obj.id);
+          clearProcessingStatus(simdata_obj.id);
           prisma.simData
             .update({
               where: { id: simdata_obj.id },

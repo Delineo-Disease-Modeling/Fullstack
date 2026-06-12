@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
     const papdata_id = crypto.randomUUID();
     const patterns_id = crypto.randomUUID();
     const papdataPath = `${DB_FOLDER}${papdata_id}.gz`;
-    const patternsPath = `${DB_FOLDER}${patterns_id}.gz`;
+
+    // Sniff the patterns body: the compact binary (DLNOPAT) format is stored raw
+    // under `.bin` (it is already zstd-compressed); legacy JSON is gzipped under
+    // `.gz`. resolveDbDataPath detects which on read.
+    const patternsHead = Buffer.from(await patterns.slice(0, 8).arrayBuffer());
+    const patternsBinary = patternsHead.toString('latin1').startsWith('DLNOPAT');
+    const patternsPath = `${DB_FOLDER}${patterns_id}${patternsBinary ? '.bin' : '.gz'}`;
 
     const existingZone = await prisma.convenienceZone.findUnique({
       where: { id: czone_id },
@@ -46,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     try {
       await Promise.all([
-        saveFileStream(patterns, patternsPath, true),
+        saveFileStream(patterns, patternsPath, !patternsBinary),
         saveFileStream(papdata, papdataPath, true)
       ]);
 

@@ -227,10 +227,27 @@ export default function PoiRankings({
   const [activeView, setActiveView] = useState<RankingView>('pois');
   const simdata = useMapData((s) => s.simdata);
   const papdata = useMapData((s) => s.papdata);
+  const poiPeaks = useMapData((s) => s.poiPeaks);
 
   const poiStats = useMemo<PoiStat[]>(() => {
-    if (!simdata || !papdata?.places?.length) return [];
+    if (!papdata?.places?.length || (!poiPeaks && !simdata)) return [];
     const places = papdata.places;
+
+    if (poiPeaks) {
+      return places.map((place) => {
+        const peak = poiPeaks[String(place.id)];
+        return {
+          id: String(place.id),
+          label: place.label || `Place #${place.id}`,
+          category: place.top_category || 'Uncategorized',
+          peakInfected: peak?.infected ?? 0,
+          popAtPeak: peak?.population ?? 0
+        };
+      });
+    }
+
+    if (!simdata) return [];
+
     const count = places.length;
     const peak = new Array<number>(count).fill(0);
     const popAtPeak = new Array<number>(count).fill(0);
@@ -254,7 +271,7 @@ export default function PoiRankings({
       peakInfected: peak[index],
       popAtPeak: popAtPeak[index]
     }));
-  }, [simdata, papdata]);
+  }, [simdata, papdata, poiPeaks]);
 
   const poiRows = useMemo<RankRow[]>(() => {
     return poiStats

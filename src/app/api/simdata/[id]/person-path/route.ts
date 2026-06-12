@@ -1,6 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { readDbJson, resolveDbDataPath } from '@/lib/db-files';
 import { streamJsonObjectEntries } from '@/lib/json-stream';
+import {
+  decodeLocationIndex,
+  getPatternMeta,
+  isNumericTimestep,
+  type PatternMeta
+} from '@/lib/numeric-movement';
 import { prisma } from '@/lib/prisma';
 import {
   getPersonSexLabel,
@@ -130,16 +136,32 @@ async function buildPersonPath(
 
   const points: TimelinePoint[] = [];
   let previousLocation: KnownLocation | null = null;
+  // SoA-engine runs lead with a non-timestep `meta` entry; resolve this
+  // person's index once and decode their location from the compact `loc`
+  // stream. Legacy runs have no `meta`/`loc` and fall back to pid-list search.
+  let meta: PatternMeta | null = null;
+  let personIdx = -1;
   let nextItem = await patternsIterator.next();
 
   while (!nextItem.done) {
-    const minute = Number(nextItem.value.key);
+    const { key, value } = nextItem.value;
+
+    if (key === 'meta') {
+      meta = getPatternMeta({ meta: value });
+      personIdx = meta ? meta.pids.indexOf(personKey) : -1;
+      nextItem = await patternsIterator.next();
+      continue;
+    }
+
+    const minute = Number(key);
     if (Number.isFinite(minute)) {
-      const location = findPersonLocation(
-        nextItem.value.value ?? {},
-        personKey,
-        previousLocation
-      );
+      const timestep = value ?? {};
+      const location: { type: 'homes' | 'places' | 'unknown'; id: string } =
+        meta && isNumericTimestep(timestep)
+          ? personIdx >= 0
+            ? decodeLocationIndex(timestep.loc[personIdx], meta)
+            : { type: 'unknown', id: 'unknown' }
+          : findPersonLocation(timestep, personKey, previousLocation);
       points.push({
         minute,
         location_type: location.type,

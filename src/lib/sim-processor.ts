@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { getCachedPapdata } from './papdata-cache';
+import { writeDotsFile } from './people-map-cache';
 import {
   AGE_RANGE_LABELS,
   ALL_STATE_NAMES,
@@ -38,6 +39,34 @@ interface ProcessOpts {
 
 /** In-memory progress tracker for active processing jobs (simDataId -> 0-100). */
 export const processingProgress = new Map<number, number>();
+export const processingStatus = new Map<
+  number,
+  { progress: number; message: string }
+>();
+
+export function setProcessingStatus(
+  simDataId: number,
+  progress: number,
+  message: string
+) {
+  const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+  processingProgress.set(simDataId, clamped);
+  processingStatus.set(simDataId, { progress: clamped, message });
+}
+
+export function clearProcessingStatus(simDataId: number) {
+  processingProgress.delete(simDataId);
+  processingStatus.delete(simDataId);
+}
+
+export function getProcessingStatus(simDataId: number) {
+  return (
+    processingStatus.get(simDataId) ?? {
+      progress: processingProgress.get(simDataId) ?? 0,
+      message: 'Processing simulation data...'
+    }
+  );
+}
 
 /**
  * Single-pass processor that streams simdata + patterns files once and produces:
@@ -56,7 +85,7 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     mapCachePath,
     totalLength
   } = opts;
-  processingProgress.set(simDataId, 0);
+  setProcessingStatus(simDataId, 0, 'Processing simulation results...');
 
   // Load papdata from shared cache (avoids redundant gunzip)
   let stageStart = nowMs();
@@ -174,54 +203,81 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     const time = +skey / 60;
     matchedTimesteps++;
 
-    // === MAP CACHE: build infected set, homes/places arrays ===
+    // === MAP CACHE: per-location [count, infected] arrays ===
+    // The SoA engine emits these directly as { h: [...], p: [...] } (numeric
+    // format), already aligned to homeIds/placeIds order — use them as-is.
+    // Older runs emit { homes/places: {id: [pids]} }, computed here.
     let tStage = nowMs();
-    const curinfected = new Set<string>();
-    for (const people of Object.values(svalue)) {
-      for (const key of Object.keys(people as Record<string, unknown>)) {
-        curinfected.add(key);
-      }
-    }
-    accum('processSimulation/build_infected_set', tStage);
+    let homesArray: number[];
+    let placesArray: number[];
+    const numericPattern = Array.isArray(
+      (pvalue as unknown as { h?: unknown }).h
+    );
 
-    tStage = nowMs();
-    const homesArray: number[] = [];
-    for (const id of homeIds) {
-      const pop: string[] | undefined = pvalue.homes?.[id];
-      if (pop) {
-        let inf = 0;
-        for (const v of pop) {
-          if (curinfected.has(v)) inf++;
-        }
-        homesArray.push(pop.length, inf);
-      } else {
-        homesArray.push(0, 0);
-      }
-    }
-    accum('processSimulation/build_homes_array', tStage);
-
-    tStage = nowMs();
-    const placesArray: number[] = [];
-    for (const id of placeIds) {
-      const pop: string[] | undefined = pvalue.places?.[id];
-      if (pop) {
-        let inf = 0;
-        for (const v of pop) {
-          if (curinfected.has(v)) inf++;
-        }
-        placesArray.push(pop.length, inf);
+    if (numericPattern) {
+      const np = pvalue as unknown as { h: number[]; p: number[] };
+      homesArray = np.h;
+      placesArray = np.p;
+      // Hotspot tracking from the numeric places array (inf at index 2*i+1).
+      for (let i = 0; i < placeIds.length; i++) {
+        const id = placeIds[i];
+        const inf = placesArray[i * 2 + 1] || 0;
         const prevInf = prevInfected[id] || 0;
         if (inf > 0 && prevInf > 0 && inf >= prevInf * 5) {
           if (!hotspots[id]) hotspots[id] = [];
           hotspots[id].push(Number(skey));
         }
         prevInfected[id] = inf;
-      } else {
-        placesArray.push(0, 0);
-        prevInfected[id] = 0;
       }
+      accum('processSimulation/numeric_passthrough', tStage);
+    } else {
+      const curinfected = new Set<string>();
+      for (const people of Object.values(svalue)) {
+        for (const key of Object.keys(people as Record<string, unknown>)) {
+          curinfected.add(key);
+        }
+      }
+      accum('processSimulation/build_infected_set', tStage);
+
+      tStage = nowMs();
+      homesArray = [];
+      for (const id of homeIds) {
+        const pop: string[] | undefined = pvalue.homes?.[id];
+        if (pop) {
+          let inf = 0;
+          for (const v of pop) {
+            if (curinfected.has(v)) inf++;
+          }
+          homesArray.push(pop.length, inf);
+        } else {
+          homesArray.push(0, 0);
+        }
+      }
+      accum('processSimulation/build_homes_array', tStage);
+
+      tStage = nowMs();
+      placesArray = [];
+      for (const id of placeIds) {
+        const pop: string[] | undefined = pvalue.places?.[id];
+        if (pop) {
+          let inf = 0;
+          for (const v of pop) {
+            if (curinfected.has(v)) inf++;
+          }
+          placesArray.push(pop.length, inf);
+          const prevInf = prevInfected[id] || 0;
+          if (inf > 0 && prevInf > 0 && inf >= prevInf * 5) {
+            if (!hotspots[id]) hotspots[id] = [];
+            hotspots[id].push(Number(skey));
+          }
+          prevInfected[id] = inf;
+        } else {
+          placesArray.push(0, 0);
+          prevInfected[id] = 0;
+        }
+      }
+      accum('processSimulation/build_places_array', tStage);
     }
-    accum('processSimulation/build_places_array', tStage);
 
     tStage = nowMs();
     if (!first) cacheParts.push(',');
@@ -273,9 +329,10 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     accum('processSimulation/global_stats_aggregation', tStage);
 
     if (totalLength > 0) {
-      processingProgress.set(
+      setProcessingStatus(
         simDataId,
-        Math.min(99, Math.round((+skey / totalLength) * 100))
+        Math.min(84, Math.round((+skey / totalLength) * 84)),
+        'Processing simulation results...'
       );
     }
   }
@@ -288,8 +345,6 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
       console.info(`[perf] ${label}: ${(perfAccum[label] / 1000).toFixed(3)}s`);
     }
   }
-
-  processingProgress.delete(simDataId);
 
   // Finalize map cache.
   //
@@ -305,9 +360,33 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   cacheParts.push(`},"hotspots":${JSON.stringify(hotspots)}`);
   stageStart = nowMs();
   const tmpMapCachePath = `${mapCachePath}.tmp`;
+  setProcessingStatus(simDataId, 85, 'Writing map cache...');
   await writeFile(tmpMapCachePath, cacheParts.join(''));
   await rename(tmpMapCachePath, mapCachePath);
   logPerfTiming('processSimulation map cache write', stageStart);
+
+  // Pre-bake compact per-timestep dot frames ({fileId}.dots.json) so the Cases
+  // view has them ready the moment the run appears (no first-open / early-
+  // playback gap). Cheap now that the engine emits per-place dot counts (the
+  // bake is a passthrough). Best-effort: on failure the route lazily generates
+  // them on first open.
+  stageStart = nowMs();
+  setProcessingStatus(simDataId, 92, 'Writing case map frames...');
+  const dotsFileId = mapCachePath
+    .split('/')
+    .pop()
+    ?.replace(/\.map\.json$/, '');
+  if (dotsFileId) {
+    try {
+      await writeDotsFile(dotsFileId, simData, patData, placeIds);
+    } catch (dotsError) {
+      console.warn('processSimulation: dot frame pre-bake failed:', dotsError);
+    }
+  }
+  logPerfTiming('processSimulation dot frame pre-bake', stageStart);
+
+  setProcessingStatus(simDataId, 100, 'Finalizing simulation...');
+  clearProcessingStatus(simDataId);
   logPerfTiming('processSimulation total', totalStart);
 
   return globalStats;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useMapData from '@/stores/mapdata';
+import useMapData, { type SimData } from '@/stores/mapdata';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/modelmap.css';
@@ -33,6 +33,23 @@ import {
 } from '@/features/model-map/map-storage';
 import MapLegend from './maplegend';
 
+function getMapFrameCacheKey(simId: number, timestep: number) {
+  return `${simId}:${timestep}`;
+}
+
+// Stable empty default so the `pois` memo isn't invalidated by a fresh `{}`
+// reference on every render while hotspots are still loading.
+const EMPTY_HOTSPOTS: Record<string, number[]> = {};
+
+// Max consecutive playback ticks to wait for an unloaded Cases frame before
+// advancing anyway. Per-frame people-map fetches are now ~20ms (the dots are
+// pre-baked + served from the in-memory cache), so the deep buffer this used to
+// need (for the old ~0.4-1.7s fetches) just produced long "spaced out" stalls.
+// With PREFETCH_STEPS keeping frames ready, hold at most 1 tick so playback
+// advances at a steady rate. At PLAYBACK_INTERVAL_MS (750ms) this caps a stall
+// at ~1.5s instead of ~7.5s.
+const MAX_BUFFER_HOLDS = 1;
+
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
   simId?: number | null;
@@ -54,7 +71,9 @@ export default function ModelMap({
 }: ModelMapProps) {
   const sim_data = useMapData((state) => state.simdata);
   const pap_data = useMapData((state) => state.papdata);
-  const hotspots = useMapData((state) => state.hotspots) || {};
+  const hotspots = useMapData((state) => state.hotspots) ?? EMPTY_HOTSPOTS;
+  const timesteps = useMapData((state) => state.timesteps);
+  const setSimData = useMapData((state) => state.setSimData);
   const [zoneGeoJSON, setZoneGeoJSON] = useState<GeoJSONData | null>(null);
 
   const [maxHours, setMaxHours] = useState(1);
@@ -69,11 +88,15 @@ export default function ModelMap({
     null
   );
   const [peopleMapError, setPeopleMapError] = useState<string | null>(null);
+  const [caseDotsVisible, setCaseDotsVisible] = useState(false);
   const peopleMapDataSimId = useRef<number | null>(null);
   const peopleMapCache = useRef<Map<string, PeopleMapData>>(new Map());
   const peopleMapRequests = useRef<Map<string, Promise<PeopleMapData>>>(
     new Map()
   );
+  const mapFrameRequests = useRef<Map<string, Promise<SimData>>>(new Map());
+  const bufferHoldsRef = useRef(0);
+  const [mapFrameError, setMapFrameError] = useState<string | null>(null);
 
   useEffect(() => {
     resetModelMapLayoutCaches();
@@ -85,6 +108,8 @@ export default function ModelMap({
     peopleMapDataSimId.current = null;
     setPeopleMapData(null);
     setPeopleMapError(null);
+    setMapFrameError(null);
+    setCaseDotsVisible(false);
   }, [simId]);
 
   useEffect(() => {
@@ -133,12 +158,15 @@ export default function ModelMap({
   }, [selectedZone]);
 
   const availableTimesteps = useMemo(() => {
+    if (timesteps?.length) {
+      return timesteps;
+    }
     if (!sim_data) return [];
     return Object.keys(sim_data)
       .map(Number)
       .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b);
-  }, [sim_data]);
+  }, [sim_data, timesteps]);
 
   const findNearestTimestep = useCallback(
     (targetMinutes: number) => {
@@ -164,14 +192,60 @@ export default function ModelMap({
     return findNearestTimestep(targetMinutes);
   }, [currentTime, findNearestTimestep]);
 
+  const loadMapFrameData = useCallback(
+    async (timestep: number) => {
+      if (!simId) {
+        throw new Error('Missing simulation id.');
+      }
+
+      const timestepKey = timestep.toString();
+      const currentSimData = useMapData.getState().simdata;
+      if (currentSimData?.[timestepKey]) {
+        return { [timestepKey]: currentSimData[timestepKey] } satisfies SimData;
+      }
+
+      const cacheKey = getMapFrameCacheKey(simId, timestep);
+      const existingRequest = mapFrameRequests.current.get(cacheKey);
+      if (existingRequest) {
+        return existingRequest;
+      }
+
+      const request = fetch(`/api/simdata/${simId}/map?time=${timestep}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`Map frame request failed: ${response.status}`);
+          }
+          return response.json() as Promise<{ data?: { simdata?: SimData } }>;
+        })
+        .then((json) => {
+          if (!json.data?.simdata) {
+            throw new Error('Map frame response did not include simdata.');
+          }
+          return json.data.simdata;
+        })
+        .finally(() => {
+          mapFrameRequests.current.delete(cacheKey);
+        });
+
+      mapFrameRequests.current.set(cacheKey, request);
+      return request;
+    },
+    [simId]
+  );
+
+  // Only the *current* frame's data feeds the icons. Depending on this slice
+  // rather than the whole `sim_data` object keeps prefetching/merging future
+  // frames — which replaces the `sim_data` reference on every store write —
+  // from needlessly recomputing the current frame's POIs.
+  const currentFrameData =
+    selectedTimestep !== null
+      ? (sim_data?.[selectedTimestep.toString()] ?? null)
+      : null;
+
   const pois = useMemo(() => {
-    const dataForTime =
-      selectedTimestep !== null
-        ? sim_data?.[selectedTimestep.toString()]
-        : null;
     const nextPois = updateIcons(
       mapCenter,
-      dataForTime,
+      currentFrameData,
       pap_data,
       hotspots,
       zoneGeoJSON
@@ -189,9 +263,125 @@ export default function ModelMap({
     hotspots,
     mapCenter,
     pap_data,
-    sim_data,
-    selectedTimestep,
+    currentFrameData,
     zoneGeoJSON
+  ]);
+
+  // Person dots only need static place geometry (lat/lng/footprint/label),
+  // which is identical across timesteps. Deriving it from papData with a zeroed
+  // sim — rather than the per-frame `pois` — lets the dot FeatureCollection memo
+  // skip rebuilding on every count/icon recompute; it now rebuilds only when
+  // occupancy (selectedPeopleMapData) actually changes.
+  const stableDotPois = useMemo(() => {
+    if (!pap_data) {
+      return [];
+    }
+    const base = updateIcons(
+      mapCenter,
+      { h: [], p: [] },
+      pap_data,
+      {},
+      zoneGeoJSON
+    );
+    if (!disabledPoiIds?.size) {
+      return base;
+    }
+    return base.map((poi) =>
+      poi.type === 'places' && disabledPoiIds.has(String(poi.id))
+        ? { ...poi, disabled: true }
+        : poi
+    );
+  }, [disabledPoiIds, mapCenter, pap_data, zoneGeoJSON]);
+
+  const selectedMapFrameLoaded =
+    selectedTimestep !== null && Boolean(sim_data?.[selectedTimestep]);
+
+  useEffect(() => {
+    if (!simId || selectedTimestep === null || selectedMapFrameLoaded) {
+      return;
+    }
+
+    let active = true;
+    setMapFrameError(null);
+
+    loadMapFrameData(selectedTimestep)
+      .then((nextSimData) => {
+        if (active) {
+          setSimData(nextSimData);
+        }
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        console.warn('Failed to load map frame data:', error);
+        setMapFrameError('Map frame is still loading.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    loadMapFrameData,
+    selectedMapFrameLoaded,
+    selectedTimestep,
+    setSimData,
+    simId
+  ]);
+
+  useEffect(() => {
+    if (
+      !simId ||
+      selectedTimestep === null ||
+      availableTimesteps.length === 0 ||
+      !selectedMapFrameLoaded
+    ) {
+      return;
+    }
+
+    const selectedIndex = availableTimesteps.indexOf(selectedTimestep);
+    if (selectedIndex === -1) {
+      return;
+    }
+
+    const upcomingTimesteps = availableTimesteps.slice(
+      selectedIndex + 1,
+      selectedIndex + 1 + PEOPLE_MAP_PREFETCH_STEPS
+    );
+
+    let active = true;
+    const preloadUpcoming = async () => {
+      // Fetch the upcoming frames concurrently instead of serially, then merge
+      // them in a single store update.
+      const results = await Promise.all(
+        upcomingTimesteps.map((timestep) =>
+          loadMapFrameData(timestep).catch((error) => {
+            console.warn('Failed to preload map frame data:', error);
+            return null;
+          })
+        )
+      );
+      if (!active) return;
+      const merged: SimData = Object.assign(
+        {},
+        ...results.filter((r): r is SimData => r !== null)
+      );
+      if (Object.keys(merged).length > 0) {
+        setSimData(merged);
+      }
+    };
+
+    preloadUpcoming();
+    return () => {
+      active = false;
+    };
+  }, [
+    availableTimesteps,
+    loadMapFrameData,
+    selectedMapFrameLoaded,
+    selectedTimestep,
+    setSimData,
+    simId
   ]);
 
   const loadPeopleMapData = useCallback(
@@ -236,7 +426,12 @@ export default function ModelMap({
   );
 
   useEffect(() => {
-    if (heatmapMode !== 'people' || !simId || selectedTimestep === null) {
+    if (
+      heatmapMode !== 'people' ||
+      !caseDotsVisible ||
+      !simId ||
+      selectedTimestep === null
+    ) {
       return;
     }
 
@@ -262,14 +457,46 @@ export default function ModelMap({
     return () => {
       active = false;
     };
-  }, [heatmapMode, loadPeopleMapData, selectedTimestep, simId]);
+  }, [
+    caseDotsVisible,
+    heatmapMode,
+    loadPeopleMapData,
+    selectedTimestep,
+    simId
+  ]);
+
+  const selectedPeopleMapData = useMemo(() => {
+    if (
+      heatmapMode !== 'people' ||
+      !caseDotsVisible ||
+      !simId ||
+      selectedTimestep === null
+    ) {
+      return null;
+    }
+
+    if (
+      peopleMapDataSimId.current === simId &&
+      peopleMapData?.requested_time === selectedTimestep
+    ) {
+      return peopleMapData;
+    }
+
+    return (
+      peopleMapCache.current.get(
+        getPeopleMapCacheKey(simId, selectedTimestep)
+      ) ?? null
+    );
+  }, [caseDotsVisible, heatmapMode, peopleMapData, selectedTimestep, simId]);
 
   useEffect(() => {
     if (
       heatmapMode !== 'people' ||
+      !caseDotsVisible ||
       !simId ||
       selectedTimestep === null ||
-      availableTimesteps.length === 0
+      availableTimesteps.length === 0 ||
+      !selectedPeopleMapData
     ) {
       return;
     }
@@ -284,15 +511,30 @@ export default function ModelMap({
       selectedIndex + 1 + PEOPLE_MAP_PREFETCH_STEPS
     );
 
-    for (const timestep of upcomingTimesteps) {
-      loadPeopleMapData(timestep).catch((error) => {
-        console.warn('Failed to preload person-level map data:', error);
-      });
-    }
+    let active = true;
+    const preloadUpcoming = async () => {
+      if (!active) return;
+      // Warm the cache for upcoming frames concurrently so the playback buffer
+      // (MAX_BUFFER_HOLDS) stops stalling on serial ~0.4-1.7s fetches.
+      await Promise.all(
+        upcomingTimesteps.map((timestep) =>
+          loadPeopleMapData(timestep).catch((error) => {
+            console.warn('Failed to preload person-level map data:', error);
+          })
+        )
+      );
+    };
+
+    preloadUpcoming();
+    return () => {
+      active = false;
+    };
   }, [
     availableTimesteps,
+    caseDotsVisible,
     heatmapMode,
     loadPeopleMapData,
+    selectedPeopleMapData,
     selectedTimestep,
     simId
   ]);
@@ -309,65 +551,79 @@ export default function ModelMap({
           (ts) => ts > currentMinutes
         );
         if (nextIndex === -1) return prev;
-        return availableTimesteps[nextIndex] / 60;
+        const nextTimestep = availableTimesteps[nextIndex];
+        // Buffer like a video player: when the Cases dots are showing, don't
+        // advance to a frame whose per-person data hasn't loaded yet. The
+        // /people-map fetch (~0.4-1.7s) is slower than PLAYBACK_INTERVAL_MS, so
+        // advancing eagerly blanks the dots ("Loading cases..."). Holding on the
+        // current (already-loaded) frame keeps the dots on screen until the next
+        // frame is cached.
+        const nextFrameReady =
+          heatmapMode !== 'people' ||
+          !caseDotsVisible ||
+          !simId ||
+          peopleMapError !== null ||
+          peopleMapCache.current.has(getPeopleMapCacheKey(simId, nextTimestep));
+        if (!nextFrameReady && bufferHoldsRef.current < MAX_BUFFER_HOLDS) {
+          bufferHoldsRef.current += 1;
+          return prev;
+        }
+        bufferHoldsRef.current = 0;
+        return nextTimestep / 60;
       });
     }, PLAYBACK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [isPlaying, availableTimesteps]);
+  }, [
+    isPlaying,
+    availableTimesteps,
+    heatmapMode,
+    caseDotsVisible,
+    simId,
+    peopleMapError
+  ]);
+
+  const peopleMapLoading =
+    heatmapMode === 'people' &&
+    caseDotsVisible &&
+    !!simId &&
+    selectedTimestep !== null &&
+    !selectedPeopleMapData &&
+    !peopleMapError;
 
   const peopleDotColor = heatmapMode === 'infection' ? '#dc2626' : '#2563eb';
 
   const peopleDotGeoJSON = useMemo<PeopleDotFeatureCollection>(() => {
+    if (peopleMapLoading) {
+      return makePeopleDotGeoJSON(pois, 'population');
+    }
     if (heatmapMode !== 'population' && heatmapMode !== 'infection') {
       return { type: 'FeatureCollection', features: [] };
     }
     return makePeopleDotGeoJSON(pois, heatmapMode);
-  }, [pois, heatmapMode]);
-
-  const selectedPeopleMapData = useMemo(() => {
-    if (heatmapMode !== 'people' || !simId || selectedTimestep === null) {
-      return null;
-    }
-
-    if (
-      peopleMapDataSimId.current === simId &&
-      peopleMapData?.requested_time === selectedTimestep
-    ) {
-      return peopleMapData;
-    }
-
-    return (
-      peopleMapCache.current.get(
-        getPeopleMapCacheKey(simId, selectedTimestep)
-      ) ?? null
-    );
-  }, [heatmapMode, peopleMapData, selectedTimestep, simId]);
+  }, [pois, heatmapMode, peopleMapLoading]);
 
   const personStatusDotGeoJSON = useMemo<PersonStatusDotFeatureCollection>(
     () =>
-      heatmapMode === 'people'
-        ? makePersonStatusDotGeoJSON(pois, selectedPeopleMapData)
+      heatmapMode === 'people' && caseDotsVisible
+        ? makePersonStatusDotGeoJSON(stableDotPois, selectedPeopleMapData)
         : { type: 'FeatureCollection', features: [] },
-    [heatmapMode, selectedPeopleMapData, pois]
+    [caseDotsVisible, heatmapMode, selectedPeopleMapData, stableDotPois]
   );
 
   useEffect(() => {
-    if (sim_data) {
-      const keys = Object.keys(sim_data)
-        .map(Number)
-        .filter((n) => !Number.isNaN(n));
-      setMaxHours(keys.length > 0 ? Math.max(...keys) / 60 : 1);
-    }
-  }, [sim_data]);
+    setMaxHours(
+      availableTimesteps.length > 0 ? Math.max(...availableTimesteps) / 60 : 1
+    );
+  }, [availableTimesteps]);
 
   useEffect(() => {
-    if (!sim_data || maxHours <= 1) return;
+    if (availableTimesteps.length === 0 || maxHours <= 1) return;
     setCurrentTime((prev) => {
       if (!Number.isFinite(prev)) return 1;
       return Math.min(Math.max(prev, 1), maxHours);
     });
-  }, [maxHours, sim_data]);
+  }, [availableTimesteps.length, maxHours]);
 
   return (
     <div className="modelmap_panel">
@@ -392,25 +648,38 @@ export default function ModelMap({
       </div>
       {heatmapMode === 'people' && (
         <div className="people-map-key">
-          <span className="people-map-key-item">
-            <span className="people-map-swatch people-map-swatch-blue" />
-            Uninfected
-          </span>
+          {caseDotsVisible && (
+            <span className="people-map-key-item">
+              <span className="people-map-swatch people-map-swatch-blue" />
+              Uninfected
+            </span>
+          )}
           <span className="people-map-key-item">
             <span className="people-map-swatch people-map-swatch-red" />
             Infected
           </span>
-          <span className="people-map-key-item">
-            <span className="people-map-swatch people-map-swatch-recovered" />
-            Recovered
-          </span>
+          {caseDotsVisible && (
+            <span className="people-map-key-item">
+              <span className="people-map-swatch people-map-swatch-recovered" />
+              Recovered
+            </span>
+          )}
           {selectedPeopleMapData && selectedPeopleMapData.sample_rate > 1 && (
             <span className="people-map-key-note">
               sampled 1 in {selectedPeopleMapData.sample_rate}
             </span>
           )}
+          {selectedPeopleMapData?.source === 'aggregate' && (
+            <span className="people-map-key-note">aggregate cases</span>
+          )}
           {peopleMapError && (
             <span className="people-map-key-note">{peopleMapError}</span>
+          )}
+          {mapFrameError && (
+            <span className="people-map-key-note">{mapFrameError}</span>
+          )}
+          {peopleMapLoading && (
+            <span className="people-map-key-note">Loading cases...</span>
           )}
         </div>
       )}
@@ -425,6 +694,7 @@ export default function ModelMap({
         peopleDotGeoJSON={peopleDotGeoJSON}
         peopleDotColor={peopleDotColor}
         personStatusDotGeoJSON={personStatusDotGeoJSON}
+        onCaseDotsVisibilityChange={setCaseDotsVisible}
       />
       <div className="modelmap_current_time">
         {new Date(

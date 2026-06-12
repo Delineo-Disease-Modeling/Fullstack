@@ -38,6 +38,52 @@ async function readResponseMessage(response: Response) {
 
 export type ProgressUpdate = { value?: number; message?: string };
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForSavedRunReady(
+  simId: number,
+  onProgress: (update: ProgressUpdate) => void
+) {
+  onProgress({ value: 90, message: 'Processing simulation results...' });
+
+  while (true) {
+    const response = await fetch(`/api/simdata/${simId}/map`, {
+      cache: 'no-store'
+    });
+
+    if (response.status !== 202) {
+      if (!response.ok) {
+        throw new Error(await readResponseMessage(response));
+      }
+      break;
+    }
+
+    const payload = await response.json().catch(() => null);
+    const progress =
+      payload && typeof payload === 'object'
+        ? Number((payload as { progress?: unknown }).progress)
+        : NaN;
+    const message =
+      payload &&
+      typeof payload === 'object' &&
+      typeof (payload as { message?: unknown }).message === 'string'
+        ? (payload as { message: string }).message
+        : 'Processing simulation results...';
+
+    onProgress({
+      value: Number.isFinite(progress)
+        ? Math.max(90, Math.min(99, Math.round(90 + progress * 0.09)))
+        : 90,
+      message
+    });
+    await sleep(2000);
+  }
+
+  onProgress({ value: 100, message: 'Simulation complete.' });
+}
+
 export async function runSimulation(
   settings: SimSettingsState,
   onProgress: (update: ProgressUpdate) => void
@@ -110,7 +156,7 @@ export async function runSimulation(
             );
           }
 
-          onProgress({ value: 100, message: 'Simulation complete.' });
+          await waitForSavedRunReady(simId, onProgress);
           return simId;
         } else if (msg.type === 'error') {
           throw new Error(msg.message);
@@ -132,6 +178,6 @@ export async function runSimulation(
     throw new Error('Simulation finished but no saved run ID was returned.');
   }
 
-  onProgress({ value: 100, message: 'Simulation complete.' });
+  await waitForSavedRunReady(simId, onProgress);
   return simId;
 }
