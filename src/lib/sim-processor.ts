@@ -1,7 +1,7 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { getCachedPapdata } from './papdata-cache';
-import { writeDotsFile } from './people-map-cache';
+import { bakeDotsInBackground } from './people-map-cache';
 import {
   AGE_RANGE_LABELS,
   ALL_STATE_NAMES,
@@ -365,24 +365,19 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
   await rename(tmpMapCachePath, mapCachePath);
   logPerfTiming('processSimulation map cache write', stageStart);
 
-  // Pre-bake compact per-timestep dot frames ({fileId}.dots.json) so Cases
-  // playback serves frames instantly instead of re-streaming the .pat file on
-  // every request. Best-effort: on failure the route lazily generates them on
-  // first open.
-  stageStart = nowMs();
-  setProcessingStatus(simDataId, 92, 'Writing case map frames...');
+  // Kick off the compact per-timestep dot frames ({fileId}.dots.json) in the
+  // BACKGROUND rather than awaiting them: the map cache + charts are ready now,
+  // so the run view can unblock immediately while the (heavier) dot bake
+  // finishes a moment later. It registers in the inflight map so a lazy Cases-
+  // view open dedupes against it instead of re-baking. On failure the route
+  // lazily generates the frames on first open.
   const dotsFileId = mapCachePath
     .split('/')
     .pop()
     ?.replace(/\.map\.json$/, '');
   if (dotsFileId) {
-    try {
-      await writeDotsFile(dotsFileId, simData, patData, placeIds);
-    } catch (dotsError) {
-      console.warn('processSimulation: dot frame pre-bake failed:', dotsError);
-    }
+    bakeDotsInBackground(dotsFileId, simData, patData, placeIds);
   }
-  logPerfTiming('processSimulation dot frame pre-bake', stageStart);
 
   setProcessingStatus(simDataId, 100, 'Finalizing simulation...');
   clearProcessingStatus(simDataId);
