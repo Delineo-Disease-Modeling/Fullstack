@@ -180,6 +180,9 @@ export default function SimulatorRun() {
 
   const [selectedZone, setSelectedZone] = useState<typeof zone>(null);
   const [selectedLoc, setSelectedLoc] = useState<SelectedLoc | null>(null);
+  const [focusPoi, setFocusPoi] = useState<{ id: string; nonce: number } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -578,6 +581,21 @@ export default function SimulatorRun() {
     setSelectedLoc({ id, label, type });
   };
 
+  // Selecting a POI from the hotspot rankings scopes the chart (as a marker
+  // click does) AND flies the Cases map to that POI. The bumped nonce lets a
+  // repeat click on the same POI re-trigger the fly-to.
+  const handleSelectPoiFromRankings = (loc: {
+    id: string;
+    label: string;
+    type: string;
+  }) => {
+    handleMarkerClick(loc);
+    setFocusPoi((previous) => ({
+      id: loc.id,
+      nonce: (previous?.nonce ?? 0) + 1
+    }));
+  };
+
   const onReset = () => {
     setSelectedLoc(null);
   };
@@ -782,6 +800,7 @@ export default function SimulatorRun() {
             simId={activeSimId}
             disabledPoiIds={effectiveDisabledPoiIds}
             onMarkerClick={handleMarkerClick}
+            focusPoi={focusPoi}
           />
         </section>
 
@@ -796,7 +815,7 @@ export default function SimulatorRun() {
         <PersonPathPanel simId={activeSimId} />
 
         <PoiRankings
-          onSelectPoi={handleMarkerClick}
+          onSelectPoi={handleSelectPoiFromRankings}
           disabledPoiIds={effectiveDisabledPoiIds}
           disabledCategories={disabledCategories}
           effectiveDisabledPoiCount={effectiveDisabledPoiIds.size}

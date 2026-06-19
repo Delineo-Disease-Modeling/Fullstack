@@ -237,6 +237,10 @@ div.mapcontainer {
   background: #16a34a;
 }
 
+.people-map-swatch-disabled {
+  background: #111827;
+}
+
 .people-map-key-note {
   color: #4b5563;
   white-space: nowrap;
