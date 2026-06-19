@@ -42,6 +42,10 @@ interface ClusteredMapProps {
   currentTime: number;
   mapCenter: [number, number];
   pois: MapPoi[];
+  // Timestep-invariant POI geometry (footprints/labels) — derived from a zeroed
+  // sim so it doesn't change every playback tick. Feeds the footprint/label
+  // layers; the live per-frame `pois` still feeds clusters/markers and popups.
+  stablePois: MapPoi[];
   zoneGeoJSON: GeoJSONData | null;
   hotspots: Record<string, number[]>;
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
@@ -50,6 +54,7 @@ interface ClusteredMapProps {
   peopleDotColor: string;
   personStatusDotGeoJSON: PersonStatusDotFeatureCollection;
   onCaseDotsVisibilityChange?: (visible: boolean) => void;
+  focusPoi?: { id: string; nonce: number } | null;
 }
 
 function asPointCoordinate(value: unknown): [number, number] | null {
@@ -85,6 +90,7 @@ export default function ClusteredMap({
   currentTime: _currentTime,
   mapCenter,
   pois,
+  stablePois,
   zoneGeoJSON,
   hotspots,
   onMarkerClick,
@@ -92,7 +98,8 @@ export default function ClusteredMap({
   peopleDotGeoJSON,
   peopleDotColor,
   personStatusDotGeoJSON,
-  onCaseDotsVisibilityChange
+  onCaseDotsVisibilityChange,
+  focusPoi
 }: ClusteredMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [mapInstance, setMapInstance] = useState<ModelMapInstance | null>(null);
@@ -100,6 +107,7 @@ export default function ClusteredMap({
   const [caseDotsZoom, setCaseDotsZoom] = useState(false);
   const [caseDetailZoom, setCaseDetailZoom] = useState(false);
   const hasFitBounds = useRef(false);
+  const lastFocusNonce = useRef<number | null>(null);
   // Cases view tiers: clustered infection bubbles when zoomed out, individual
   // person dots once past CASE_CLUSTER_MAX_ZOOM, and POI footprints/labels once
   // past CASE_DETAIL_MIN_ZOOM.
@@ -139,6 +147,29 @@ export default function ClusteredMap({
     }
     hasFitBounds.current = true;
   }, [mapInstance, pois]);
+
+  // Fly the map to a POI requested from the hotspot rankings. Guarded on the
+  // nonce so it runs once per click (this effect also re-runs when `pois`/the
+  // map settle); if the POI isn't loaded yet we leave the nonce unhandled so a
+  // later `pois` update retries the fly-to.
+  useEffect(() => {
+    if (!focusPoi || !mapInstance) return;
+    if (lastFocusNonce.current === focusPoi.nonce) return;
+    const poi = pois.find(
+      (candidate) =>
+        candidate.type === 'places' &&
+        String(candidate.id) === String(focusPoi.id)
+    );
+    if (!poi || !Number.isFinite(poi.latitude) || !Number.isFinite(poi.longitude)) {
+      return;
+    }
+    lastFocusNonce.current = focusPoi.nonce;
+    mapInstance.easeTo({
+      center: [poi.longitude, poi.latitude],
+      zoom: Math.max(mapInstance.getZoom(), 16),
+      duration: 700
+    });
+  }, [focusPoi, mapInstance, pois]);
 
   useEffect(() => {
     if (!mapInstance) return;
@@ -250,13 +281,19 @@ export default function ClusteredMap({
   }, []);
 
   const geojson = useMemo(() => makeGeoJSON(pois), [pois]);
+  // Footprints + labels are visually timestep-invariant (their paint/layout read
+  // only `disabled`/`label`), so derive them from the stable POI geometry rather
+  // than the per-frame `pois`. Building from `pois` re-set both sources every
+  // playback tick — their features bake in per-frame counts — forcing a full
+  // polygon re-tessellation + label collision pass that, on large/sampled runs,
+  // overran the frame interval and made the outlines/labels flicker.
   const poiFootprintGeoJSON = useMemo(
-    () => makePoiFootprintGeoJSON(pois),
-    [pois]
+    () => makePoiFootprintGeoJSON(stablePois),
+    [stablePois]
   );
   const poiLabelGeoJSON = useMemo(
-    () => makeGeoJSON(pois.filter((poi) => poi.type === 'places')),
-    [pois]
+    () => makeGeoJSON(stablePois.filter((poi) => poi.type === 'places')),
+    [stablePois]
   );
 
   // Hotspot hours for the open popup, read from the same `hotspots` prop the
@@ -308,6 +345,8 @@ export default function ClusteredMap({
       zoom: Math.max(map.getZoom(), 15),
       duration: 600
     });
+    // Only the Markers source (live per-frame `pois`) opens this popup, so its
+    // feature props already carry current counts.
     setPopupInfo(null);
     setTimeout(
       () =>
@@ -368,10 +407,10 @@ export default function ClusteredMap({
           'unclustered-point-circle',
           'unclustered-point-emoji',
           'case-clusters-circle',
-          'case-clusters-point',
-          'poi-footprint-fill',
-          'poi-footprint-outline',
-          'poi-footprint-labels'
+          'case-clusters-point'
+          // POI footprint/label layers are intentionally NOT interactive: in the
+          // Cases view the name label is shown inline and the popup is reserved
+          // for the Markers view. (Case clusters above stay clickable to zoom in.)
         ]}
         onClick={handleClick}
       >

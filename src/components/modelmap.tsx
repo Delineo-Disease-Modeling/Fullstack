@@ -54,6 +54,9 @@ interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
   simId?: number | null;
   disabledPoiIds?: ReadonlySet<string>;
+  // A POI to fly the Cases map to (e.g. clicked in the hotspot rankings). The
+  // `nonce` changes on every request so repeat clicks on the same POI re-fly.
+  focusPoi?: { id: string; nonce: number } | null;
   selectedZone: {
     latitude: number;
     longitude: number;
@@ -66,6 +69,7 @@ interface ModelMapProps {
 export default function ModelMap({
   onMarkerClick,
   disabledPoiIds,
+  focusPoi,
   simId,
   selectedZone
 }: ModelMapProps) {
@@ -96,6 +100,7 @@ export default function ModelMap({
   );
   const mapFrameRequests = useRef<Map<string, Promise<SimData>>>(new Map());
   const bufferHoldsRef = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [mapFrameError, setMapFrameError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -127,6 +132,15 @@ export default function ModelMap({
       heatmapMode
     );
   }, [heatmapMode, simId]);
+
+  // When a POI is selected from the hotspot rankings, surface it on the Cases
+  // map: switch to the Cases ("people") view, scroll the map into view (the
+  // rankings sit below it), and let ClusteredMap handle the fly-to.
+  useEffect(() => {
+    if (!focusPoi) return;
+    setHeatmapMode('people');
+    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focusPoi]);
 
   useEffect(() => {
     const cbgList = selectedZone?.cbg_list?.filter(Boolean) ?? [];
@@ -626,7 +640,7 @@ export default function ModelMap({
   }, [availableTimesteps.length, maxHours]);
 
   return (
-    <div className="modelmap_panel">
+    <div className="modelmap_panel" ref={panelRef}>
       <div className="heatmap-toggle">
         <MapLegend icon_lookup={iconLookup} />
         <div className="heatmap-toggle-group">
@@ -664,6 +678,12 @@ export default function ModelMap({
               Recovered
             </span>
           )}
+          {disabledPoiIds && disabledPoiIds.size > 0 && (
+            <span className="people-map-key-item">
+              <span className="people-map-swatch people-map-swatch-disabled" />
+              Disabled
+            </span>
+          )}
           {selectedPeopleMapData && selectedPeopleMapData.sample_rate > 1 && (
             <span className="people-map-key-note">
               sampled 1 in {selectedPeopleMapData.sample_rate}
@@ -687,6 +707,7 @@ export default function ModelMap({
         currentTime={currentTime}
         mapCenter={mapCenter}
         pois={pois}
+        stablePois={stableDotPois}
         zoneGeoJSON={zoneGeoJSON}
         hotspots={hotspots as Record<string, number[]>}
         onMarkerClick={onMarkerClick}
@@ -695,6 +716,7 @@ export default function ModelMap({
         peopleDotColor={peopleDotColor}
         personStatusDotGeoJSON={personStatusDotGeoJSON}
         onCaseDotsVisibilityChange={setCaseDotsVisible}
+        focusPoi={focusPoi}
       />
       <div className="modelmap_current_time">
         {new Date(

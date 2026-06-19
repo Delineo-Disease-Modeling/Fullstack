@@ -35,6 +35,7 @@ export default function EmojiOverlay({
         const props = f.properties;
         if (!props || props.cluster || !props.icon) return;
         const [lng, lat] = f.geometry.coordinates;
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
         const pixel = map.project([lng, lat]);
         const infectionRatio = Number.parseFloat(
           String(props.infection_ratio || 0)
