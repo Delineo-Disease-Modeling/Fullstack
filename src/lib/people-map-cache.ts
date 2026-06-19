@@ -296,7 +296,7 @@ function cacheDots(filePath: string, entry: CachedDots) {
   }
 }
 
-async function loadDots(fileId: string): Promise<CachedDots | null> {
+export async function loadDots(fileId: string): Promise<CachedDots | null> {
   const filePath = dotsPath(fileId);
   let fileStat: Awaited<ReturnType<typeof stat>>;
   try {
