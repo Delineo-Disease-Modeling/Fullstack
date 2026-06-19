@@ -8,7 +8,11 @@ import {
   placesFromNumeric
 } from '@/lib/numeric-movement';
 import { getCachedPapdata } from '@/lib/papdata-cache';
-import { ensureDotsFile, readDotsPayload } from '@/lib/people-map-cache';
+import {
+  ensureDotsFile,
+  getRecentBakeFailure,
+  readDotsPayload
+} from '@/lib/people-map-cache';
 import { prisma } from '@/lib/prisma';
 import type {
   DiseaseStateTimestep,
@@ -470,7 +474,13 @@ export async function GET(
           await ensureDotsFile(fileId, placeIds);
         }
       } catch (bakeError) {
-        console.warn('people-map: dot frame generation failed:', bakeError);
+        const err = bakeError as NodeJS.ErrnoException;
+        console.error('people-map: dot frame generation failed:', {
+          fileId,
+          code: err?.code,
+          message: err?.message,
+          rssMB: Math.round((process.memoryUsage?.().rss ?? 0) / 1024 / 1024)
+        });
       }
       const baked = await readDotsPayload(fileId, requested);
       if (baked) {
@@ -482,12 +492,19 @@ export async function GET(
     }
 
     // Fallback: live per-request computation (counts-only runs, or if baking
-    // is unavailable).
+    // is unavailable). Surface any bake failure as a response header so it can
+    // be diagnosed without server-log access.
     const data = await buildPeopleMapPayload(fileId, requested, papdataId);
-    return Response.json(
-      { data },
-      { headers: { 'Cache-Control': 'private, max-age=30' } }
-    );
+    const headers: Record<string, string> = {
+      'Cache-Control': 'private, max-age=30'
+    };
+    const bakeFailure = getRecentBakeFailure(fileId);
+    if (bakeFailure) {
+      headers['X-Dots-Bake-Error'] = `${bakeFailure.code}: ${bakeFailure.message}`
+        .replace(/[^\x20-\x7E]/g, ' ')
+        .slice(0, 180);
+    }
+    return Response.json({ data }, { headers });
   } catch (error) {
     console.error('People map computation error:', error);
     return Response.json(
