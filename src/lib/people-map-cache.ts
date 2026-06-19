@@ -96,6 +96,11 @@ export function getRecentBakeFailure(
   return failure ? { code: failure.code, message: failure.message } : null;
 }
 
+/** True once a run has been determined to have no per-person data to bake. */
+export function isFileUnbakeable(fileId: string): boolean {
+  return unbakeableFileIds.has(fileId);
+}
+
 function dotsPath(fileId: string) {
   return `${DB_FOLDER}${fileId}.dots.json`;
 }

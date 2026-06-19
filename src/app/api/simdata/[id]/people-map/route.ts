@@ -11,6 +11,7 @@ import { getCachedPapdata } from '@/lib/papdata-cache';
 import {
   ensureDotsFile,
   getRecentBakeFailure,
+  isFileUnbakeable,
   readDotsPayload
 } from '@/lib/people-map-cache';
 import { prisma } from '@/lib/prisma';
@@ -464,16 +465,25 @@ export async function GET(
     // Fast path: serve a pre-baked per-timestep dot frame, generating the
     // `{fileId}.dots.json` file once (deduped) on first request. This replaces
     // re-streaming + parsing the whole .pat file on every frame.
+    // `dotsStatus` records which branch we took so it can be read from a
+    // response header (X-Dots-Status) without server-log access.
+    let dotsStatus = 'fallback:no-papdata';
+    let ensured = false;
+    let bakeThrew = false;
     if (papdataId) {
+      dotsStatus = 'fallback';
       try {
         const papdata = (await getCachedPapdata(papdataId)) as {
           places?: Record<string, unknown>;
         };
         const placeIds = Object.keys(papdata.places ?? {});
         if (placeIds.length > 0) {
-          await ensureDotsFile(fileId, placeIds);
+          ensured = await ensureDotsFile(fileId, placeIds);
+        } else {
+          dotsStatus = 'fallback:no-places';
         }
       } catch (bakeError) {
+        bakeThrew = true;
         const err = bakeError as NodeJS.ErrnoException;
         console.error('people-map: dot frame generation failed:', {
           fileId,
@@ -486,17 +496,36 @@ export async function GET(
       if (baked) {
         return Response.json(
           { data: baked },
-          { headers: { 'Cache-Control': 'private, max-age=30' } }
+          {
+            headers: {
+              'Cache-Control': 'private, max-age=30',
+              'X-Dots-Status': 'baked'
+            }
+          }
         );
+      }
+      if (dotsStatus === 'fallback') {
+        if (bakeThrew || getRecentBakeFailure(fileId)) {
+          dotsStatus = 'fallback:bake-error';
+        } else if (isFileUnbakeable(fileId)) {
+          dotsStatus = 'fallback:unbakeable';
+        } else if (ensured) {
+          // A dots file exists/was written but readDotsPayload couldn't serve
+          // the frame (e.g. version mismatch or empty/partial file).
+          dotsStatus = 'fallback:baked-unreadable';
+        } else {
+          dotsStatus = 'fallback:skipped';
+        }
       }
     }
 
     // Fallback: live per-request computation (counts-only runs, or if baking
-    // is unavailable). Surface any bake failure as a response header so it can
-    // be diagnosed without server-log access.
+    // is unavailable). Surface the dots status + any bake failure as response
+    // headers so the cause can be diagnosed without server-log access.
     const data = await buildPeopleMapPayload(fileId, requested, papdataId);
     const headers: Record<string, string> = {
-      'Cache-Control': 'private, max-age=30'
+      'Cache-Control': 'private, max-age=30',
+      'X-Dots-Status': dotsStatus
     };
     const bakeFailure = getRecentBakeFailure(fileId);
     if (bakeFailure) {
