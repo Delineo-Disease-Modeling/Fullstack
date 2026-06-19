@@ -21,7 +21,7 @@ test('HEATMAP_MODES only exposes the modes surfaced in the toggle UI', () => {
 
 test('playback/prefetch tuning constants keep their expected values', () => {
   assert.equal(PLAYBACK_INTERVAL_MS, 750);
-  assert.equal(PEOPLE_MAP_PREFETCH_STEPS, 4);
+  assert.equal(PEOPLE_MAP_PREFETCH_STEPS, 8);
 });
 
 test('PERSON_STATUS_DOT_RADIUS is a zoom interpolation expression', () => {

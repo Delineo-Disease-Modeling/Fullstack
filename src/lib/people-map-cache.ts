@@ -14,7 +14,8 @@
 // counts is visually identical to the old real-person sampling.
 
 import { access, readFile, rename, stat, writeFile } from 'node:fs/promises';
-import { DB_FOLDER, readDbJson } from './db-files';
+import { DB_FOLDER, readDbJson, resolveDbDataPath } from './db-files';
+import { streamJsonObjectEntries } from './json-stream';
 import {
   getPatternMeta,
   isNumericTimestep,
@@ -78,6 +79,22 @@ const inflightGeneration = new Map<string, Promise<boolean>>();
 // fileIds whose patterns carry no per-person data (counts-only) and so can't be
 // baked — remembered so we don't re-parse the whole file every request.
 const unbakeableFileIds = new Set<string>();
+
+// Remember a *hard* bake failure (a thrown error, e.g. OOM or a full/read-only
+// disk) so we don't re-attempt the expensive bake on every frame + prefetch.
+// Distinct from unbakeableFileIds (a permanent counts-only verdict): this is a
+// short-TTL backoff that retries periodically in case the cause was transient.
+const BAKE_FAILURE_TTL_MS = 60_000;
+type BakeFailure = { code: string; message: string; at: number };
+const bakeFailures = new Map<string, BakeFailure>();
+
+/** The last unresolved bake failure for a run (cleared once a bake succeeds). */
+export function getRecentBakeFailure(
+  fileId: string
+): { code: string; message: string } | null {
+  const failure = bakeFailures.get(fileId);
+  return failure ? { code: failure.code, message: failure.message } : null;
+}
 
 function dotsPath(fileId: string) {
   return `${DB_FOLDER}${fileId}.dots.json`;
@@ -224,6 +241,15 @@ export async function writeDotsFile(
     frames[skey] = frame;
   }
 
+  return persistDotsFile(fileId, placeIds, frames);
+}
+
+/** Atomically write the computed frames to `{fileId}.dots.json` (tmp + rename). */
+async function persistDotsFile(
+  fileId: string,
+  placeIds: string[],
+  frames: Record<string, number[]>
+): Promise<boolean> {
   const payload: DotsFile = {
     version: DOTS_FILE_VERSION,
     place_ids: placeIds,
@@ -238,15 +264,93 @@ export async function writeDotsFile(
   return true;
 }
 
+/**
+ * Build `{fileId}.dots.json` for a run that has no pre-baked file yet.
+ *
+ * The .pat is often >200MB decompressed; loading it whole (readDbJson) spikes
+ * the heap and OOMs on memory-limited hosts. So for the common legacy
+ * per-person format (`{homes,places:{id:[pids]}}`) we STREAM the .pat one
+ * timestep at a time (the .sim is comparatively tiny and loaded whole). The
+ * engine `{loc:[...]}` format needs `meta` (which can sit anywhere in the file)
+ * and is rare in this lazy path — new runs are baked at processing time — so it
+ * keeps the proven full-load path.
+ */
 async function generateDotsFile(
   fileId: string,
   placeIds: string[]
 ): Promise<boolean> {
-  const [simData, patData] = await Promise.all([
-    readDbJson<Record<string, DiseaseStateTimestep>>(fileId, '.sim'),
-    readDbJson<Record<string, PatternTimestep>>(fileId, '.pat')
-  ]);
-  return writeDotsFile(fileId, simData, patData, placeIds);
+  const { path: patPath, gzipped: patGzipped } = await resolveDbDataPath(
+    fileId,
+    '.pat'
+  );
+
+  // Probe the first real timestep to pick a strategy without loading the .pat.
+  let firstTimestep: PatternTimestep | null = null;
+  const probe = streamJsonObjectEntries<PatternTimestep>(patPath, patGzipped);
+  try {
+    let entry = await probe.next();
+    while (!entry.done && entry.value.key === 'meta') {
+      entry = await probe.next();
+    }
+    if (!entry.done) {
+      firstTimestep = entry.value.value;
+    }
+  } finally {
+    await probe.return?.(undefined);
+  }
+
+  if (!firstTimestep) {
+    unbakeableFileIds.add(fileId);
+    return false;
+  }
+
+  // Engine/numeric format → full-load (needs meta).
+  if (isNumericTimestep(firstTimestep)) {
+    const [simData, patData] = await Promise.all([
+      readDbJson<Record<string, DiseaseStateTimestep>>(fileId, '.sim'),
+      readDbJson<Record<string, PatternTimestep>>(fileId, '.pat')
+    ]);
+    return writeDotsFile(fileId, simData, patData, placeIds);
+  }
+
+  // No inline per-person places (e.g. counts-only `{h,p}`) → can't bake dots.
+  if (typeof firstTimestep.places !== 'object' || firstTimestep.places === null) {
+    unbakeableFileIds.add(fileId);
+    return false;
+  }
+
+  // Legacy per-person: stream the big .pat, hold only the small .sim in memory.
+  const simData = await readDbJson<Record<string, DiseaseStateTimestep>>(
+    fileId,
+    '.sim'
+  );
+  const placeIndex = new Map(placeIds.map((id, index) => [id, index]));
+  const frames: Record<string, number[]> = {};
+  let sawPerPerson = false;
+
+  const patIter = streamJsonObjectEntries<PatternTimestep>(patPath, patGzipped);
+  for await (const { key, value } of patIter) {
+    if (key === 'meta' || !Number.isFinite(Number(key))) {
+      continue;
+    }
+    const simValue = simData[key];
+    if (!simValue) {
+      continue;
+    }
+    if (!sawPerPerson && Object.keys(value?.places ?? {}).length > 0) {
+      sawPerPerson = true;
+    }
+    const frame = new Array<number>(placeIds.length * 3).fill(0);
+    fillPlaceCounts(frame, simValue, value, null, placeIndex);
+    frames[key] = frame;
+  }
+
+  if (!sawPerPerson) {
+    unbakeableFileIds.add(fileId);
+    return false;
+  }
+
+  return persistDotsFile(fileId, placeIds, frames);
 }
 
 /**
@@ -268,11 +372,34 @@ export async function ensureDotsFile(
     // not generated yet
   }
 
+  // Don't re-attempt a recently-failed bake on every frame (and every one of
+  // the concurrent prefetches) — that turns a hard failure (OOM, full/read-only
+  // disk) into a retry storm that dogpiles the server. Degrade to the live
+  // fallback and retry at most once per TTL in case the cause was transient.
+  const failure = bakeFailures.get(fileId);
+  if (failure && Date.now() - failure.at < BAKE_FAILURE_TTL_MS) {
+    return false;
+  }
+
   let pending = inflightGeneration.get(fileId);
   if (!pending) {
-    pending = generateDotsFile(fileId, placeIds).finally(() => {
-      inflightGeneration.delete(fileId);
-    });
+    pending = generateDotsFile(fileId, placeIds)
+      .then((ok) => {
+        bakeFailures.delete(fileId);
+        return ok;
+      })
+      .catch((error: unknown) => {
+        const err = error as NodeJS.ErrnoException;
+        bakeFailures.set(fileId, {
+          code: err?.code ?? (error as Error)?.name ?? 'BakeError',
+          message: String(err?.message ?? error).slice(0, 180),
+          at: Date.now()
+        });
+        throw error;
+      })
+      .finally(() => {
+        inflightGeneration.delete(fileId);
+      });
     inflightGeneration.set(fileId, pending);
   }
   return pending;
