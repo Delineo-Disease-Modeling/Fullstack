@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { resolveDbDataPath } from '@/lib/db-files';
 import { streamJsonObjectEntries } from '@/lib/json-stream';
 import { getCachedPapdata } from '@/lib/papdata-cache';
+import { loadDots } from '@/lib/people-map-cache';
 import { prisma } from '@/lib/prisma';
 import {
   AGE_RANGE_LABELS,
@@ -161,6 +162,74 @@ async function computeLocationStats(
   return chartData;
 }
 
+// ── Fast path: per-location chart from the pre-baked `.dots.json` ──────────────
+// computeLocationStats above re-streams the full .pat.gz + .sim.gz (~150MB,
+// ~90s cold) AND only understands the legacy pid-list pattern shape — for the
+// numeric SoA engine format (h/p/loc) `pvalue.places` is undefined, so it
+// streams the whole run only to return an EMPTY chart. The dots bake already
+// holds correct per-place [pop, infected, recovered] per timestep for both
+// formats, so for a `places` scope we build the iot series + a 3-bucket
+// (Susceptible/Infected/Recovered) states series straight from it — a keyed
+// lookup instead of a full re-stream. (ages/sexes aren't derivable from dots,
+// but the UI exposes only the Infectiousness + States tabs.)
+function diseaseKeyFromStats(globalStats: unknown): string {
+  if (globalStats && typeof globalStats === 'object') {
+    const meta = (globalStats as Record<string, unknown>).metadata;
+    const variants =
+      meta && typeof meta === 'object'
+        ? (meta as Record<string, unknown>).variants
+        : undefined;
+    if (
+      Array.isArray(variants) &&
+      variants.length === 1 &&
+      typeof variants[0] === 'string' &&
+      variants[0].trim()
+    ) {
+      return variants[0];
+    }
+  }
+  return 'Infected';
+}
+
+function buildChartFromDots(
+  dots: {
+    placeIds: string[];
+    frames: Record<string, number[]>;
+    sortedTimes: number[];
+  },
+  locId: string,
+  diseaseKey: string
+): ChartData | null {
+  const idx = dots.placeIds.indexOf(locId);
+  if (idx < 0) {
+    return null;
+  }
+  const base = idx * 3;
+  const chartData: ChartData = { iot: [], ages: [], sexes: [], states: [] };
+  for (const minutes of dots.sortedTimes) {
+    const frame = dots.frames[String(minutes)];
+    if (!frame) {
+      continue;
+    }
+    const pop = frame[base] ?? 0;
+    // Match computeLocationStats: only emit a point when the place is occupied.
+    if (pop <= 0) {
+      continue;
+    }
+    const infected = frame[base + 1] ?? 0;
+    const recovered = frame[base + 2] ?? 0;
+    const time = minutes / 60;
+    chartData.iot.push({ time, 'All People': pop, [diseaseKey]: infected });
+    chartData.states.push({
+      time,
+      Susceptible: Math.max(0, pop - infected - recovered),
+      Infected: infected,
+      Recovered: recovered
+    });
+  }
+  return chartData;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -214,6 +283,23 @@ export async function GET(
         { message: 'PapData not available for this zone' },
         { status: 404 }
       );
+    }
+
+    // Fast path: places scope from the pre-baked dots (instant, and works for
+    // numeric SoA runs the slow streamer returns empty for). Fall back to the
+    // full stream for a homes scope or runs baked without a dots file.
+    if (loc_type === 'places') {
+      const dots = await loadDots(simdata.file_id);
+      const fast = dots
+        ? buildChartFromDots(
+            dots,
+            loc_id,
+            diseaseKeyFromStats(simdata.global_stats)
+          )
+        : null;
+      if (fast) {
+        return Response.json({ data: fast });
+      }
     }
 
     const papdata = await getCachedPapdata(papDataId);
