@@ -84,6 +84,7 @@ export async function GET(
         data: {
           name: simdata.name,
           length: simdata.length,
+          saved: simdata.saved,
           zone: getPublicZone(simdata.czone),
           metadata: getRunMetadata(simdata.global_stats),
           papdata: manifest.papdata,

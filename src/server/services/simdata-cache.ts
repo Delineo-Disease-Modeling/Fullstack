@@ -1,7 +1,6 @@
 import type { SimData } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { ServiceResult } from '@/server/api/responses';
-import { canReadConvenienceZone, zoneAccessDenied } from './zone-access';
 
 type SimDataCacheEntry = {
   name: SimData['name'];
@@ -9,15 +8,18 @@ type SimDataCacheEntry = {
   sim_id: SimData['id'];
 };
 
+// Runs are publicly readable: any visitor can list a zone's previous runs,
+// matching the public zone browsing (?all=true) and run-by-URL endpoints.
+// Ownership only gates mutations (rename/delete), handled elsewhere.
 export async function listSimDataCacheForZone(
-  czoneId: number,
-  userId: string | null,
-  guestClaimTokenHashes: string[] = []
+  czoneId: number
 ): Promise<ServiceResult<SimDataCacheEntry[]>> {
   const czone = await prisma.convenienceZone.findUnique({
     where: { id: czoneId },
     include: {
-      simdata: { orderBy: { id: 'desc' } }
+      // Only explicitly-saved runs appear in "Visit a Previous Run".
+      // Unsaved runs stay reachable by URL until the cleanup script prunes them.
+      simdata: { where: { saved: true }, orderBy: { id: 'desc' } }
     }
   });
 
@@ -27,9 +29,6 @@ export async function listSimDataCacheForZone(
       message: `Could not find convenience zone #${czoneId}`,
       status: 404
     };
-  }
-  if (!canReadConvenienceZone(czone, userId, guestClaimTokenHashes)) {
-    return zoneAccessDenied(userId);
   }
 
   return {
