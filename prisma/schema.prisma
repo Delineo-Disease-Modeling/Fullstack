@@ -89,6 +89,9 @@ model SimData {
   file_id       String @unique @default(uuid()) // Files: {file_id}.sim.gz + {file_id}.pat.gz
   czone_id      Int
   length        Int
+  // Explicitly-kept runs. Unsaved runs (the default after a sim) are pruned by
+  // the cleanup script after a TTL; saved runs are listed in "Visit a Previous Run".
+  saved         Boolean @default(false)
   global_stats  Json?
   czone         ConvenienceZone @relation(references: [id], fields: [czone_id], onDelete: Cascade)
 }

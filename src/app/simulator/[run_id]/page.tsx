@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check, Save } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ComparisonSummary from '@/components/comparison-summary';
@@ -188,6 +188,12 @@ export default function SimulatorRun() {
   const [progress, setProgress] = useState(0);
   const [loginOpen, setLoginOpen] = useState(false);
 
+  // Whether this run is kept (listed in "Visit a Previous Run"). Unsaved runs
+  // are reachable by URL but pruned by the cleanup job after a TTL.
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   // Comparison mode: `?baseline=<id>` pairs this (intervention) run with a
   // no-intervention baseline run over the same zone.
   const baselineParam = Number(searchParams.get('baseline'));
@@ -228,6 +234,36 @@ export default function SimulatorRun() {
         : interventionSimId;
   const hasComparisonRuns = baselineId != null || disabledSimId != null;
   const activeViewLabel = RUN_VIEW_LABELS[activeView];
+
+  // Keep this run (and its baseline/disabled companions, so the comparison
+  // survives) by marking them saved.
+  const handleSaveRun = useCallback(async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const ids = [interventionSimId];
+      if (baselineId != null) ids.push(baselineId);
+      if (disabledSimId != null) ids.push(disabledSimId);
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/simdata/${id}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ saved: true })
+          })
+        )
+      );
+      if (results.some((r) => !r.ok)) {
+        throw new Error('One or more runs could not be saved.');
+      }
+      setIsSaved(true);
+    } catch (e) {
+      console.error(e);
+      setSaveError('Could not save this run. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [interventionSimId, baselineId, disabledSimId]);
 
   // Swap which run drives the map. setSimData merges by default, so clear it
   // first to guarantee a clean replace rather than a union of both timelines.
@@ -351,6 +387,7 @@ export default function SimulatorRun() {
 
         const {
           name,
+          saved,
           zone: zoneData,
           hotspots,
           papdata,
@@ -365,6 +402,7 @@ export default function SimulatorRun() {
           hours: zoneData.length
         });
 
+        setIsSaved(Boolean(saved));
         setSelectedZone(zoneData);
         setSimData(null);
         setRunName(name);
@@ -829,6 +867,22 @@ export default function SimulatorRun() {
         />
 
         <div className="sim_run_bottom_actions">
+          {isSaved ? (
+            <Button variant="secondary" className="sim_return_button" disabled>
+              <Check size={16} aria-hidden="true" />
+              <span>Saved</span>
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              className="sim_return_button"
+              onClick={handleSaveRun}
+              disabled={saving}
+            >
+              <Save size={16} aria-hidden="true" />
+              <span>{saving ? 'Saving…' : 'Save run'}</span>
+            </Button>
+          )}
           <Button
             variant="secondary"
             className="sim_return_button"
@@ -838,6 +892,15 @@ export default function SimulatorRun() {
             <span>Return to simulator setup</span>
           </Button>
         </div>
+        {!isSaved && (
+          <p className="text-sm text-center mt-2 text-(--color-text-muted)">
+            Unsaved runs are removed automatically. Save to keep this run in
+            “Visit a Previous Run”.
+          </p>
+        )}
+        {saveError && (
+          <p className="text-sm text-center mt-2 text-red-600">{saveError}</p>
+        )}
       </div>
       <LoginModal
         isOpen={loginOpen}

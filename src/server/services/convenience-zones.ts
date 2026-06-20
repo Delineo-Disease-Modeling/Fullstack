@@ -8,11 +8,7 @@ import {
   hashGuestZoneClaimToken,
   guestZoneClaimTokensSchema
 } from './guest-zone-claims';
-import {
-  ANONYMOUS_ZONE_USER_EMAIL,
-  canReadConvenienceZone,
-  zoneAccessDenied
-} from './zone-access';
+import { ANONYMOUS_ZONE_USER_EMAIL } from './zone-access';
 
 export const createConvenienceZoneSchema = z.object({
   name: z.string().min(1),
@@ -167,10 +163,10 @@ export async function createConvenienceZone(
   return { ok: true, data: withReady(zone) };
 }
 
+// Zones are publicly readable so guests can open and run any zone, including
+// ones they don't own. Ownership is enforced only on mutations (PATCH/DELETE).
 export async function getConvenienceZone(
-  id: number,
-  userId: string | null,
-  guestClaimTokenHashes: string[] = []
+  id: number
 ): Promise<ServiceResult<ConvenienceZoneWithReady>> {
   try {
     const zone = await prisma.convenienceZone.findUnique({
@@ -178,9 +174,6 @@ export async function getConvenienceZone(
     });
     if (!zone) {
       return { ok: false, message: 'Not found', status: 404 };
-    }
-    if (!canReadConvenienceZone(zone, userId, guestClaimTokenHashes)) {
-      return zoneAccessDenied(userId);
     }
 
     return { ok: true, data: withReady(zone) };

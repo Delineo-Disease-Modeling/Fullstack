@@ -1,8 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { jsonMessage, serviceResult } from '@/server/api/responses';
 import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
-import { getSessionUserId, requireSessionUserId } from '@/server/api/session';
-import { getGuestZoneClaimTokenHashesFromHeaders } from '@/server/services/guest-zone-claims';
+import { requireSessionUserId } from '@/server/api/session';
 import {
   deleteConvenienceZone,
   getConvenienceZone,
@@ -11,7 +10,7 @@ import {
 } from '@/server/services/convenience-zones';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ czone_id: string }> }
 ) {
   const { czone_id } = await params;
@@ -20,15 +19,7 @@ export async function GET(
     return jsonMessage(id.message, id.status);
   }
 
-  const userId = await getSessionUserId(request.headers);
-  const guestClaimTokenHashes = getGuestZoneClaimTokenHashesFromHeaders(
-    request.headers
-  );
-  const result = await getConvenienceZone(
-    id.value,
-    userId,
-    guestClaimTokenHashes
-  );
+  const result = await getConvenienceZone(id.value);
   return serviceResult(result);
 }
 
