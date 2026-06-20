@@ -4,9 +4,10 @@ import { z } from 'zod';
 import { DB_FOLDER } from '@/lib/db-files';
 import { prisma } from '@/lib/prisma';
 import { processingProgress } from '@/lib/sim-processor';
-import { jsonMessage } from '@/server/api/responses';
+import { isAdminEmail } from '@/lib/admin';
+import { jsonMessage, unauthorized } from '@/server/api/responses';
 import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
-import { requireSessionUserId } from '@/server/api/session';
+import { getSessionUser, requireSessionUserId } from '@/server/api/session';
 
 const updateSchema = z.object({
   name: z.string().min(2).optional()
@@ -235,9 +236,11 @@ export async function DELETE(
     return jsonMessage(id.message, id.status);
   }
 
-  const session = await requireSessionUserId(request.headers);
-  if (!session.ok) {
-    return session.response;
+  // Delete is allowed for the zone owner OR an admin (so an admin can clean up
+  // runs on shared zones they don't own).
+  const sessionUser = await getSessionUser(request.headers);
+  if (!sessionUser) {
+    return unauthorized();
   }
 
   try {
@@ -253,7 +256,8 @@ export async function DELETE(
       );
     }
 
-    if (existing.czone.user_id !== session.userId) {
+    const isOwner = existing.czone.user_id === sessionUser.id;
+    if (!isOwner && !isAdminEmail(sessionUser.email)) {
       return Response.json({ message: 'Forbidden' }, { status: 403 });
     }
 
@@ -266,7 +270,8 @@ export async function DELETE(
       unlink(`${base}.sim.gz`),
       unlink(`${base}.pat`),
       unlink(`${base}.pat.gz`),
-      unlink(`${base}.map.json`)
+      unlink(`${base}.map.json`),
+      unlink(`${base}.dots.json`)
     ]);
 
     return Response.json({ data: deleted });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Info } from 'lucide-react';
+import { Info, Trash2 } from 'lucide-react';
 import { getGuestZoneClaimHeaders } from '@/lib/guest-zone-claims';
 import '@/styles/settings-components.css';
 import Slider from './ui/slider';
@@ -239,6 +239,7 @@ export function SimRunSelector({
 }: SimRunSelectorProps) {
   const [data, setData] = useState<SimRunType[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!czone_id) {
@@ -262,6 +263,35 @@ export function SimRunSelector({
       });
   }, [czone_id]);
 
+  // Admins can delete any run (server-enforced); this just toggles the UI.
+  useEffect(() => {
+    fetch('/api/admin/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => setIsAdmin(Boolean(json?.data?.isAdmin)))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  const handleDeleteRun = async (run: SimRunType) => {
+    if (
+      !window.confirm(`Delete run "${run.name}"? This cannot be undone.`)
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/simdata/${run.sim_id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+      setData((prev) =>
+        prev ? prev.filter((r) => r.sim_id !== run.sim_id) : prev
+      );
+      if (run.sim_id === sim_id) callback(null);
+    } catch (e) {
+      console.error(e);
+      window.alert('Could not delete run. Are you signed in as an admin?');
+    }
+  };
+
   return (
     <div className="sim_table">
       <div className="sim_table_header">
@@ -280,17 +310,29 @@ export function SimRunSelector({
           </p>
         )}
         {data?.map((run) => (
-          <button
-            type="button"
-            key={run.sim_id}
-            className={`sim_table_row ${run.sim_id === sim_id ? 'is-selected' : ''}`}
-            onClick={() => callback(run.sim_id === sim_id ? null : run.sim_id)}
-          >
-            <span className="flex-1 truncate">{run.name}</span>
-            <span className="flex-1 text-right">
-              {new Date(run.created_at).toLocaleDateString()}
-            </span>
-          </button>
+          <div key={run.sim_id} className="flex items-stretch gap-1">
+            <button
+              type="button"
+              className={`sim_table_row flex-1 ${run.sim_id === sim_id ? 'is-selected' : ''}`}
+              onClick={() => callback(run.sim_id === sim_id ? null : run.sim_id)}
+            >
+              <span className="flex-1 truncate">{run.name}</span>
+              <span className="flex-1 text-right">
+                {new Date(run.created_at).toLocaleDateString()}
+              </span>
+            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                aria-label={`Delete run ${run.name}`}
+                title="Delete run"
+                className="px-2 rounded text-(--color-text-muted) hover:text-red-600 hover:bg-red-50 transition-colors"
+                onClick={() => handleDeleteRun(run)}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>
