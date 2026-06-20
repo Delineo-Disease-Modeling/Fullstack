@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
-import { jsonMessage, serviceResult } from '@/server/api/responses';
+import { isAdminEmail } from '@/lib/admin';
+import { jsonMessage, serviceResult, unauthorized } from '@/server/api/responses';
 import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
-import { requireSessionUserId } from '@/server/api/session';
+import { getSessionUser, requireSessionUserId } from '@/server/api/session';
 import {
   deleteConvenienceZone,
   getConvenienceZone,
@@ -59,11 +60,17 @@ export async function DELETE(
     return jsonMessage(id.message, id.status);
   }
 
-  const session = await requireSessionUserId(request.headers);
-  if (!session.ok) {
-    return session.response;
+  // Delete is allowed for the zone owner OR an admin (admin cleanup of shared
+  // zones, e.g. pruning duplicates). Cascades the zone's runs + files.
+  const sessionUser = await getSessionUser(request.headers);
+  if (!sessionUser) {
+    return unauthorized();
   }
 
-  const result = await deleteConvenienceZone(id.value, session.userId);
+  const result = await deleteConvenienceZone(
+    id.value,
+    sessionUser.id,
+    isAdminEmail(sessionUser.email)
+  );
   return serviceResult(result);
 }
