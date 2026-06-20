@@ -1,5 +1,7 @@
+import { unlink } from 'node:fs/promises';
 import { z } from 'zod';
 import type { ConvenienceZone } from '@/generated/prisma/client';
+import { DB_FOLDER } from '@/lib/db-files';
 import { invalidatePapdata } from '@/lib/papdata-cache';
 import { prisma } from '@/lib/prisma';
 import { broadcast } from '@/lib/sse-broadcast';
@@ -260,20 +262,57 @@ export async function updateConvenienceZone(
   }
 }
 
+// Per-run file variants + the zone's papdata/patterns files, removed on disk
+// after the DB cascade deletes the run rows.
+const RUN_FILE_SUFFIXES = [
+  '.sim',
+  '.sim.gz',
+  '.pat',
+  '.pat.gz',
+  '.map.json',
+  '.dots.json'
+];
+
+async function deleteZoneFiles(
+  zone: Pick<ConvenienceZone, 'papdata_id' | 'patterns_id'>,
+  runFileIds: string[]
+) {
+  const paths: string[] = [];
+  for (const fileId of runFileIds) {
+    for (const suffix of RUN_FILE_SUFFIXES) {
+      paths.push(`${DB_FOLDER}${fileId}${suffix}`);
+    }
+  }
+  if (zone.papdata_id) paths.push(`${DB_FOLDER}${zone.papdata_id}.gz`);
+  if (zone.patterns_id) {
+    paths.push(`${DB_FOLDER}${zone.patterns_id}.gz`);
+    paths.push(`${DB_FOLDER}${zone.patterns_id}.bin`);
+  }
+  await Promise.allSettled(paths.map((p) => unlink(p)));
+}
+
 export async function deleteConvenienceZone(
   id: number,
-  userId: string
+  userId: string,
+  isAdmin = false
 ): Promise<ServiceResult<ConvenienceZone>> {
   try {
     const existing = await prisma.convenienceZone.findUnique({ where: { id } });
     if (!existing) {
       return { ok: false, message: 'Not found', status: 404 };
     }
-    if (existing.user_id !== userId) {
+    if (existing.user_id !== userId && !isAdmin) {
       return { ok: false, message: 'Forbidden', status: 403 };
     }
 
+    // Collect run file ids BEFORE the delete cascades the run rows away.
+    const runs = await prisma.simData.findMany({
+      where: { czone_id: id },
+      select: { file_id: true }
+    });
+
     const zone = await prisma.convenienceZone.delete({ where: { id } });
+    await deleteZoneFiles(zone, runs.map((r) => r.file_id));
     if (zone.papdata_id) {
       invalidatePapdata(zone.papdata_id);
     }

@@ -1,7 +1,9 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/auth-client';
+import { useIsAdmin } from '@/lib/use-is-admin';
 import type { ConvenienceZone } from '@/stores/simsettings';
 import useSimSettings from '@/stores/simsettings';
 import EditDeleteActions from './edit-delete-actions';
@@ -17,7 +19,33 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
   const { data: session } = useSession();
   const user = session?.user;
   const userId = user?.id ?? null;
+  const isAdmin = useIsAdmin();
   const setSettings = useSimSettings((state) => state.setSettings);
+
+  // Admins can delete any zone (server-enforced) — used to prune duplicates.
+  // Cascades the zone's runs + files; not undoable.
+  const handleDeleteZone = async (loc: ConvenienceZone) => {
+    if (
+      !window.confirm(
+        `Delete zone "${loc.name}" (pop ${loc.size}) and ALL its runs? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/convenience-zones/${loc.id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+      setLocations((prev) => prev.filter((l) => l.id !== loc.id));
+      if (zone?.id === loc.id) {
+        setSettings({ zone: null, sim_id: null });
+      }
+    } catch (e) {
+      console.error(e);
+      window.alert('Could not delete zone. Are you signed in as an admin?');
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -183,24 +211,36 @@ export default function CzDict({ zone, setZone, locations, setLocations }: CzDic
                 .filter(Boolean)
                 .join(' ');
               return (
-                <button
-                  type="button"
-                  key={loc.id}
-                  className={rowClasses}
-                  onClick={() => {
-                    setZone(loc);
-                    setSettings({ sim_id: null });
-                  }}
-                >
-                  <span className="flex-1 truncate">{loc.name}</span>
-                  <span className="flex-1 text-center">{loc.size}</span>
-                  <span className="flex-1 text-right">
-                    {new Date(loc.created_at).toLocaleDateString()}
-                  </span>
-                  {!loc.ready && (
-                    <span className="sim_table_row_badge">Generating…</span>
+                <div key={loc.id} className="flex items-stretch gap-1">
+                  <button
+                    type="button"
+                    className={`${rowClasses} flex-1`}
+                    onClick={() => {
+                      setZone(loc);
+                      setSettings({ sim_id: null });
+                    }}
+                  >
+                    <span className="flex-1 truncate">{loc.name}</span>
+                    <span className="flex-1 text-center">{loc.size}</span>
+                    <span className="flex-1 text-right">
+                      {new Date(loc.created_at).toLocaleDateString()}
+                    </span>
+                    {!loc.ready && (
+                      <span className="sim_table_row_badge">Generating…</span>
+                    )}
+                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      aria-label={`Delete zone ${loc.name}`}
+                      title="Delete zone (and all its runs)"
+                      className="px-2 rounded text-(--color-text-muted) hover:text-red-600 hover:bg-red-50 transition-colors"
+                      onClick={() => handleDeleteZone(loc)}
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                    </button>
                   )}
-                </button>
+                </div>
               );
             });
           })()}

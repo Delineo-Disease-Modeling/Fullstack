@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Info, Trash2 } from 'lucide-react';
 import { getGuestZoneClaimHeaders } from '@/lib/guest-zone-claims';
+import { useIsAdmin } from '@/lib/use-is-admin';
 import '@/styles/settings-components.css';
 import Slider from './ui/slider';
 
@@ -239,7 +240,7 @@ export function SimRunSelector({
 }: SimRunSelectorProps) {
   const [data, setData] = useState<SimRunType[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = useIsAdmin();
 
   useEffect(() => {
     if (!czone_id) {
@@ -262,14 +263,6 @@ export function SimRunSelector({
         setLoading(false);
       });
   }, [czone_id]);
-
-  // Admins can delete any run (server-enforced); this just toggles the UI.
-  useEffect(() => {
-    fetch('/api/admin/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => setIsAdmin(Boolean(json?.data?.isAdmin)))
-      .catch(() => setIsAdmin(false));
-  }, []);
 
   const handleDeleteRun = async (run: SimRunType) => {
     if (
