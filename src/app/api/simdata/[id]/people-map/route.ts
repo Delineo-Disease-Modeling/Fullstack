@@ -19,6 +19,7 @@ import type {
   DiseaseStateTimestep,
   PatternTimestep
 } from '@/lib/simulation-data';
+import { gzipJsonData } from '@/server/api/gzip-json';
 import { jsonMessage } from '@/server/api/responses';
 import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
 
@@ -494,15 +495,10 @@ export async function GET(
       }
       const baked = await readDotsPayload(fileId, requested);
       if (baked) {
-        return Response.json(
-          { data: baked },
-          {
-            headers: {
-              'Cache-Control': 'private, max-age=30',
-              'X-Dots-Status': 'baked'
-            }
-          }
-        );
+        return gzipJsonData(request, baked, {
+          'Cache-Control': 'private, max-age=30',
+          'X-Dots-Status': 'baked'
+        });
       }
       if (dotsStatus === 'fallback') {
         if (bakeThrew || getRecentBakeFailure(fileId)) {
@@ -533,7 +529,7 @@ export async function GET(
         .replace(/[^\x20-\x7E]/g, ' ')
         .slice(0, 180);
     }
-    return Response.json({ data }, { headers });
+    return gzipJsonData(request, data, headers);
   } catch (error) {
     console.error('People map computation error:', error);
     return Response.json(

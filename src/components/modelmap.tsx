@@ -25,6 +25,7 @@ import {
   resetModelMapLayoutCaches,
   updateIcons
 } from '@/features/model-map/map-data';
+import { type DotsBundle, synthesizeFromBundle } from '@/lib/dots-synth';
 import {
   getMapStorageKey,
   getPeopleMapCacheKey,
@@ -42,13 +43,14 @@ function getMapFrameCacheKey(simId: number, timestep: number) {
 const EMPTY_HOTSPOTS: Record<string, number[]> = {};
 
 // Max consecutive playback ticks to wait for an unloaded Cases frame before
-// advancing anyway. Per-frame people-map fetches are now ~20ms (the dots are
-// pre-baked + served from the in-memory cache), so the deep buffer this used to
-// need (for the old ~0.4-1.7s fetches) just produced long "spaced out" stalls.
-// With PREFETCH_STEPS keeping frames ready, hold at most 1 tick so playback
-// advances at a steady rate. At PLAYBACK_INTERVAL_MS (750ms) this caps a stall
-// at ~1.5s instead of ~7.5s.
-const MAX_BUFFER_HOLDS = 1;
+// advancing anyway. When the whole-run dots bundle is loaded, frames are
+// synthesized client-side (instant) and this buffer is bypassed entirely — it
+// only governs the per-frame /people-map FALLBACK path (runs with no baked
+// bundle), where each fetch can take ~0.4-1.7s over the WAN. Holding long enough
+// to ride out a slow frame keeps the dots on screen instead of blanking to
+// "Loading cases...". At PLAYBACK_INTERVAL_MS (750ms), 6 holds caps a stall at
+// ~4.5s.
+const MAX_BUFFER_HOLDS = 6;
 
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
@@ -100,6 +102,12 @@ export default function ModelMap({
   );
   const mapFrameRequests = useRef<Map<string, Promise<SimData>>>(new Map());
   const bufferHoldsRef = useRef(0);
+  // Whole-run compact dots bundle: fetched once per run so playback frames are
+  // synthesized client-side instead of re-fetched per tick. Null when the run
+  // has no baked bundle (then the per-frame /people-map path is used).
+  const dotsBundleRef = useRef<DotsBundle | null>(null);
+  const dotsBundleSimId = useRef<number | null>(null);
+  const [dotsBundleReady, setDotsBundleReady] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [mapFrameError, setMapFrameError] = useState<string | null>(null);
 
@@ -115,6 +123,9 @@ export default function ModelMap({
     setPeopleMapError(null);
     setMapFrameError(null);
     setCaseDotsVisible(false);
+    dotsBundleRef.current = null;
+    dotsBundleSimId.current = null;
+    setDotsBundleReady(false);
   }, [simId]);
 
   useEffect(() => {
@@ -398,6 +409,72 @@ export default function ModelMap({
     simId
   ]);
 
+  // Fetch the whole-run compact dots bundle ONCE when the Cases view opens, so
+  // playback frames are synthesized client-side (instant) instead of being
+  // re-fetched per tick — the large per-frame payloads choke playback over the
+  // WAN on prod. Runs with no baked bundle return 409 and fall back to the
+  // per-frame /people-map path below.
+  useEffect(() => {
+    if (heatmapMode !== 'people' || !caseDotsVisible || !simId) {
+      return;
+    }
+    if (dotsBundleSimId.current === simId) {
+      return; // already loaded (or attempted) for this run
+    }
+
+    let active = true;
+    const controller = new AbortController();
+    fetch(`/api/simdata/${simId}/dots`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null; // 409 (no bundle) / error -> per-frame fallback
+        }
+        const json = (await response.json()) as {
+          data?: { place_ids?: string[]; frames?: Record<string, number[]> };
+        };
+        return json.data ?? null;
+      })
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+        dotsBundleSimId.current = simId;
+        if (
+          data?.place_ids &&
+          data.frames &&
+          Object.keys(data.frames).length > 0
+        ) {
+          const frames = data.frames;
+          const sortedTimes = Object.keys(frames)
+            .map(Number)
+            .filter((value) => Number.isFinite(value))
+            .sort((a, b) => a - b);
+          dotsBundleRef.current = {
+            placeIds: data.place_ids,
+            frames,
+            sortedTimes
+          };
+        } else {
+          dotsBundleRef.current = null;
+        }
+        setDotsBundleReady(Boolean(dotsBundleRef.current));
+      })
+      .catch((error) => {
+        if (!active || controller.signal.aborted) {
+          return;
+        }
+        console.warn('Failed to load dots bundle:', error);
+        dotsBundleSimId.current = simId;
+        dotsBundleRef.current = null;
+        setDotsBundleReady(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [caseDotsVisible, heatmapMode, simId]);
+
   const loadPeopleMapData = useCallback(
     async (timestep: number) => {
       if (!simId) {
@@ -444,7 +521,8 @@ export default function ModelMap({
       heatmapMode !== 'people' ||
       !caseDotsVisible ||
       !simId ||
-      selectedTimestep === null
+      selectedTimestep === null ||
+      dotsBundleReady
     ) {
       return;
     }
@@ -476,7 +554,8 @@ export default function ModelMap({
     heatmapMode,
     loadPeopleMapData,
     selectedTimestep,
-    simId
+    simId,
+    dotsBundleReady
   ]);
 
   const selectedPeopleMapData = useMemo(() => {
@@ -487,6 +566,15 @@ export default function ModelMap({
       selectedTimestep === null
     ) {
       return null;
+    }
+
+    // Whole-run bundle loaded: synthesize the frame locally (zero network).
+    if (
+      dotsBundleReady &&
+      dotsBundleSimId.current === simId &&
+      dotsBundleRef.current
+    ) {
+      return synthesizeFromBundle(dotsBundleRef.current, selectedTimestep);
     }
 
     if (
@@ -501,7 +589,14 @@ export default function ModelMap({
         getPeopleMapCacheKey(simId, selectedTimestep)
       ) ?? null
     );
-  }, [caseDotsVisible, heatmapMode, peopleMapData, selectedTimestep, simId]);
+  }, [
+    caseDotsVisible,
+    heatmapMode,
+    peopleMapData,
+    selectedTimestep,
+    simId,
+    dotsBundleReady
+  ]);
 
   useEffect(() => {
     if (
@@ -510,7 +605,8 @@ export default function ModelMap({
       !simId ||
       selectedTimestep === null ||
       availableTimesteps.length === 0 ||
-      !selectedPeopleMapData
+      !selectedPeopleMapData ||
+      dotsBundleReady // bundle path synthesizes locally — no prefetch needed
     ) {
       return;
     }
@@ -550,7 +646,8 @@ export default function ModelMap({
     loadPeopleMapData,
     selectedPeopleMapData,
     selectedTimestep,
-    simId
+    simId,
+    dotsBundleReady
   ]);
 
   useEffect(() => {
@@ -576,6 +673,7 @@ export default function ModelMap({
           heatmapMode !== 'people' ||
           !caseDotsVisible ||
           !simId ||
+          dotsBundleReady || // bundle path: every frame is synthesized instantly
           peopleMapError !== null ||
           peopleMapCache.current.has(getPeopleMapCacheKey(simId, nextTimestep));
         if (!nextFrameReady && bufferHoldsRef.current < MAX_BUFFER_HOLDS) {
@@ -594,7 +692,8 @@ export default function ModelMap({
     heatmapMode,
     caseDotsVisible,
     simId,
-    peopleMapError
+    peopleMapError,
+    dotsBundleReady
   ]);
 
   const peopleMapLoading =

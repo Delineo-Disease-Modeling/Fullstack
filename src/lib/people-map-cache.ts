@@ -15,6 +15,7 @@
 
 import { access, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { DB_FOLDER, readDbJson, resolveDbDataPath } from './db-files';
+import { findNearestTime, synthesizeDotsFrame } from './dots-synth';
 import { streamJsonObjectEntries } from './json-stream';
 import {
   getPatternMeta,
@@ -29,7 +30,6 @@ import type {
 
 const ACTIVE_INFECTION_MASK = 1 | 2 | 4 | 8;
 const RECOVERED_MASK = 16;
-const MAX_PEOPLE_DOTS = 12_000;
 const DOTS_FILE_VERSION = 1;
 const DOTS_CACHE_LIMIT = 4;
 
@@ -468,89 +468,27 @@ export async function loadDots(fileId: string): Promise<CachedDots | null> {
   return entry;
 }
 
-function findNearestTime(sortedTimes: number[], requestedTime: number) {
-  if (sortedTimes.length === 0) return null;
-  let nearest = sortedTimes[0];
-  for (const time of sortedTimes) {
-    if (Math.abs(time - requestedTime) < Math.abs(nearest - requestedTime)) {
-      nearest = time;
-    }
-    if (time > requestedTime) break;
+/**
+ * Load the whole compact dots bundle for a run (the parsed `{fileId}.dots.json`)
+ * so the client can fetch it ONCE and synthesize every frame locally — no
+ * per-frame /people-map fetch during playback. Returns null when the run has no
+ * (readable) baked file; the caller then falls back to the per-frame route.
+ */
+export async function loadDotsBundle(fileId: string): Promise<{
+  version: number;
+  place_ids: string[];
+  frames: Record<string, number[]>;
+  mtimeMs: number;
+} | null> {
+  const dots = await loadDots(fileId);
+  if (!dots) {
+    return null;
   }
-  return nearest;
-}
-
-/** Build the sampled dot payload from a place-count frame (synthetic people). */
-function synthesizePayload(
-  placeIds: string[],
-  frame: number[],
-  time: number,
-  requestedTime: number
-): PeopleMapPayload {
-  let totalPeople = 0;
-  for (let index = 0; index < placeIds.length; index += 1) {
-    totalPeople += frame[index * 3] || 0;
-  }
-  const sampleRate = Math.max(1, Math.ceil(totalPeople / MAX_PEOPLE_DOTS));
-
-  let returnedPeople = 0;
-  const locations: PeopleMapLocation[] = [];
-
-  for (let index = 0; index < placeIds.length; index += 1) {
-    const base = index * 3;
-    const population = frame[base] || 0;
-    if (population === 0) {
-      continue;
-    }
-    const infected = Math.min(population, frame[base + 1] || 0);
-    const recovered = Math.min(population - infected, frame[base + 2] || 0);
-    const uninfected = Math.max(0, population - infected - recovered);
-    const placeId = placeIds[index];
-
-    // Match the live route's semantics: every infected/recovered person is
-    // shown; only susceptibles are downsampled.
-    const uninfectedSamples =
-      uninfected > 0 ? Math.max(1, Math.ceil(uninfected / sampleRate)) : 0;
-    const people: PeopleMapPerson[] = [];
-    for (let k = 0; k < infected; k += 1) {
-      people.push({
-        id: `i:${placeId}:${k}`,
-        infected: true,
-        newly_infected: false,
-        recovered: false
-      });
-    }
-    for (let k = 0; k < recovered; k += 1) {
-      people.push({
-        id: `r:${placeId}:${k}`,
-        infected: false,
-        newly_infected: false,
-        recovered: true
-      });
-    }
-    for (let k = 0; k < uninfectedSamples; k += 1) {
-      people.push({
-        id: `u:${placeId}:${k}`,
-        infected: false,
-        newly_infected: false,
-        recovered: false
-      });
-    }
-
-    if (people.length > 0) {
-      returnedPeople += people.length;
-      locations.push({ type: 'places', id: placeId, people });
-    }
-  }
-
   return {
-    time,
-    requested_time: requestedTime,
-    total_people: totalPeople,
-    returned_people: returnedPeople,
-    sample_rate: sampleRate,
-    source: 'person',
-    locations
+    version: DOTS_FILE_VERSION,
+    place_ids: dots.placeIds,
+    frames: dots.frames,
+    mtimeMs: dots.mtimeMs
   };
 }
 
@@ -574,5 +512,5 @@ export async function readDotsPayload(
   if (!frame) {
     return null;
   }
-  return synthesizePayload(dots.placeIds, frame, nearest, requestedTime);
+  return synthesizeDotsFrame(dots.placeIds, frame, nearest, requestedTime);
 }
