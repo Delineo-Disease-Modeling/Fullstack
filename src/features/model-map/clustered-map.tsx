@@ -252,8 +252,7 @@ export default function ClusteredMap({
     for (const id of [
       'person-status-uninfected',
       'person-status-recovered',
-      'person-status-infected',
-      'person-status-disabled'
+      'person-status-infected'
     ]) {
       if (mapInstance.getLayer(id))
         mapInstance.setLayoutProperty(
@@ -370,12 +369,6 @@ export default function ClusteredMap({
     ['==', ['get', 'disabled'], true],
     DISABLED_POI_COLOR,
     clusterColor
-  ] as unknown as string;
-  const peopleDotPaintColor = [
-    'case',
-    ['==', ['get', 'disabled'], true],
-    DISABLED_POI_COLOR,
-    peopleDotColor
   ] as unknown as string;
   const footprintPaintColor = [
     'case',
@@ -625,7 +618,7 @@ export default function ClusteredMap({
                 18,
                 6
               ] as const,
-              'circle-color': peopleDotPaintColor,
+              'circle-color': peopleDotColor,
               'circle-opacity': 0.72,
               'circle-stroke-width': 0
             }}
@@ -752,23 +745,8 @@ export default function ClusteredMap({
               'circle-stroke-width': 0
             }}
           />
-          <Layer
-            id="person-status-disabled"
-            type="circle"
-            minzoom={CASE_CLUSTER_MAX_ZOOM}
-            filter={['==', ['get', 'disabled'], true]}
-            layout={
-              {
-                visibility: showCaseDotsLayer ? 'visible' : 'none'
-              } as const
-            }
-            paint={{
-              'circle-radius': PERSON_STATUS_DOT_RADIUS,
-              'circle-color': DISABLED_POI_COLOR,
-              'circle-opacity': 0.88,
-              'circle-stroke-width': 0
-            }}
-          />
+          {/* Disabled POIs emit no person dots (suppressed in map-data); their
+              "disabled" state shows as the black footprint/marker, not dots. */}
         </Source>
         <Source id="poi-label-points" type="geojson" data={poiLabelGeoJSON}>
           <Layer

@@ -936,6 +936,8 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
 
     const isHome = poi.type === 'homes';
     if (isHome) continue;
+    // Disabled POIs render as an empty black marker: suppress aggregate dots.
+    if (poi.disabled) continue;
 
     const dotCount = Math.min(
       MAX_PLACE_DOTS_PER_LOCATION,
@@ -1026,6 +1028,11 @@ export function makePersonStatusDotGeoJSON(
       !Number.isFinite(poi.latitude) ||
       !Number.isFinite(poi.longitude)
     ) {
+      continue;
+    }
+    // Disabled POIs render as an empty black marker: suppress their people
+    // dots entirely (visitors were rerouted away) rather than recoloring them.
+    if (poi.disabled) {
       continue;
     }
 
