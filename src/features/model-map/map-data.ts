@@ -74,7 +74,14 @@ const HOME_CIRCLE_RADIUS_MAX = 0.025;
 const HOME_CIRCLE_RADIUS_QUANTILE = 0.95;
 const MAX_PERSON_DOTS = 8000;
 const MAX_PLACE_DOTS_PER_LOCATION = 220;
-const NO_FOOTPRINT_DOT_JITTER_DEGREES = 0.0008;
+// Spread for POIs that have no footprint polygon (only a point). Kept tight so
+// they read as a small cluster on the pin rather than a wide spray of dots that
+// look unanchored. POIs that DO have a footprint never use this — their dots are
+// clamped inside the polygon.
+const NO_FOOTPRINT_DOT_JITTER_DEGREES = 0.00025;
+// Cap on how much the no-footprint disk grows with occupancy (radius scales with
+// sqrt(count)); keeps even busy footprint-less POIs from spraying too far.
+const NO_FOOTPRINT_DISK_MAX_GROWTH = 3;
 
 let householdLocs: Record<string, Coordinate> = {};
 let placeLocs: Record<string, Coordinate> = {};
@@ -230,10 +237,13 @@ function pointInRing(lng: number, lat: number, ring: Coordinate[]) {
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [lngI, latI] = ring[i];
     const [lngJ, latJ] = ring[j];
+    // The `latI > lat !== latJ > lat` guard means the edge straddles `lat`, so
+    // `latJ - latI` is non-zero here. Dividing by it directly preserves the
+    // sign; a `Math.max(latJ - latI, 1e-12)` would flip the ray-cast on every
+    // downward edge and wrongly classify exterior points as inside.
     const intersects =
       latI > lat !== latJ > lat &&
-      lng <
-        ((lngJ - lngI) * (lat - latI)) / Math.max(latJ - latI, 1e-12) + lngI;
+      lng < ((lngJ - lngI) * (lat - latI)) / (latJ - latI) + lngI;
     if (intersects) inside = !inside;
   }
   return inside;
@@ -355,9 +365,11 @@ function computeDiskLayout(
   if (count <= 0) return [];
   const offsetA = 1 + Math.floor(hashUnit(seed, 11) * 997);
   const offsetB = 1 + Math.floor(hashUnit(seed, 13) * 997);
-  // Scale the disk radius with sqrt(count) so density stays roughly constant
+  // Scale the disk radius with sqrt(count) so density stays roughly constant,
+  // capped so a busy footprint-less POI still reads as a contained cluster.
   const radius =
-    NO_FOOTPRINT_DOT_JITTER_DEGREES * Math.max(1, Math.sqrt(count / 24));
+    NO_FOOTPRINT_DOT_JITTER_DEGREES *
+    Math.min(NO_FOOTPRINT_DISK_MAX_GROWTH, Math.max(1, Math.sqrt(count / 24)));
   const cos = Math.max(Math.cos((centerLat * Math.PI) / 180), 0.35);
   const out: Coordinate[] = new Array(count);
   for (let i = 0; i < count; i++) {
@@ -959,6 +971,7 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
         placeDotLayouts[footprintKey] = footprintDots;
       }
     }
+    const hasFootprintDots = Boolean(footprintDots && footprintDots.length > 0);
 
     for (let i = 0; i < dotCount; i++) {
       if (features.length >= MAX_PERSON_DOTS) {
@@ -966,18 +979,25 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
         break;
       }
 
-      const footprintDot =
-        footprintDots && i < footprintDots.length ? footprintDots[i] : null;
-      const angle = hashUnit(baseSeed, i) * Math.PI * 2;
-      const radius =
-        Math.sqrt(hashUnit(baseSeed, i + 100_000)) *
-        NO_FOOTPRINT_DOT_JITTER_DEGREES;
-      const lat = footprintDot
-        ? footprintDot[1]
-        : poi.latitude + Math.sin(angle) * radius;
-      const lng = footprintDot
-        ? footprintDot[0]
-        : poi.longitude + Math.cos(angle) * radius;
+      let lat: number;
+      let lng: number;
+      if (hasFootprintDots) {
+        // Clamp inside the footprint: cycle interior samples if short so a
+        // footprint POI never spills dots outside its polygon.
+        const fp = (footprintDots as Coordinate[])[
+          i % (footprintDots as Coordinate[]).length
+        ];
+        lng = fp[0];
+        lat = fp[1];
+      } else {
+        // No footprint: a tight jitter disk around the POI point.
+        const angle = hashUnit(baseSeed, i) * Math.PI * 2;
+        const radius =
+          Math.sqrt(hashUnit(baseSeed, i + 100_000)) *
+          NO_FOOTPRINT_DOT_JITTER_DEGREES;
+        lat = poi.latitude + Math.sin(angle) * radius;
+        lng = poi.longitude + Math.cos(angle) * radius;
+      }
 
       features.push({
         type: 'Feature',
@@ -1050,17 +1070,24 @@ export function makePersonStatusDotGeoJSON(
         location.type === 'places' && poi.footprint
           ? samplePointsInFootprint(poi.footprint, count, seed)
           : [];
-      const shortfall = Math.max(0, count - footprintPoints.length);
-      const diskPoints =
-        shortfall > 0
-          ? computeDiskLayout(
-              poi.latitude,
-              poi.longitude,
-              shortfall,
-              seed ^ 0x9e3779b1
-            )
-          : [];
-      positions = [...footprintPoints, ...diskPoints];
+      if (footprintPoints.length >= count) {
+        positions = footprintPoints;
+      } else if (footprintPoints.length > 0) {
+        // Footprint POI whose sampling fell short (thin/awkward polygon): cycle
+        // the interior points so dots NEVER spill outside the footprint.
+        positions = Array.from(
+          { length: count },
+          (_, i) => footprintPoints[i % footprintPoints.length]
+        );
+      } else {
+        // No usable footprint: a tight disk around the POI point.
+        positions = computeDiskLayout(
+          poi.latitude,
+          poi.longitude,
+          count,
+          seed ^ 0x9e3779b1
+        );
+      }
       personLayoutCache[layoutKey] = positions;
     }
 

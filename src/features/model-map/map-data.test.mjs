@@ -43,6 +43,49 @@ test('samplePointsInFootprint is deterministic and keeps dots inside the footpri
   }
 });
 
+// A diamond (rotated square) is the unit L1 ball — its edges run diagonally
+// up AND down, which is exactly what the old `Math.max(latJ - latI, 1e-12)`
+// ray-cast got wrong. An axis-aligned square hides the bug (its vertical edges
+// have a zero numerator), so test the diamond against an exact oracle.
+const diamond = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [0, 1],
+      [1, 0],
+      [0, -1],
+      [-1, 0],
+      [0, 1]
+    ]
+  ]
+};
+
+test('pointInGeometry classifies a polygon with downward edges correctly (sign-bug regression)', () => {
+  const oracle = (x, y) => Math.abs(x) + Math.abs(y) < 1;
+  let checked = 0;
+  let mismatches = 0;
+  for (let gx = -9; gx <= 9; gx += 1) {
+    for (let gy = -9; gy <= 9; gy += 1) {
+      const x = gx / 10;
+      const y = gy / 10;
+      // Skip points sitting exactly on an edge (boundary is ambiguous).
+      if (Math.abs(Math.abs(x) + Math.abs(y) - 1) < 1e-9) continue;
+      checked += 1;
+      if (pointInGeometry(x, y, diamond) !== oracle(x, y)) mismatches += 1;
+    }
+  }
+  assert.ok(checked > 0);
+  assert.equal(mismatches, 0);
+});
+
+test('samplePointsInFootprint keeps every dot inside a diagonally-edged polygon', () => {
+  const points = samplePointsInFootprint(diamond, 40, 7);
+  assert.equal(points.length, 40);
+  for (const [lng, lat] of points) {
+    assert.equal(pointInGeometry(lng, lat, diamond), true);
+  }
+});
+
 test('makePeopleDotGeoJSON ignores homes and places dots inside place footprints', () => {
   resetModelMapLayoutCaches();
 
@@ -130,6 +173,60 @@ test('makePersonStatusDotGeoJSON keeps person dots stable inside place footprint
   for (const feature of first.features) {
     const [lng, lat] = feature.geometry.coordinates;
     assert.equal(pointInGeometry(lng, lat, square), true);
+  }
+});
+
+test('makePersonStatusDotGeoJSON clamps dots inside a sparse footprint (never spills)', () => {
+  resetModelMapLayoutCaches();
+  // A thin diagonal sliver: its area is <1% of its bounding box, so rejection
+  // sampling can't place all `count` points and the shortfall path engages.
+  // Those leftover dots must cycle interior points, not spill into a disk.
+  const sliver = {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [0, 0],
+        [10, 10],
+        [9.97, 10],
+        [-0.03, 0],
+        [0, 0]
+      ]
+    ]
+  };
+  const people = Array.from({ length: 60 }, (_, k) => ({
+    id: `p${k}`,
+    infected: false,
+    newly_infected: false,
+    recovered: false
+  }));
+  const result = makePersonStatusDotGeoJSON(
+    [
+      {
+        type: 'places',
+        id: 's1',
+        latitude: 5,
+        longitude: 5,
+        label: 'Sliver',
+        footprint: sliver,
+        icon: '🏥',
+        population: 60,
+        infected: 0
+      }
+    ],
+    {
+      time: 0,
+      requested_time: 0,
+      total_people: 60,
+      returned_people: 60,
+      sample_rate: 1,
+      locations: [{ type: 'places', id: 's1', people }]
+    }
+  );
+
+  assert.equal(result.features.length, 60);
+  for (const feature of result.features) {
+    const [lng, lat] = feature.geometry.coordinates;
+    assert.equal(pointInGeometry(lng, lat, sliver), true);
   }
 });
 
