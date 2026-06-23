@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { ArrowLeft, Check, Save } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ComparisonSummary from '@/components/comparison-summary';
 import EditDeleteActions from '@/components/edit-delete-actions';
 import LoginModal from '@/components/login-modal';
@@ -60,6 +60,9 @@ function formatRunDate(value?: string | null) {
   }
   return new Date(value).toLocaleDateString();
 }
+
+// Stable identity so gating the map overlay off doesn't churn ModelMap's memo.
+const EMPTY_DISABLED_POI_IDS: ReadonlySet<string> = new Set();
 
 function getDisabledPoiIdsFromMetadata(metadata: unknown) {
   if (!metadata || typeof metadata !== 'object') {
@@ -225,6 +228,10 @@ export default function SimulatorRun() {
     null
   );
   const [disabledRunError, setDisabledRunError] = useState<string | null>(null);
+  // Set when the user kicks off a disabled rerun, so the page auto-switches to
+  // the rerouted run once its payload loads instead of leaving them on the
+  // original (un-rerouted) run with a stale view.
+  const autoShowDisabledRef = useRef(false);
 
   const activeSimId =
     activeView === 'disabled' && disabledSimId != null
@@ -344,6 +351,16 @@ export default function SimulatorRun() {
     setDisabledCategories(new Set());
     setDisabledPoiIds(new Set(metadataDisabledIds));
   }, [disabledPayload?.metadata]);
+
+  // After a disabled rerun completes and its payload loads, switch the map to
+  // the rerouted run so the user sees the actual effect of disabling rather
+  // than the original run with a (now-gated) disabled overlay.
+  useEffect(() => {
+    if (autoShowDisabledRef.current && disabledPayload) {
+      autoShowDisabledRef.current = false;
+      showRun('disabled');
+    }
+  }, [disabledPayload, showRun]);
 
   useEffect(() => {
     if (!run_id) {
@@ -591,6 +608,8 @@ export default function SimulatorRun() {
       const comparisonId = await runSimulation(comparisonSettings, onProgress);
       const params = new URLSearchParams(searchParams.toString());
       params.set('disabled', String(comparisonId));
+      // Land the user on the rerouted run once it finishes loading.
+      autoShowDisabledRef.current = true;
       router.push(`/simulator/${interventionSimId}?${params.toString()}`);
     } catch (e) {
       console.error(e);
@@ -836,7 +855,13 @@ export default function SimulatorRun() {
             key={activeSimId}
             selectedZone={selectedZone}
             simId={activeSimId}
-            disabledPoiIds={effectiveDisabledPoiIds}
+            // Only paint POIs as disabled on the run that actually rerouted
+            // them; the intervention/baseline runs still placed people there.
+            disabledPoiIds={
+              activeView === 'disabled'
+                ? effectiveDisabledPoiIds
+                : EMPTY_DISABLED_POI_IDS
+            }
             onMarkerClick={handleMarkerClick}
             focusPoi={focusPoi}
           />
