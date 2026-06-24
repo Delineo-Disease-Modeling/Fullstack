@@ -333,7 +333,7 @@ export default function SimSettings({
               setSettings({ initial_infected_count })
             }
             min={1}
-            max={Math.min(100, zone?.size ?? 100)}
+            max={Math.min(1000, zone?.size ?? 1000)}
             percent={false}
             units=" people"
           />
