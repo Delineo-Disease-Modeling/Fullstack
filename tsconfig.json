@@ -13,6 +13,11 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    // Allow `import ... from './foo.ts'`. Required so feature modules can be
+    // split across files while staying importable by the `node --test` runner
+    // (which can only resolve explicit-extension relative paths, not the `@/`
+    // alias). Purely additive — extensionless/`@/` imports still resolve.
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
