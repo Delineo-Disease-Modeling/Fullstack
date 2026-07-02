@@ -73,14 +73,60 @@ export type OutcomeStats = {
   newInfections: number;
 };
 
-/** Active infected at a timestep = sum of the per-disease counts in `iot`. */
-function activeInfected(point: DataPoint | undefined): number {
-  if (!point) return 0;
+function numericValue(point: DataPoint | undefined, key: string): number | null {
+  if (!point) return null;
+  const value = point[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Unique people represented by the per-disease series at a timestep.
+ *
+ * For zone-wide simulator snapshots this includes terminal states such as
+ * Recovered/Removed because the disease map keeps everyone with a timeline.
+ */
+export function diseaseTotalAtPoint(point: DataPoint | undefined): number {
   let total = 0;
+  if (!point) return total;
   for (const [key, value] of Object.entries(point)) {
-    if (key !== 'time' && typeof value === 'number') total += value;
+    if (
+      key !== 'time' &&
+      key !== 'All People' &&
+      typeof value === 'number' &&
+      Number.isFinite(value)
+    ) {
+      total += value;
+    }
   }
   return total;
+}
+
+/**
+ * Current active infections from the disease series and state buckets.
+ *
+ * Zone-wide `iot` counts include recovered/removed people, so subtract terminal
+ * states. Per-place dots already store active infected separately; those points
+ * include `All People` and satisfy Susceptible + Infected + Recovered = total,
+ * so the disease count is already active and should not be reduced again.
+ */
+export function currentInfectionsAtPoint(
+  iotPoint: DataPoint | undefined,
+  statePoint: DataPoint | undefined
+): number {
+  const diseaseTotal = diseaseTotalAtPoint(iotPoint);
+  const recovered = numericValue(statePoint, 'Recovered') ?? 0;
+  const removed = numericValue(statePoint, 'Removed') ?? 0;
+  const allPeople = numericValue(iotPoint, 'All People');
+  const susceptible = numericValue(statePoint, 'Susceptible');
+
+  if (allPeople != null && susceptible != null) {
+    const simpleBucketTotal = susceptible + diseaseTotal + recovered + removed;
+    if (Math.abs(simpleBucketTotal - allPeople) < 1e-6) {
+      return Math.max(0, diseaseTotal);
+    }
+  }
+
+  return Math.max(0, diseaseTotal - recovered - removed);
 }
 
 function getMetadataRecord(metadata: unknown): Record<string, unknown> | null {
@@ -106,19 +152,26 @@ function getSeededInfectedCount(metadata: unknown) {
  * Headline outcomes from a run's zone-wide `global_stats`.
  *
  * NOTE: BITMASK_STATES are not mutually exclusive (a person can be
- * Infected + Infectious + Symptomatic at once), so we never sum the `states`
- * columns to count infections. Active infections come from summing `iot`'s
- * disease counts; the cumulative attack count comes from the monotonic
- * `Susceptible` series (population − Susceptible_final).
+ * Infected + Infectious + Symptomatic at once), so we never sum the raw
+ * `states` columns to count infections. Cumulative attack count comes from the
+ * monotonic `Susceptible` series (population − Susceptible_final); active
+ * infections are the disease total after terminal states are removed.
  */
 export function computeOutcomeStats(stats: ChartData): OutcomeStats {
   const iot = stats.iot ?? [];
   const states = stats.states ?? [];
+  const statesByTime = new Map(
+    states
+      .filter((point) => typeof point.time === 'number')
+      .map((point) => [point.time, point])
+  );
 
   let peakInfected = 0;
   let peakTimeHours = 0;
-  for (const point of iot) {
-    const active = activeInfected(point);
+  for (let index = 0; index < iot.length; index += 1) {
+    const point = iot[index];
+    const statePoint = statesByTime.get(point.time) ?? states[index];
+    const active = currentInfectionsAtPoint(point, statePoint);
     if (active > peakInfected) {
       peakInfected = active;
       peakTimeHours = typeof point.time === 'number' ? point.time : 0;
@@ -129,7 +182,7 @@ export function computeOutcomeStats(stats: ChartData): OutcomeStats {
   if (states.length > 0) {
     const firstSusceptible = Number(states[0].Susceptible ?? 0);
     const lastSusceptible = Number(states[states.length - 1].Susceptible ?? 0);
-    const population = firstSusceptible + activeInfected(iot[0]);
+    const population = firstSusceptible + diseaseTotalAtPoint(iot[0]);
     totalInfected = Math.max(0, population - lastSusceptible);
   }
 

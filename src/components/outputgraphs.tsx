@@ -16,7 +16,10 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-import { fetchChartData } from '@/lib/chartdata-client';
+import {
+  currentInfectionsAtPoint,
+  fetchChartData
+} from '@/lib/chartdata-client';
 import type { ChartData, DataPoint } from '@/lib/simulation-data';
 import { CustomTooltip } from './customtooltip';
 
@@ -36,15 +39,18 @@ const COLORS = [
 
 const BASELINE_SUFFIX = ' (baseline)';
 const DISABLED_POI_SUFFIX = ' (disabled POIs)';
+const ACTIVE_INFECTIONS_KEY = 'Active infections';
 const DEFAULT_HIDDEN_STATE_METRICS = new Set([
+  'Infected',
   'Infectious',
   'Susceptible',
   'Symptomatic'
 ]);
 
 const SERIES_COLORS: Record<string, string> = {
+  [ACTIVE_INFECTIONS_KEY]: '#3d88ad',
   Removed: '#e8485a',
-  Infected: '#3d88ad',
+  Infected: '#64748b',
   Recovered: '#2f9e44',
   Infectious: '#8b5cf6',
   Susceptible: '#c58f55',
@@ -60,6 +66,23 @@ const CHART_TYPE_OPTIONS = [
   },
   { value: 'states', label: 'States', heading: 'Disease states' }
 ] as const;
+
+const STATE_SERIES_ORDER = [
+  ACTIVE_INFECTIONS_KEY,
+  'Recovered',
+  'Hospitalized',
+  'Removed',
+  'Infected',
+  'Infectious',
+  'Symptomatic',
+  'Susceptible'
+];
+
+const STATE_SERIES_LABELS: Record<string, string> = {
+  [ACTIVE_INFECTIONS_KEY]: 'Active infections',
+  Infected: 'Infected stage',
+  Infectious: 'Infectious stage'
+};
 
 type ChartType = (typeof CHART_TYPE_OPTIONS)[number]['value'];
 type ScenarioKey = 'selected' | 'baseline' | 'disabledPoi';
@@ -226,6 +249,58 @@ function getSeriesKeys(series: DataPoint[]) {
     }
   }
   return [...keys];
+}
+
+function getOrderedSeriesKeys(series: DataPoint[], chartType: ChartType) {
+  const keys = getSeriesKeys(series);
+  if (chartType !== 'states') {
+    return keys;
+  }
+
+  return keys.sort((a, b) => {
+    const ai = STATE_SERIES_ORDER.indexOf(a);
+    const bi = STATE_SERIES_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
+function getMetricLabel(chartType: ChartType, key: string) {
+  if (chartType === 'states') {
+    return STATE_SERIES_LABELS[key] ?? key;
+  }
+  return key;
+}
+
+function withActiveInfectionsSeries(
+  states: DataPoint[],
+  iot: DataPoint[]
+): DataPoint[] {
+  const iotByTime = new Map(
+    iot
+      .filter((point) => typeof point.time === 'number')
+      .map((point) => [point.time, point])
+  );
+
+  return states.map((point, index) => {
+    const iotPoint = iotByTime.get(point.time) ?? iot[index];
+    return {
+      ...point,
+      [ACTIVE_INFECTIONS_KEY]: currentInfectionsAtPoint(iotPoint, point)
+    };
+  });
+}
+
+function getChartSeries(data: ChartData | null, chartType: ChartType) {
+  if (!data) {
+    return [];
+  }
+  if (chartType !== 'states') {
+    return data[chartType] ?? [];
+  }
+  return withActiveInfectionsSeries(data.states ?? [], data.iot ?? []);
 }
 
 function hasSeriesData(data: DataPoint[], key: string) {
@@ -412,16 +487,17 @@ export default function OutputGraphs({
     seriesDefs: SeriesDef[];
     splitCharts: SplitChart[];
   }>(() => {
-    const primarySeries = chartData?.[chartType] ?? [];
-    const baselineSeries = hasBaseline ? (baselineData?.[chartType] ?? []) : [];
-    const disabledPoiSeries = hasDisabledPoi
-      ? (disabledPoiData?.[chartType] ?? [])
+    const primarySeries = getChartSeries(chartData, chartType);
+    const baselineSeries = hasBaseline
+      ? getChartSeries(baselineData, chartType)
       : [];
-    const baseKeys = getSeriesKeys([
-      ...primarySeries,
-      ...baselineSeries,
-      ...disabledPoiSeries
-    ]);
+    const disabledPoiSeries = hasDisabledPoi
+      ? getChartSeries(disabledPoiData, chartType)
+      : [];
+    const baseKeys = getOrderedSeriesKeys(
+      [...primarySeries, ...baselineSeries, ...disabledPoiSeries],
+      chartType
+    );
     const colorByKey = new Map(
       baseKeys.map((key, index) => [
         key,
@@ -432,7 +508,7 @@ export default function OutputGraphs({
     const selectedSeriesDefs = baseKeys.map((key) => ({
       key,
       metricKey: key,
-      label: key,
+      label: getMetricLabel(chartType, key),
       scenario: 'selected' as const,
       color: colorOf(key),
       strokeWidth: SCENARIOS.selected.strokeWidth
@@ -523,7 +599,9 @@ export default function OutputGraphs({
               return {
                 key: `${key}${scenario.suffix}`,
                 metricKey: key,
-                label: `${key} · ${scenario.label}`,
+                label: `${getMetricLabel(chartType, key)} · ${
+                  scenario.label
+                }`,
                 scenario: comparison.scenario,
                 color: colorOf(key),
                 strokeDasharray: scenario.strokeDasharray,
