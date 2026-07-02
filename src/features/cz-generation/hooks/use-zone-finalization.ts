@@ -19,6 +19,7 @@ import type {
   GuidedSelectionSummary
 } from '@/features/cz-generation/types';
 import { useSession } from '@/lib/auth-client';
+import { normalizeCbgId } from '@/lib/cz-geo';
 import {
   createGuestZoneClaimToken,
   rememberGuestZoneClaim
@@ -38,6 +39,7 @@ type UseZoneFinalizationParams = {
   cityName: string;
   location: string;
   seedCBG: string;
+  seedCbgIds: string[];
   clusterAlgorithm: ClusterAlgorithm;
   mobilityPruneMinSeedCapturePct: number;
   isGuidedSecondOrderAlgorithm: boolean;
@@ -156,6 +158,7 @@ export function useZoneFinalization({
   cityName,
   location,
   seedCBG,
+  seedCbgIds,
   clusterAlgorithm,
   mobilityPruneMinSeedCapturePct,
   isGuidedSecondOrderAlgorithm,
@@ -220,11 +223,17 @@ export function useZoneFinalization({
         CLUSTER_ALGORITHM_OPTIONS.find(
           (option) => option.value === clusterAlgorithm
         )?.label || clusterAlgorithm;
+      const normalizedSeedCbgIds = Array.from(
+        new Set(seedCbgIds.map((cbg) => normalizeCbgId(cbg)).filter(Boolean))
+      );
 
       const generatedDescription = [
         `Auto-generated on ${now.toLocaleString()}`,
         `Location: ${cityName || location || 'N/A'}`,
-        `Seed CBG: ${seedCBG || 'N/A'}`,
+        `Seed CBG: ${seedCBG || normalizedSeedCbgIds[0] || 'N/A'}`,
+        ...(normalizedSeedCbgIds.length > 1
+          ? [`Seed CBGs: ${normalizedSeedCbgIds.join(', ')}`]
+          : []),
         `Algorithm: ${algorithmLabel}`,
         clusterAlgorithm === 'mobility_prune'
           ? `Minimum seed movement captured: ${Number(

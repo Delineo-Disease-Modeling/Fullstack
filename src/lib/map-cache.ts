@@ -1,4 +1,5 @@
 import { open, readFile, stat } from 'node:fs/promises';
+import type { DataPoint } from './simulation-data';
 
 const PAPDATA_MARKER = ',"papdata":';
 const SIMDATA_MARKER = ',"simdata":';
@@ -336,6 +337,63 @@ export async function loadMapCacheManifest(
   const { papdata, hotspots, timesteps, poiPeaks, incidence } =
     await getCachedManifest(filePath);
   return { papdata, hotspots, timesteps, poiPeaks, incidence };
+}
+
+export async function loadPlaceIncidenceSeries(
+  filePath: string,
+  locId: string,
+  seriesKey = 'New infections'
+): Promise<DataPoint[] | null> {
+  const manifest = await getCachedManifest(filePath);
+  const places = getPapdataPlaces(manifest.papdata);
+  const placeIndex = places.findIndex(
+    (place, index) => getPlaceId(place, index) === locId
+  );
+
+  if (placeIndex < 0) {
+    return null;
+  }
+
+  const file = await open(filePath, 'r');
+  const series: DataPoint[] = [];
+  let previousCumulative = 0;
+  let sawIncidence = false;
+
+  try {
+    for (const frameIndex of manifest.frames) {
+      const buffer = Buffer.alloc(frameIndex.byteLength);
+      let bytesRead = 0;
+      while (bytesRead < frameIndex.byteLength) {
+        const result = await file.read(
+          buffer,
+          bytesRead,
+          frameIndex.byteLength - bytesRead,
+          frameIndex.byteStart + bytesRead
+        );
+        if (result.bytesRead === 0) {
+          throw new Error('Unexpected end of map cache frame.');
+        }
+        bytesRead += result.bytesRead;
+      }
+
+      const frame = JSON.parse(buffer.toString('utf8')) as MapCacheFrame;
+      if (!Array.isArray(frame.pinc)) {
+        continue;
+      }
+
+      sawIncidence = true;
+      const cumulative = toNonNegativeCount(frame.pinc[placeIndex]);
+      series.push({
+        time: frameIndex.time / 60,
+        [seriesKey]: Math.max(0, cumulative - previousCumulative)
+      });
+      previousCumulative = cumulative;
+    }
+  } finally {
+    await file.close();
+  }
+
+  return sawIncidence ? series : null;
 }
 
 export async function loadMapCacheFrame(

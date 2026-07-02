@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
+import { ArrowLeft } from 'lucide-react';
 import {
   currentInfectionsAtPoint,
   fetchChartData
@@ -40,6 +41,7 @@ const COLORS = [
 const BASELINE_SUFFIX = ' (baseline)';
 const DISABLED_POI_SUFFIX = ' (disabled POIs)';
 const ACTIVE_INFECTIONS_KEY = 'Active infections';
+const POI_INCIDENCE_SERIES_KEY = 'New infections';
 const DEFAULT_HIDDEN_STATE_METRICS = new Set([
   'Infected',
   'Infectious',
@@ -48,6 +50,7 @@ const DEFAULT_HIDDEN_STATE_METRICS = new Set([
 ]);
 
 const SERIES_COLORS: Record<string, string> = {
+  [POI_INCIDENCE_SERIES_KEY]: '#e8485a',
   [ACTIVE_INFECTIONS_KEY]: '#3d88ad',
   Removed: '#e8485a',
   Infected: '#64748b',
@@ -63,6 +66,15 @@ const CHART_TYPE_OPTIONS = [
     value: 'iot',
     label: 'Infectiousness',
     heading: 'Infectiousness over time'
+  },
+  { value: 'states', label: 'States', heading: 'Disease states' }
+] as const;
+
+const POI_CHART_TYPE_OPTIONS = [
+  {
+    value: 'iot',
+    label: 'Incidence',
+    heading: 'Infection incidence over time'
   },
   { value: 'states', label: 'States', heading: 'Disease states' }
 ] as const;
@@ -144,11 +156,13 @@ const SCENARIOS: Record<
 function ChartLines({
   data,
   seriesDefs,
-  hiddenLines
+  hiddenLines,
+  yAxisLabel = 'People'
 }: {
   data: DataPoint[];
   seriesDefs: SeriesDef[];
   hiddenLines: Set<string>;
+  yAxisLabel?: string;
 }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -172,7 +186,7 @@ function ChartLines({
         />
         <YAxis
           label={{
-            value: 'People',
+            value: yAxisLabel,
             angle: -90,
             position: 'insideLeft'
           }}
@@ -293,14 +307,32 @@ function withActiveInfectionsSeries(
   });
 }
 
-function getChartSeries(data: ChartData | null, chartType: ChartType) {
+function getDataSeries(data: ChartData, key: string): DataPoint[] {
+  const series = data[key];
+  return Array.isArray(series) ? (series as DataPoint[]) : [];
+}
+
+function getChartSeries(
+  data: ChartData | null,
+  chartType: ChartType,
+  preferIncidence = false
+) {
   if (!data) {
     return [];
   }
-  if (chartType !== 'states') {
-    return data[chartType] ?? [];
+  if (preferIncidence && chartType === 'iot') {
+    const incidence = getDataSeries(data, 'incidence');
+    if (incidence.length > 0) {
+      return incidence;
+    }
   }
-  return withActiveInfectionsSeries(data.states ?? [], data.iot ?? []);
+  if (chartType !== 'states') {
+    return getDataSeries(data, chartType);
+  }
+  return withActiveInfectionsSeries(
+    getDataSeries(data, 'states'),
+    getDataSeries(data, 'iot')
+  );
 }
 
 function hasSeriesData(data: DataPoint[], key: string) {
@@ -478,7 +510,13 @@ export default function OutputGraphs({
   const hasBaseline = baselineSimId != null && baselineData != null;
   const hasDisabledPoi = disabledPoiSimId != null && disabledPoiData != null;
   const hasComparisons = hasBaseline || hasDisabledPoi;
-  const activeChart = CHART_TYPE_OPTIONS.find(
+  const selectedPoi = selected_loc?.type === 'places';
+  const chartTypeOptions = selectedPoi
+    ? POI_CHART_TYPE_OPTIONS
+    : CHART_TYPE_OPTIONS;
+  const prefersIncidenceSeries = selectedPoi && chartType === 'iot';
+  const yAxisLabel = prefersIncidenceSeries ? 'New infections' : 'People';
+  const activeChart = chartTypeOptions.find(
     (option) => option.value === chartType
   );
 
@@ -487,12 +525,16 @@ export default function OutputGraphs({
     seriesDefs: SeriesDef[];
     splitCharts: SplitChart[];
   }>(() => {
-    const primarySeries = getChartSeries(chartData, chartType);
+    const primarySeries = getChartSeries(
+      chartData,
+      chartType,
+      prefersIncidenceSeries
+    );
     const baselineSeries = hasBaseline
-      ? getChartSeries(baselineData, chartType)
+      ? getChartSeries(baselineData, chartType, prefersIncidenceSeries)
       : [];
     const disabledPoiSeries = hasDisabledPoi
-      ? getChartSeries(disabledPoiData, chartType)
+      ? getChartSeries(disabledPoiData, chartType, prefersIncidenceSeries)
       : [];
     const baseKeys = getOrderedSeriesKeys(
       [...primarySeries, ...baselineSeries, ...disabledPoiSeries],
@@ -571,7 +613,9 @@ export default function OutputGraphs({
     ];
 
     for (const comparison of comparisons) {
-      const comparisonSeries = comparison.data?.[chartType] ?? [];
+      const comparisonSeries = comparison.data
+        ? getChartSeries(comparison.data, chartType, prefersIncidenceSeries)
+        : [];
       const scenario = SCENARIOS[comparison.scenario];
       for (const point of comparisonSeries) {
         const merged = byTime.get(point.time) ?? { time: point.time };
@@ -587,7 +631,7 @@ export default function OutputGraphs({
       ...baseKeys.map((key) => ({
         key,
         metricKey: key,
-        label: key,
+        label: getMetricLabel(chartType, key),
         scenario: 'selected' as const,
         color: colorOf(key),
         strokeWidth: SCENARIOS.selected.strokeWidth
@@ -621,7 +665,8 @@ export default function OutputGraphs({
     disabledPoiData,
     hasBaseline,
     hasComparisons,
-    hasDisabledPoi
+    hasDisabledPoi,
+    prefersIncidenceSeries
   ]);
 
   const legendSeriesDefs = useMemo(() => {
@@ -680,30 +725,42 @@ export default function OutputGraphs({
               )}
             </div>
           </div>
-          <div
-            className="outputgraph_segmented"
-            role="tablist"
-            aria-label="Chart type"
-          >
-            {CHART_TYPE_OPTIONS.map((option) => (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={chartType === option.value}
-                className={
-                  chartType === option.value
-                    ? 'outputgraph_segment is-active'
-                    : 'outputgraph_segment'
-                }
-                key={option.value}
-                onClick={() => {
-                  setChartType(option.value);
-                  setLineVisibilityOverrides(new Map());
-                }}
+          <div className="outputgraph_header_actions">
+            {selected_loc && (
+              <Button
+                variant="secondary"
+                className="outputgraph_back_button"
+                onClick={onReset}
               >
-                {option.label}
-              </button>
-            ))}
+                <ArrowLeft size={16} aria-hidden="true" />
+                <span>All infection graphs</span>
+              </Button>
+            )}
+            <div
+              className="outputgraph_segmented"
+              role="tablist"
+              aria-label="Chart type"
+            >
+              {chartTypeOptions.map((option) => (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chartType === option.value}
+                  className={
+                    chartType === option.value
+                      ? 'outputgraph_segment is-active'
+                      : 'outputgraph_segment'
+                  }
+                  key={option.value}
+                  onClick={() => {
+                    setChartType(option.value);
+                    setLineVisibilityOverrides(new Map());
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         {chartError ? (
@@ -744,6 +801,7 @@ export default function OutputGraphs({
                           data={chart.data}
                           seriesDefs={chartSeriesDefs}
                           hiddenLines={hiddenLines}
+                          yAxisLabel={yAxisLabel}
                         />
                       </div>
                     </section>
@@ -756,6 +814,7 @@ export default function OutputGraphs({
                   data={mergedData}
                   seriesDefs={legendSeriesDefs}
                   hiddenLines={hiddenLines}
+                  yAxisLabel={yAxisLabel}
                 />
               </div>
             )}
@@ -767,17 +826,6 @@ export default function OutputGraphs({
           </>
         )}
       </section>
-      {selected_loc && (
-        <div className="outputgraph_reset">
-          <Button
-            variant="destructive"
-            className="px-4! py-2!"
-            onClick={onReset}
-          >
-            Reset Selection
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

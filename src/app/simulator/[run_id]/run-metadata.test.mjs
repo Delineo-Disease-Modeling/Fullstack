@@ -4,6 +4,8 @@ import {
   getDisabledPoiIdsFromMetadata,
   getInterventions,
   getModelPaths,
+  getSeedCbgIdsForRun,
+  getSeedRegionLookupQueryForRun,
   getRunSettingsFromMetadata,
   getStringArray
 } from './run-metadata.ts';
@@ -22,6 +24,82 @@ test('getDisabledPoiIdsFromMetadata is empty for non-objects / missing / non-arr
   assert.deepEqual(
     getDisabledPoiIdsFromMetadata({ disabled_poi_ids: 'a' }),
     []
+  );
+});
+
+test('getSeedCbgIdsForRun reads explicit seed CBG metadata', () => {
+  assert.deepEqual(
+    getSeedCbgIdsForRun(null, {
+      algorithm_metadata: {
+        seed_cbgs: ['401139400081', '401139400082', '401139400083']
+      }
+    }),
+    ['401139400081', '401139400082', '401139400083']
+  );
+});
+
+test('getSeedCbgIdsForRun reads saved explicit seed CBG description line', () => {
+  assert.deepEqual(
+    getSeedCbgIdsForRun(
+      {
+        description:
+          'Auto-generated\nSeed CBGs: 401139400081, 401139400082, 401139400083',
+        cbg_list: ['401139400084']
+      },
+      null
+    ),
+    ['401139400081', '401139400082', '401139400083']
+  );
+});
+
+test('getSeedCbgIdsForRun falls back to old guided seed count descriptions', () => {
+  assert.deepEqual(
+    getSeedCbgIdsForRun(
+      {
+        description: 'Seed CBG: 401139400081\nSeed region: 3 seed CBGs',
+        cbg_list: [
+          '401139400081',
+          '401139400082',
+          '401139400083',
+          '401139400084'
+        ]
+      },
+      null
+    ),
+    ['401139400081', '401139400082', '401139400083']
+  );
+});
+
+test('getSeedRegionLookupQueryForRun reads old guided seed labels', () => {
+  assert.equal(
+    getSeedRegionLookupQueryForRun(
+      {
+        description: 'Seed CBG: 401139400081\nSeed region: Pawhuska, OK'
+      },
+      null
+    ),
+    'Pawhuska, OK'
+  );
+  assert.equal(
+    getSeedRegionLookupQueryForRun(
+      {
+        description: 'Seed region: 3 seed CBGs'
+      },
+      null
+    ),
+    ''
+  );
+});
+
+test('getSeedRegionLookupQueryForRun falls back to generated location labels', () => {
+  assert.equal(
+    getSeedRegionLookupQueryForRun(
+      {
+        description: 'Location: Pawhuska, OK\nSeed CBG: 401139400081'
+      },
+      null
+    ),
+    'Pawhuska, OK'
   );
 });
 

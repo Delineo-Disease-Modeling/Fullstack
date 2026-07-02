@@ -27,6 +27,8 @@ import {
   formatRunDate,
   getDisabledPoiIdsFromMetadata,
   getRunSettingsFromMetadata,
+  getSeedCbgIdsForRun,
+  getSeedRegionLookupQueryForRun,
   RUN_VIEW_LABELS,
   type RunView,
   type SelectedLoc,
@@ -102,6 +104,9 @@ export default function SimulatorRun() {
     null
   );
   const [disabledRunError, setDisabledRunError] = useState<string | null>(null);
+  const [resolvedSeedRegionCbgIds, setResolvedSeedRegionCbgIds] = useState<
+    string[]
+  >([]);
   // Set when the user kicks off a disabled rerun, so the page auto-switches to
   // the rerouted run once its payload loads instead of leaving them on the
   // original (un-rerouted) run with a stale view.
@@ -115,6 +120,27 @@ export default function SimulatorRun() {
         : interventionSimId;
   const hasComparisonRuns = baselineId != null || disabledSimId != null;
   const activeViewLabel = RUN_VIEW_LABELS[activeView];
+  const activeRunMetadata =
+    activeView === 'disabled'
+      ? disabledPayload?.metadata
+      : activeView === 'baseline'
+        ? baselinePayload?.metadata
+        : interventionPayload?.metadata;
+  const seedCbgIds = useMemo(
+    () => getSeedCbgIdsForRun(selectedZone, activeRunMetadata),
+    [activeRunMetadata, selectedZone]
+  );
+  const seedRegionLookupQuery = useMemo(
+    () => getSeedRegionLookupQueryForRun(selectedZone, activeRunMetadata),
+    [activeRunMetadata, selectedZone]
+  );
+  const effectiveSeedCbgIds = useMemo(
+    () =>
+      resolvedSeedRegionCbgIds.length > seedCbgIds.length
+        ? resolvedSeedRegionCbgIds
+        : seedCbgIds,
+    [resolvedSeedRegionCbgIds, seedCbgIds]
+  );
 
   // Keep this run (and its baseline/disabled companions, so the comparison
   // survives) by marking them saved.
@@ -227,6 +253,42 @@ export default function SimulatorRun() {
     setDisabledCategories(new Set());
     setDisabledPoiIds(new Set(metadataDisabledIds));
   }, [disabledPayload?.metadata]);
+
+  useEffect(() => {
+    setResolvedSeedRegionCbgIds([]);
+    if (!seedRegionLookupQuery || seedCbgIds.length > 1) {
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch('/api/lookup-location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ location: seedRegionLookupQuery }),
+      signal: controller.signal
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const seedCbgs = Array.isArray(data?.seed_cbgs)
+          ? data.seed_cbgs.filter((cbg: unknown): cbg is string => {
+              return typeof cbg === 'string' && cbg.trim().length > 0;
+            })
+          : [];
+        setResolvedSeedRegionCbgIds(seedCbgs);
+      })
+      .catch((error) => {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.warn('Failed to resolve seed region CBGs:', error);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [seedCbgIds.length, seedRegionLookupQuery]);
 
   // After a disabled rerun completes and its payload loads, switch the map to
   // the rerouted run so the user sees the actual effect of disabling rather
@@ -737,6 +799,7 @@ export default function SimulatorRun() {
             key={activeSimId}
             selectedZone={selectedZone}
             simId={activeSimId}
+            seedCbgIds={effectiveSeedCbgIds}
             // Only paint POIs as disabled on the run that actually rerouted
             // them; the intervention/baseline runs still placed people there.
             disabledPoiIds={

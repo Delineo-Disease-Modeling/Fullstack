@@ -2,11 +2,11 @@ import {
   type GeoJSONData,
   getFeatureCbgId,
   normalizeCbgId
-} from '@/lib/cz-geo';
+} from '../../lib/cz-geo.ts';
 import {
   CLUSTER_ALGORITHM_OPTIONS,
   type ClusterAlgorithm
-} from './constants';
+} from './constants.ts';
 
 export function isClusterAlgorithm(
   value: unknown
@@ -22,6 +22,29 @@ export function dedupeCbgList(values: string[]) {
   return Array.from(
     new Set(values.map((value) => normalizeCbgId(value)).filter(Boolean))
   );
+}
+
+export function getMapSeedCbgIds({
+  algorithmSeedCbgs,
+  guidedSeedCbgs,
+  resolvedSeedCbgs,
+  seedCbg,
+  setupSeedCbgs
+}: {
+  algorithmSeedCbgs?: string[] | null;
+  guidedSeedCbgs?: string[] | null;
+  resolvedSeedCbgs?: string[] | null;
+  seedCbg?: string | null;
+  setupSeedCbgs?: string[] | null;
+}) {
+  const source =
+    (guidedSeedCbgs?.length ? guidedSeedCbgs : null) ??
+    (setupSeedCbgs?.length ? setupSeedCbgs : null) ??
+    (resolvedSeedCbgs?.length ? resolvedSeedCbgs : null) ??
+    (algorithmSeedCbgs?.length ? algorithmSeedCbgs : null) ??
+    (seedCbg ? [seedCbg] : []);
+
+  return dedupeCbgList(source);
 }
 
 export function sameStringArray(a: string[], b: string[]) {
@@ -99,6 +122,48 @@ export function monthFromEndDate(endDate: string): string {
   return `${prevYear.toString().padStart(4, '0')}-${prevMonth
     .toString()
     .padStart(2, '0')}`;
+}
+
+export function normalizeAvailableMonths(availableMonths: string[]) {
+  return Array.from(
+    new Set(
+      availableMonths.filter((month) => /^\d{4}-\d{2}$/.test(month))
+    )
+  ).sort();
+}
+
+export function coerceDateRangeToAvailableMonths(
+  startDate: string,
+  endDate: string,
+  availableMonths: string[]
+) {
+  const months = normalizeAvailableMonths(availableMonths);
+  if (months.length === 0) {
+    return {
+      startDate,
+      endDate,
+      changed: false
+    };
+  }
+
+  let nextStartMonth = monthFromDate(startDate);
+  if (!months.includes(nextStartMonth)) {
+    nextStartMonth = months[0];
+  }
+
+  let nextEndMonth = monthFromEndDate(endDate);
+  if (!months.includes(nextEndMonth) || nextEndMonth < nextStartMonth) {
+    nextEndMonth = nextStartMonth;
+  }
+
+  const nextStartDate = startDateFromMonth(nextStartMonth);
+  const nextEndDate = endDateFromMonth(nextEndMonth);
+
+  return {
+    startDate: nextStartDate,
+    endDate: nextEndDate,
+    changed: nextStartDate !== startDate || nextEndDate !== endDate
+  };
 }
 
 export function formatMonthLabel(month: string): string {

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchPatternAvailability } from '@/features/cz-generation/api';
+import {
+  PATTERN_AVAILABILITY_END_DATE,
+  PATTERN_AVAILABILITY_START_DATE
+} from '@/features/cz-generation/constants';
+import { normalizeAvailableMonths } from '@/features/cz-generation/helpers';
 
 export function usePatternAvailability(detectedStateAbbr: string | null) {
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
@@ -19,8 +24,8 @@ export function usePatternAvailability(detectedStateAbbr: string | null) {
     fetchPatternAvailability(
       {
         state: detectedStateAbbr,
-        startDate: '2018-01-01',
-        endDate: '2025-12-31'
+        startDate: PATTERN_AVAILABILITY_START_DATE,
+        endDate: PATTERN_AVAILABILITY_END_DATE
       },
       controller.signal
     )
@@ -29,8 +34,10 @@ export function usePatternAvailability(detectedStateAbbr: string | null) {
           return;
         }
         const months = Array.isArray(resp?.data?.available_months)
-          ? resp.data.available_months.filter(
-              (month): month is string => typeof month === 'string'
+          ? normalizeAvailableMonths(
+              resp.data.available_months.filter(
+                (month): month is string => typeof month === 'string'
+              )
             )
           : [];
         setAvailableMonths(months);

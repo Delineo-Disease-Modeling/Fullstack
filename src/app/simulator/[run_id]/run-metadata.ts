@@ -64,6 +64,176 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function normalizeCbgId(value: unknown) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  const raw = String(value).trim();
+  if (!/^\d+$/.test(raw)) {
+    return '';
+  }
+
+  return raw.length === 11 ? raw.padStart(12, '0') : raw;
+}
+
+function addSeedCbgIds(target: Set<string>, value: unknown) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      addSeedCbgIds(target, item);
+    }
+    return;
+  }
+
+  const cbgId = normalizeCbgId(value);
+  if (cbgId) {
+    target.add(cbgId);
+  }
+}
+
+function addSeedCbgIdsFromDescription(target: Set<string>, value: unknown) {
+  if (typeof value !== 'string') {
+    return;
+  }
+
+  const match = value.match(/^Seed CBGs?:\s*([0-9][0-9,\s]*)\s*$/im);
+  if (match) {
+    for (const cbgId of match[1].split(/[,\s]+/)) {
+      addSeedCbgIds(target, cbgId);
+    }
+  }
+}
+
+function getSeedCbgCountFromDescription(value: unknown) {
+  if (typeof value !== 'string') {
+    return 0;
+  }
+
+  const match = value.match(/^Seed region:\s*(\d+)\s+seed CBGs?\b/im);
+  const count = Number(match?.[1]);
+  return Number.isInteger(count) && count > 0 ? count : 0;
+}
+
+function getSeedRegionLabelFromDescription(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const match = value.match(/^Seed region:\s*(.+?)\s*$/im);
+  const label = String(match?.[1] ?? '').trim();
+  if (!label || /^\d+\s+seed CBGs?$/i.test(label)) {
+    return '';
+  }
+  return label;
+}
+
+function getLocationLabelFromDescription(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const match = value.match(/^Location:\s*(.+?)\s*$/im);
+  const label = String(match?.[1] ?? '').trim();
+  return label && label !== 'N/A' && label.toUpperCase() !== 'TEST'
+    ? label
+    : '';
+}
+
+function addSeedCbgIdsFromRecord(
+  target: Set<string>,
+  record: Record<string, unknown> | null
+) {
+  if (!record) {
+    return;
+  }
+
+  addSeedCbgIds(target, record.seed_cbg);
+  addSeedCbgIds(target, record.seed_cbgs);
+  addSeedCbgIds(target, record.seed_cbg_id);
+  addSeedCbgIds(target, record.seed_cbg_ids);
+  addSeedCbgIdsFromDescription(target, record.description);
+
+  for (const key of [
+    'algorithm_metadata',
+    'guided_metadata',
+    'zone',
+    'czone',
+    'convenience_zone'
+  ]) {
+    addSeedCbgIdsFromRecord(target, asRecord(record[key]));
+  }
+}
+
+export function getSeedCbgIdsForRun(
+  zone:
+    | {
+        description?: string | null;
+        cbg_list?: unknown[] | null;
+      }
+    | null
+    | undefined,
+  metadata: unknown
+) {
+  const seedCbgIds = new Set<string>();
+  const seedCbgCount = getSeedCbgCountFromDescription(zone?.description);
+  const addCountedZoneSeedCbgs = () => {
+    if (seedCbgCount <= 0 || seedCbgIds.size >= seedCbgCount) {
+      return;
+    }
+    for (const cbgId of zone?.cbg_list?.slice(0, seedCbgCount) ?? []) {
+      addSeedCbgIds(seedCbgIds, cbgId);
+    }
+  };
+
+  addSeedCbgIdsFromRecord(seedCbgIds, asRecord(metadata));
+  addCountedZoneSeedCbgs();
+  if (seedCbgIds.size > 0) {
+    return [...seedCbgIds];
+  }
+
+  addSeedCbgIdsFromDescription(seedCbgIds, zone?.description);
+  addCountedZoneSeedCbgs();
+  if (seedCbgIds.size > 0) {
+    return [...seedCbgIds];
+  }
+
+  addSeedCbgIds(seedCbgIds, zone?.cbg_list?.[0]);
+  return [...seedCbgIds];
+}
+
+export function getSeedRegionLookupQueryForRun(
+  zone:
+    | {
+        description?: string | null;
+      }
+    | null
+    | undefined,
+  metadata: unknown
+) {
+  const zoneLabel = getSeedRegionLabelFromDescription(zone?.description);
+  if (zoneLabel) {
+    return zoneLabel;
+  }
+
+  const zoneLocation = getLocationLabelFromDescription(zone?.description);
+  if (zoneLocation) {
+    return zoneLocation;
+  }
+
+  const metadataRecord = asRecord(metadata);
+  for (const key of ['zone', 'czone', 'convenience_zone']) {
+    const description = asRecord(metadataRecord?.[key])?.description;
+    const label =
+      getSeedRegionLabelFromDescription(description) ||
+      getLocationLabelFromDescription(description);
+    if (label) {
+      return label;
+    }
+  }
+
+  return '';
+}
+
 export function getStringArray(value: unknown) {
   if (!Array.isArray(value)) {
     return null;
