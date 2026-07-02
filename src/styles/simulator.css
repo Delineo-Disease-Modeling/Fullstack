@@ -1170,6 +1170,62 @@ div.sim_output {
   font-weight: 700;
 }
 
+.incidence_summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(61, 136, 173, 0.18);
+  border-radius: 10px;
+  background: rgba(61, 136, 173, 0.05);
+}
+
+.incidence_summary_caption {
+  margin: 0 0 2px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.incidence_summary_row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.incidence_summary_label {
+  color: var(--color-text-main);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.incidence_summary_track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.incidence_summary_fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.incidence_summary_value {
+  color: var(--color-text-main);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.incidence_summary_count {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
 .hotspot_view_toggle {
   display: inline-flex;
   overflow: hidden;

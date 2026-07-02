@@ -49,6 +49,7 @@ export default function SimulatorRun() {
   const setHotspots = useMapData((state) => state.setHotspots);
   const setTimesteps = useMapData((state) => state.setTimesteps);
   const setPoiPeaks = useMapData((state) => state.setPoiPeaks);
+  const setIncidence = useMapData((state) => state.setIncidence);
   const setRunName = useMapData((state) => state.setName);
 
   const { data: session } = useSession();
@@ -160,6 +161,7 @@ export default function SimulatorRun() {
       setHotspots(payload.hotspots ?? {});
       setTimesteps(payload.timesteps);
       setPoiPeaks(payload.poiPeaks);
+      setIncidence(payload.incidence);
       setPapData(payload.papdata);
       setActiveView(view);
     },
@@ -168,6 +170,7 @@ export default function SimulatorRun() {
       disabledPayload,
       interventionPayload,
       setHotspots,
+      setIncidence,
       setPoiPeaks,
       setPapData,
       setSimData,
@@ -251,6 +254,7 @@ export default function SimulatorRun() {
       setPapData(null);
       setTimesteps(null);
       setPoiPeaks(null);
+      setIncidence(null);
       setError(null);
       setInterventionPayload(null);
       setBaselinePayload(null);
@@ -283,6 +287,7 @@ export default function SimulatorRun() {
           papdata,
           timesteps,
           poiPeaks,
+          incidence,
           metadata
         } = (await response.json()).data;
 
@@ -300,12 +305,14 @@ export default function SimulatorRun() {
         setPapData(papdata);
         setTimesteps(timesteps);
         setPoiPeaks(poiPeaks);
+        setIncidence(incidence ?? null);
         setInterventionPayload({
           simdata: null,
           papdata,
           hotspots,
           timesteps,
           poiPeaks,
+          incidence: incidence ?? null,
           metadata
         });
 
@@ -330,6 +337,7 @@ export default function SimulatorRun() {
                 hotspots: comparisonJson.data.hotspots,
                 timesteps: comparisonJson.data.timesteps,
                 poiPeaks: comparisonJson.data.poiPeaks,
+                incidence: comparisonJson.data.incidence ?? null,
                 metadata: comparisonJson.data.metadata
               };
             }
@@ -381,6 +389,7 @@ export default function SimulatorRun() {
     router.replace,
     setHotspots,
     setPoiPeaks,
+    setIncidence,
     setPapData,
     setRunName,
     setSettings,

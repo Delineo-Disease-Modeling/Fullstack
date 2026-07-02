@@ -19,7 +19,10 @@ test('getDisabledPoiIdsFromMetadata is empty for non-objects / missing / non-arr
   assert.deepEqual(getDisabledPoiIdsFromMetadata(null), []);
   assert.deepEqual(getDisabledPoiIdsFromMetadata('x'), []);
   assert.deepEqual(getDisabledPoiIdsFromMetadata({}), []);
-  assert.deepEqual(getDisabledPoiIdsFromMetadata({ disabled_poi_ids: 'a' }), []);
+  assert.deepEqual(
+    getDisabledPoiIdsFromMetadata({ disabled_poi_ids: 'a' }),
+    []
+  );
 });
 
 test('getStringArray trims/filters and nulls on empty or non-array', () => {
@@ -57,6 +60,7 @@ const FALLBACK = {
   dmp_mode: 'off',
   model_path_by_variant: { fv: 'fallback/path' },
   initial_infected_count: 1,
+  initial_infected_ids: [],
   randseed: false,
   interventions: []
 };
@@ -82,6 +86,7 @@ test('getRunSettingsFromMetadata reads valid fields and falls back on invalid on
       dmp_mode: 'auto',
       model_path_by_variant: { a: 'pa' },
       initial_infected_count: 7,
+      initial_infected_ids: [' 10 ', '11', ''],
       randseed: true,
       interventions: [intervention]
     },
@@ -92,6 +97,7 @@ test('getRunSettingsFromMetadata reads valid fields and falls back on invalid on
   assert.equal(out.dmp_mode, 'auto');
   assert.deepEqual(out.model_path_by_variant, { a: 'pa' });
   assert.equal(out.initial_infected_count, 7);
+  assert.deepEqual(out.initial_infected_ids, ['10', '11']);
   assert.equal(out.randseed, true);
   assert.deepEqual(out.interventions, [intervention]);
 });

@@ -191,19 +191,19 @@ export default function ComparisonSummary({
           ]
         },
         {
-          title: 'Total infected',
+          title: 'New infections',
           rows: [
             {
               label: referenceLabel,
-              value: countFmt(data.reference.totalInfected),
+              value: countFmt(data.reference.newInfections),
               delta: null
             },
             ...data.scenarios.map((s) => ({
               label: s.label,
-              value: countFmt(s.stats.totalInfected),
+              value: countFmt(s.stats.newInfections),
               delta: lowerIsBetterDelta(
-                data.reference.totalInfected,
-                s.stats.totalInfected
+                data.reference.newInfections,
+                s.stats.newInfections
               )
             }))
           ]

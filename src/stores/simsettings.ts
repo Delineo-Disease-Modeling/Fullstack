@@ -37,6 +37,7 @@ export type SimSettings = {
   randseed: boolean;
   usecache: boolean;
   initial_infected_count: number;
+  initial_infected_ids: string[];
   disease_name: string;
   variants: string[];
   dmp_mode: DmpMode;
@@ -78,6 +79,7 @@ const default_settings: SimSettings = {
   randseed: true,
   usecache: true,
   initial_infected_count: 1,
+  initial_infected_ids: [],
   disease_name: 'COVID-19',
   variants: ['Delta'],
   dmp_mode: 'auto',

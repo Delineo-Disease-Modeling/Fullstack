@@ -8,6 +8,10 @@ const CACHE_LIMIT = 4;
 export type MapCacheFrame = {
   h: number[];
   p: number[];
+  // Cumulative infection incidence emitted by the engine: home total (hinc)
+  // and per-place counts (pinc, places order). Absent on older/non-engine runs.
+  hinc?: number;
+  pinc?: number[];
 };
 
 export type PoiPeak = {
@@ -16,6 +20,12 @@ export type PoiPeak = {
 };
 
 export type PoiPeaks = Record<string, PoiPeak>;
+
+// Run-level incidence: where infection actually happened (home vs each POI).
+export type RunIncidence = {
+  home: number;
+  places: Record<string, number>;
+};
 
 type FrameIndex = {
   key: string;
@@ -29,6 +39,7 @@ export type MapCacheManifest = {
   hotspots: Record<string, number[]>;
   timesteps: number[];
   poiPeaks: PoiPeaks;
+  incidence: RunIncidence | null;
 };
 
 type CachedManifest = MapCacheManifest & {
@@ -151,6 +162,42 @@ function updatePoiPeaks(
   }
 }
 
+type IncidenceAccumulator = {
+  home: number;
+  places: Record<string, number>;
+  seen: boolean;
+};
+
+// Incidence is cumulative and monotonic, so the final frame holds the totals;
+// element-wise max across frames is robust to any frame gaps or ordering.
+function updateIncidence(
+  acc: IncidenceAccumulator,
+  places: unknown[],
+  frame: MapCacheFrame
+) {
+  const hasHome = typeof frame.hinc === 'number';
+  const pinc = frame.pinc;
+  if (!hasHome && !Array.isArray(pinc)) {
+    return;
+  }
+  acc.seen = true;
+  if (hasHome && (frame.hinc as number) > acc.home) {
+    acc.home = frame.hinc as number;
+  }
+  if (Array.isArray(pinc)) {
+    for (let index = 0; index < places.length; index += 1) {
+      const value = toNonNegativeCount(pinc[index]);
+      if (value === 0) {
+        continue;
+      }
+      const placeId = getPlaceId(places[index], index);
+      if (value > (acc.places[placeId] ?? 0)) {
+        acc.places[placeId] = value;
+      }
+    }
+  }
+}
+
 async function buildManifest(filePath: string, mtimeMs: number, size: number) {
   const raw = await readFile(filePath, 'utf8');
   const papdataIndex = raw.indexOf(PAPDATA_MARKER);
@@ -180,6 +227,11 @@ async function buildManifest(filePath: string, mtimeMs: number, size: number) {
   const frames: FrameIndex[] = [];
   const timesteps: number[] = [];
   const poiPeaks: PoiPeaks = {};
+  const incidenceAcc: IncidenceAccumulator = {
+    home: 0,
+    places: {},
+    seen: false
+  };
   const simdataContentByteStart = Buffer.byteLength(
     raw.slice(0, simdataContentStart),
     'utf8'
@@ -212,21 +264,26 @@ async function buildManifest(filePath: string, mtimeMs: number, size: number) {
       const byteLength = valueEnd - valueStart;
       frames.push({ key, time, byteStart, byteLength });
       timesteps.push(time);
-      updatePoiPeaks(
-        poiPeaks,
-        places,
-        JSON.parse(raw.slice(valueStart, valueEnd)) as MapCacheFrame
-      );
+      const parsedFrame = JSON.parse(
+        raw.slice(valueStart, valueEnd)
+      ) as MapCacheFrame;
+      updatePoiPeaks(poiPeaks, places, parsedFrame);
+      updateIncidence(incidenceAcc, places, parsedFrame);
     }
 
     position = valueEnd;
   }
+
+  const incidence: RunIncidence | null = incidenceAcc.seen
+    ? { home: incidenceAcc.home, places: incidenceAcc.places }
+    : null;
 
   const manifest = {
     papdata,
     hotspots,
     timesteps,
     poiPeaks,
+    incidence,
     frames,
     mtimeMs,
     size,
@@ -276,9 +333,9 @@ function findNearestFrame(frames: FrameIndex[], requestedTime: number) {
 export async function loadMapCacheManifest(
   filePath: string
 ): Promise<MapCacheManifest> {
-  const { papdata, hotspots, timesteps, poiPeaks } =
+  const { papdata, hotspots, timesteps, poiPeaks, incidence } =
     await getCachedManifest(filePath);
-  return { papdata, hotspots, timesteps, poiPeaks };
+  return { papdata, hotspots, timesteps, poiPeaks, incidence };
 }
 
 export async function loadMapCacheFrame(

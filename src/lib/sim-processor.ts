@@ -210,14 +210,25 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     let tStage = nowMs();
     let homesArray: number[];
     let placesArray: number[];
+    // Engine-only cumulative incidence (home total + per-place); carried
+    // through to the map cache so the frontend can split home vs POI.
+    let homeIncidence: number | undefined;
+    let placeIncidence: number[] | undefined;
     const numericPattern = Array.isArray(
       (pvalue as unknown as { h?: unknown }).h
     );
 
     if (numericPattern) {
-      const np = pvalue as unknown as { h: number[]; p: number[] };
+      const np = pvalue as unknown as {
+        h: number[];
+        p: number[];
+        hinc?: number;
+        pinc?: number[];
+      };
       homesArray = np.h;
       placesArray = np.p;
+      homeIncidence = np.hinc;
+      placeIncidence = np.pinc;
       // Hotspot tracking from the numeric places array (inf at index 2*i+1).
       for (let i = 0; i < placeIds.length; i++) {
         const id = placeIds[i];
@@ -282,9 +293,16 @@ export async function processSimulation(opts: ProcessOpts): Promise<ChartData> {
     tStage = nowMs();
     if (!first) cacheParts.push(',');
     first = false;
-    cacheParts.push(
-      `"${skey}":${JSON.stringify({ h: homesArray, p: placesArray })}`
-    );
+    const framePayload =
+      homeIncidence !== undefined || placeIncidence !== undefined
+        ? {
+            h: homesArray,
+            p: placesArray,
+            hinc: homeIncidence ?? 0,
+            pinc: placeIncidence ?? []
+          }
+        : { h: homesArray, p: placesArray };
+    cacheParts.push(`"${skey}":${JSON.stringify(framePayload)}`);
     accum('processSimulation/cache_parts_push', tStage);
 
     // === GLOBAL STATS: per-timestep aggregation ===
