@@ -36,6 +36,21 @@ const COLORS = [
 
 const BASELINE_SUFFIX = ' (baseline)';
 const DISABLED_POI_SUFFIX = ' (disabled POIs)';
+const DEFAULT_HIDDEN_STATE_METRICS = new Set([
+  'Infectious',
+  'Susceptible',
+  'Symptomatic'
+]);
+
+const SERIES_COLORS: Record<string, string> = {
+  Removed: '#e8485a',
+  Infected: '#3d88ad',
+  Recovered: '#2f9e44',
+  Infectious: '#8b5cf6',
+  Susceptible: '#c58f55',
+  Symptomatic: '#0891b2',
+  Hospitalized: '#111827'
+};
 
 const CHART_TYPE_OPTIONS = [
   {
@@ -224,6 +239,13 @@ function getPlottedSeriesDefs(data: DataPoint[], seriesDefs: SeriesDef[]) {
   return seriesDefs.filter((series) => hasSeriesData(data, series.key));
 }
 
+function isDefaultHiddenSeries(chartType: ChartType, series: SeriesDef) {
+  return (
+    chartType === 'states' &&
+    DEFAULT_HIDDEN_STATE_METRICS.has(series.metricKey)
+  );
+}
+
 function lineSampleStyle(color: string): CSSProperties {
   return { '--series-color': color } as CSSProperties;
 }
@@ -303,19 +325,9 @@ export default function OutputGraphs({
   );
   const [chartError, setChartError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
-
-  const handleLegendToggle = useCallback((key: string) => {
-    setHiddenLines((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }, []);
+  const [lineVisibilityOverrides, setLineVisibilityOverrides] = useState<
+    Map<string, boolean>
+  >(new Map());
 
   useEffect(() => {
     setChartData(null);
@@ -323,6 +335,7 @@ export default function OutputGraphs({
     setDisabledPoiData(null);
     setChartError(null);
     setProcessing(false);
+    setLineVisibilityOverrides(new Map());
 
     if (simId == null) {
       return;
@@ -362,7 +375,6 @@ export default function OutputGraphs({
         );
         if (signal.aborted) return;
         setProcessing(false);
-        setHiddenLines(new Set());
         setChartData(primary);
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
@@ -411,7 +423,10 @@ export default function OutputGraphs({
       ...disabledPoiSeries
     ]);
     const colorByKey = new Map(
-      baseKeys.map((key, index) => [key, COLORS[index % COLORS.length]])
+      baseKeys.map((key, index) => [
+        key,
+        SERIES_COLORS[key] ?? COLORS[index % COLORS.length]
+      ])
     );
     const colorOf = (key: string) => colorByKey.get(key) ?? COLORS[0];
     const selectedSeriesDefs = baseKeys.map((key) => ({
@@ -541,6 +556,29 @@ export default function OutputGraphs({
     return getPlottedSeriesDefs(mergedData, seriesDefs);
   }, [mergedData, seriesDefs, splitCharts]);
 
+  const hiddenLines = useMemo(() => {
+    const next = new Set<string>();
+    for (const series of legendSeriesDefs) {
+      const override = lineVisibilityOverrides.get(series.key);
+      const visible = override ?? !isDefaultHiddenSeries(chartType, series);
+      if (!visible) {
+        next.add(series.key);
+      }
+    }
+    return next;
+  }, [chartType, legendSeriesDefs, lineVisibilityOverrides]);
+
+  const handleLegendToggle = useCallback(
+    (key: string) => {
+      setLineVisibilityOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(key, hiddenLines.has(key));
+        return next;
+      });
+    },
+    [hiddenLines]
+  );
+
   return (
     <div className="outputgraphs_container">
       <section className="outputgraph_chart">
@@ -582,7 +620,7 @@ export default function OutputGraphs({
                 key={option.value}
                 onClick={() => {
                   setChartType(option.value);
-                  setHiddenLines(new Set());
+                  setLineVisibilityOverrides(new Map());
                 }}
               >
                 {option.label}
