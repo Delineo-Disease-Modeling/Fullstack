@@ -83,6 +83,10 @@ export function endDateFromMonth(month: string): string {
     .padStart(2, '0')}-01`;
 }
 
+export function dateOnlyToUtcIso(dateStr: string): string {
+  return `${dateStr}T00:00:00.000Z`;
+}
+
 export function monthFromEndDate(endDate: string): string {
   const [yStr, mStr] = endDate.split('-');
   const y = Number(yStr);
@@ -113,12 +117,12 @@ export function formatMonthLabel(month: string): string {
 }
 
 export function getLengthHours(startDate: string, endDate: string) {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+  const start = Date.parse(dateOnlyToUtcIso(startDate));
+  const end = Date.parse(dateOnlyToUtcIso(endDate));
+  if (Number.isNaN(start) || Number.isNaN(end)) {
     return null;
   }
-  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
+  return Math.ceil((end - start) / (1000 * 60 * 60));
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

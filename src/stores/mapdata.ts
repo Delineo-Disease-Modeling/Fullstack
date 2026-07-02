@@ -38,6 +38,15 @@ export type PoiPeaks = Record<
   }
 >;
 
+// Cumulative infection incidence attributed to WHERE transmission happened
+// (from the engine): a home total plus per-place counts (keyed by place id).
+// Distinct from PoiPeaks, which is peak infected *present*. Null for old or
+// non-engine runs that never emitted it.
+export type RunIncidence = {
+  home: number;
+  places: Record<string, number>;
+};
+
 interface MapDataStore {
   name: string;
   simdata: SimData | null;
@@ -45,6 +54,7 @@ interface MapDataStore {
   hotspots: { [key: string]: number[] } | null;
   timesteps: number[] | null;
   poiPeaks: PoiPeaks | null;
+  incidence: RunIncidence | null;
 
   setName: (name: string) => void;
   setSimData: (simdata: SimData | null) => void;
@@ -52,6 +62,7 @@ interface MapDataStore {
   setHotspots: (hotspots: { [key: string]: number[] }) => void;
   setTimesteps: (timesteps: number[] | null) => void;
   setPoiPeaks: (poiPeaks: PoiPeaks | null) => void;
+  setIncidence: (incidence: RunIncidence | null) => void;
 }
 
 // Cap how many on-demand map frames the store retains. Frames stream in during
@@ -68,6 +79,7 @@ const useMapData = create<MapDataStore>((set) => ({
   hotspots: null,
   timesteps: null,
   poiPeaks: null,
+  incidence: null,
 
   setName: (name) => {
     set({ name });
@@ -75,7 +87,13 @@ const useMapData = create<MapDataStore>((set) => ({
 
   setSimData: (newSimData) => {
     if (newSimData === null) {
-      set({ simdata: null, hotspots: null, timesteps: null, poiPeaks: null });
+      set({
+        simdata: null,
+        hotspots: null,
+        timesteps: null,
+        poiPeaks: null,
+        incidence: null
+      });
       return;
     }
     set((state) => {
@@ -129,6 +147,10 @@ const useMapData = create<MapDataStore>((set) => ({
 
   setPoiPeaks: (poiPeaks) => {
     set({ poiPeaks });
+  },
+
+  setIncidence: (incidence) => {
+    set({ incidence });
   }
 }));
 

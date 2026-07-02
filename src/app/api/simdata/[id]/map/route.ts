@@ -90,7 +90,8 @@ export async function GET(
           papdata: manifest.papdata,
           hotspots: manifest.hotspots,
           timesteps: manifest.timesteps,
-          poiPeaks: manifest.poiPeaks
+          poiPeaks: manifest.poiPeaks,
+          incidence: manifest.incidence
         }
       },
       { headers: { 'Cache-Control': 'private, max-age=30' } }

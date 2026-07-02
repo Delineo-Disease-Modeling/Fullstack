@@ -24,6 +24,19 @@ const square = {
   ]
 };
 
+const shiftedSquare = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [2, 0],
+      [3, 0],
+      [3, 1],
+      [2, 1],
+      [2, 0]
+    ]
+  ]
+};
+
 test('summarizeGeometry returns area and centroid for a polygon footprint', () => {
   const summary = summarizeGeometry(square, 1);
 
@@ -256,6 +269,61 @@ test('makePeopleDotGeoJSON suppresses dots at disabled POIs', () => {
   assert.equal(data.features.length, 0);
 });
 
+test('makePeopleDotGeoJSON masks enabled dots inside disabled footprints', () => {
+  resetModelMapLayoutCaches();
+
+  const data = makePeopleDotGeoJSON(
+    [
+      {
+        type: 'places',
+        id: 'enabled-overlap',
+        latitude: 0.5,
+        longitude: 0.5,
+        label: 'Enabled Same Building',
+        footprint: square,
+        icon: '🏢',
+        population: 3,
+        infected: 0
+      },
+      {
+        type: 'places',
+        id: 'enabled-outside',
+        latitude: 0.5,
+        longitude: 2.5,
+        label: 'Enabled Outside',
+        footprint: shiftedSquare,
+        icon: '🏢',
+        population: 2,
+        infected: 0
+      },
+      {
+        type: 'places',
+        id: 'disabled',
+        latitude: 0.5,
+        longitude: 0.5,
+        label: 'Disabled',
+        footprint: square,
+        icon: '🏢',
+        population: 0,
+        infected: 0,
+        disabled: true
+      }
+    ],
+    'population'
+  );
+
+  assert.equal(data.features.length, 2);
+  assert.deepEqual(
+    [...new Set(data.features.map((feature) => feature.properties.loc_id))],
+    ['enabled-outside']
+  );
+  for (const feature of data.features) {
+    const [lng, lat] = feature.geometry.coordinates;
+    assert.equal(pointInGeometry(lng, lat, shiftedSquare), true);
+    assert.equal(pointInGeometry(lng, lat, square), false);
+  }
+});
+
 test('makePersonStatusDotGeoJSON suppresses dots at disabled POIs', () => {
   const pois = [
     {
@@ -294,6 +362,89 @@ test('makePersonStatusDotGeoJSON suppresses dots at disabled POIs', () => {
 
   // Disabled POI: no person dots emitted (visitors were rerouted away).
   assert.equal(result.features.length, 0);
+});
+
+test('makePersonStatusDotGeoJSON masks enabled dots inside disabled footprints', () => {
+  resetModelMapLayoutCaches();
+
+  const pois = [
+    {
+      type: 'places',
+      id: 'enabled-overlap',
+      latitude: 0.5,
+      longitude: 0.5,
+      label: 'Enabled Same Building',
+      footprint: square,
+      icon: '🏢',
+      population: 2,
+      infected: 1
+    },
+    {
+      type: 'places',
+      id: 'enabled-outside',
+      latitude: 0.5,
+      longitude: 2.5,
+      label: 'Enabled Outside',
+      footprint: shiftedSquare,
+      icon: '🏢',
+      population: 1,
+      infected: 0
+    },
+    {
+      type: 'places',
+      id: 'disabled',
+      latitude: 0.5,
+      longitude: 0.5,
+      label: 'Disabled',
+      footprint: square,
+      icon: '🏢',
+      population: 0,
+      infected: 0,
+      disabled: true
+    }
+  ];
+  const peopleMap = {
+    time: 60,
+    requested_time: 60,
+    total_people: 3,
+    returned_people: 3,
+    sample_rate: 1,
+    locations: [
+      {
+        type: 'places',
+        id: 'enabled-overlap',
+        people: [
+          {
+            id: 'a',
+            infected: false,
+            newly_infected: false,
+            recovered: false
+          },
+          { id: 'b', infected: true, newly_infected: true, recovered: false }
+        ]
+      },
+      {
+        type: 'places',
+        id: 'enabled-outside',
+        people: [
+          {
+            id: 'c',
+            infected: false,
+            newly_infected: false,
+            recovered: false
+          }
+        ]
+      }
+    ]
+  };
+
+  const result = makePersonStatusDotGeoJSON(pois, peopleMap);
+
+  assert.equal(result.features.length, 1);
+  assert.equal(result.features[0].properties.loc_id, 'enabled-outside');
+  const [lng, lat] = result.features[0].geometry.coordinates;
+  assert.equal(pointInGeometry(lng, lat, shiftedSquare), true);
+  assert.equal(pointInGeometry(lng, lat, square), false);
 });
 
 test('makePoiFootprintGeoJSON exposes only place footprints', () => {

@@ -17,6 +17,7 @@ export type SimulationRequestBody = Omit<SimSettings, 'compareBaseline'> & {
   state: string;
   location: string;
   initial_infected_count: number;
+  initial_infected_ids: string[];
   disease_name: string;
   variants: string[];
   dmp_mode: DmpMode;
@@ -77,7 +78,9 @@ export async function buildSimulationRequest(
     .map((variant) => variant.trim())
     .filter(Boolean);
 
-  const matrixCsvByVariant = await fetchMatrixCsvByVariant(settings.matrix_by_variant);
+  const matrixCsvByVariant = await fetchMatrixCsvByVariant(
+    settings.matrix_by_variant
+  );
 
   // compareBaseline is a client-only UI flag; keep it out of the sim payload.
   const { compareBaseline: _compareBaseline, ...settingsForBody } = settings;

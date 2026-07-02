@@ -15,6 +15,9 @@ type PoiStat = {
   category: string;
   peakInfected: number;
   popAtPeak: number;
+  // Cumulative infections that actually happened at this POI (true incidence).
+  // 0 when the run predates incidence tracking; ranking then falls back to peak.
+  incidence: number;
 };
 
 type RankRow = {
@@ -50,6 +53,52 @@ function truncate(label: string) {
 
 function formatPoiCount(count: number) {
   return `${count.toLocaleString()} POI${count === 1 ? '' : 's'}`;
+}
+
+// Home vs POI split of where transmission actually occurred (true incidence).
+// In reality most transmission happens at home; this surfaces that split, which
+// the peak infected-present ranking cannot show (everyone is home at night).
+function HomeVsPoiSummary({ home, poi }: { home: number; poi: number }) {
+  const total = home + poi;
+  if (total <= 0) return null;
+
+  const rows = [
+    { key: 'home', label: 'At home', value: home, color: 'var(--color-primary-blue)' },
+    { key: 'poi', label: 'At POIs', value: poi, color: 'var(--color-text-muted)' }
+  ];
+
+  return (
+    <div className="incidence_summary">
+      <p className="incidence_summary_caption">
+        Of {total.toLocaleString()} infection{total === 1 ? '' : 's'}, where
+        transmission actually happened:
+      </p>
+      {rows.map((row) => {
+        const pct = Math.round((row.value / total) * 100);
+        return (
+          <div key={row.key} className="incidence_summary_row">
+            <span className="incidence_summary_label">{row.label}</span>
+            <div
+              className="incidence_summary_track"
+              role="img"
+              aria-label={`${row.label}: ${pct} percent`}
+            >
+              <div
+                className="incidence_summary_fill"
+                style={{ width: `${pct}%`, backgroundColor: row.color }}
+              />
+            </div>
+            <span className="incidence_summary_value">
+              {pct}%{' '}
+              <span className="incidence_summary_count">
+                ({row.value.toLocaleString()})
+              </span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function HotspotSwitch({
@@ -124,12 +173,14 @@ function RankingViewToggle({
 
 function RankingTable({
   rows,
+  valueLabel,
   isDisabled,
   onToggle,
   onSelectRow,
   getDetail
 }: {
   rows: RankRow[];
+  valueLabel: string;
   isDisabled: (row: RankRow) => boolean;
   onToggle?: (row: RankRow) => void;
   onSelectRow?: (row: RankRow) => void;
@@ -143,7 +194,7 @@ function RankingTable({
         <span>#</span>
         <span className="sr-only">Disable</span>
         <span>Hotspot</span>
-        <span className="hotspot_table_header_peak">Peak</span>
+        <span className="hotspot_table_header_peak">{valueLabel}</span>
       </div>
       {rows.length === 0 ? (
         <div className="hotspot_empty">No infections recorded.</div>
@@ -228,65 +279,78 @@ export default function PoiRankings({
   const simdata = useMapData((s) => s.simdata);
   const papdata = useMapData((s) => s.papdata);
   const poiPeaks = useMapData((s) => s.poiPeaks);
+  const incidence = useMapData((s) => s.incidence);
+
+  // Incidence = where infection actually happened (the honest hotspot metric).
+  // When present we rank by it; older runs without it fall back to peak
+  // infected-present.
+  const useIncidence = incidence != null;
 
   const poiStats = useMemo<PoiStat[]>(() => {
-    if (!papdata?.places?.length || (!poiPeaks && !simdata)) return [];
-    const places = papdata.places;
-
-    if (poiPeaks) {
-      return places.map((place) => {
-        const peak = poiPeaks[String(place.id)];
-        return {
-          id: String(place.id),
-          label: place.label || `Place #${place.id}`,
-          category: place.top_category || 'Uncategorized',
-          peakInfected: peak?.infected ?? 0,
-          popAtPeak: peak?.population ?? 0
-        };
-      });
+    if (!papdata?.places?.length || (!poiPeaks && !simdata && !incidence)) {
+      return [];
     }
+    const places = papdata.places;
+    const placeIncidence = incidence?.places ?? {};
 
-    if (!simdata) return [];
-
+    // Peak infected-present per place, from the precomputed peaks if available,
+    // else scanned from the frames the store currently holds.
     const count = places.length;
     const peak = new Array<number>(count).fill(0);
     const popAtPeak = new Array<number>(count).fill(0);
 
-    for (const frame of Object.values(simdata)) {
-      const placeStats = frame?.p;
-      if (!placeStats) continue;
-      for (let index = 0; index < count; index += 1) {
-        const infected = placeStats[index * 2 + 1] ?? 0;
-        if (infected > peak[index]) {
-          peak[index] = infected;
-          popAtPeak[index] = placeStats[index * 2] ?? 0;
+    if (poiPeaks) {
+      places.forEach((place, index) => {
+        const p = poiPeaks[String(place.id)];
+        peak[index] = p?.infected ?? 0;
+        popAtPeak[index] = p?.population ?? 0;
+      });
+    } else if (simdata) {
+      for (const frame of Object.values(simdata)) {
+        const placeStats = frame?.p;
+        if (!placeStats) continue;
+        for (let index = 0; index < count; index += 1) {
+          const infected = placeStats[index * 2 + 1] ?? 0;
+          if (infected > peak[index]) {
+            peak[index] = infected;
+            popAtPeak[index] = placeStats[index * 2] ?? 0;
+          }
         }
       }
     }
 
-    return places.map((place, index) => ({
-      id: String(place.id),
-      label: place.label || `Place #${place.id}`,
-      category: place.top_category || 'Uncategorized',
-      peakInfected: peak[index],
-      popAtPeak: popAtPeak[index]
-    }));
-  }, [simdata, papdata, poiPeaks]);
+    return places.map((place, index) => {
+      const id = String(place.id);
+      return {
+        id,
+        label: place.label || `Place #${place.id}`,
+        category: place.top_category || 'Uncategorized',
+        peakInfected: peak[index],
+        popAtPeak: popAtPeak[index],
+        incidence: placeIncidence[id] ?? 0
+      };
+    });
+  }, [simdata, papdata, poiPeaks, incidence]);
+
+  const rankValue = useMemo(
+    () => (stat: PoiStat) => (useIncidence ? stat.incidence : stat.peakInfected),
+    [useIncidence]
+  );
 
   const poiRows = useMemo<RankRow[]>(() => {
     return poiStats
-      .filter((stat) => stat.peakInfected > 0)
-      .sort((left, right) => right.peakInfected - left.peakInfected)
+      .filter((stat) => rankValue(stat) > 0)
+      .sort((left, right) => rankValue(right) - rankValue(left))
       .slice(0, TOP_N)
       .map((stat) => ({
         id: stat.id,
         fullLabel: stat.label,
         label: truncate(stat.label),
-        value: stat.peakInfected,
-        infected: stat.peakInfected,
+        value: rankValue(stat),
+        infected: rankValue(stat),
         population: stat.popAtPeak
       }));
-  }, [poiStats]);
+  }, [poiStats, rankValue]);
 
   const typeRows = useMemo<RankRow[]>(() => {
     const byCategory = new Map<
@@ -306,7 +370,7 @@ export default function PoiRankings({
         poiCount: 0,
         poiIds: []
       };
-      aggregate.infected += stat.peakInfected;
+      aggregate.infected += rankValue(stat);
       aggregate.population += stat.popAtPeak;
       aggregate.poiCount += 1;
       aggregate.poiIds.push(stat.id);
@@ -327,15 +391,28 @@ export default function PoiRankings({
       .filter((row) => row.infected > 0)
       .sort((left, right) => right.value - left.value)
       .slice(0, TOP_N);
-  }, [poiStats]);
+  }, [poiStats, rankValue]);
+
+  const poiIncidenceTotal = useMemo(() => {
+    if (!incidence) return 0;
+    let sum = 0;
+    for (const value of Object.values(incidence.places)) {
+      sum += value;
+    }
+    return sum;
+  }, [incidence]);
 
   if (poiStats.length === 0) return null;
 
   const activeRows = activeView === 'pois' ? poiRows : typeRows;
-  const activeTitle =
-    activeView === 'pois'
+  const activeTitle = useIncidence
+    ? activeView === 'pois'
+      ? 'Where infections happened (POIs)'
+      : 'Where infections happened (POI types)'
+    : activeView === 'pois'
       ? 'Most infectious POIs'
       : 'Most infectious POI types';
+  const valueLabel = useIncidence ? 'Caught' : 'Peak';
   const activeIsDisabled =
     activeView === 'pois'
       ? (row: RankRow) => disabledPoiIds.has(row.id)
@@ -357,8 +434,13 @@ export default function PoiRankings({
             type: 'places'
           })
       : undefined;
-  const activeDetail =
-    activeView === 'pois'
+  const activeDetail = useIncidence
+    ? activeView === 'pois'
+      ? (row: RankRow) =>
+          `${row.value.toLocaleString()} infected here · ${row.population.toLocaleString()} present at peak`
+      : (row: RankRow) =>
+          `${formatPoiCount(row.poiCount ?? 0)} · ${row.value.toLocaleString()} infected`
+    : activeView === 'pois'
       ? (row: RankRow) => `${row.population.toLocaleString()} present at peak`
       : (row: RankRow) =>
           `${formatPoiCount(row.poiCount ?? 0)}, ${row.population.toLocaleString()} present at peaks`;
@@ -378,9 +460,16 @@ export default function PoiRankings({
         />
       </div>
       <div className="poi_rankings_body">
+        {useIncidence && (
+          <HomeVsPoiSummary
+            home={incidence?.home ?? 0}
+            poi={poiIncidenceTotal}
+          />
+        )}
         <h3 className="poi_rankings_subtitle">{activeTitle}</h3>
         <RankingTable
           rows={activeRows}
+          valueLabel={valueLabel}
           isDisabled={activeIsDisabled}
           onToggle={activeToggle}
           onSelectRow={activeSelect}

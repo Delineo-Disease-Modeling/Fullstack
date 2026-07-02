@@ -2,9 +2,11 @@
 // per-person status dots, POI footprints, and POI markers. Dot layouts are
 // memoized in the shared `layoutCaches` (place-dot and person-dot caches).
 import {
+  getGeometryPoints,
   halton,
   hashString,
   hashUnit,
+  pointInGeometry,
   samplePointsInFootprint
 } from './map-geometry.ts';
 import { layoutCaches } from './map-layout-caches.ts';
@@ -32,6 +34,68 @@ const NO_FOOTPRINT_DOT_JITTER_DEGREES = 0.00025;
 // Cap on how much the no-footprint disk grows with occupancy (radius scales with
 // sqrt(count)); keeps even busy footprint-less POIs from spraying too far.
 const NO_FOOTPRINT_DISK_MAX_GROWTH = 3;
+
+type DisabledFootprintMask = {
+  geometry: GeoJSONPolygonGeometry;
+  minLng: number;
+  maxLng: number;
+  minLat: number;
+  maxLat: number;
+};
+
+function buildDisabledFootprintMasks(pois: MapPoi[]) {
+  const masks: DisabledFootprintMask[] = [];
+
+  for (const poi of pois) {
+    const footprint = poi.footprint;
+    if (
+      poi.type !== 'places' ||
+      !poi.disabled ||
+      !isFootprintGeometry(footprint)
+    ) {
+      continue;
+    }
+
+    const points = getGeometryPoints(footprint);
+    if (!points.length) continue;
+
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    for (const [lng, lat] of points) {
+      minLng = Math.min(minLng, lng);
+      maxLng = Math.max(maxLng, lng);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    }
+
+    masks.push({ geometry: footprint, minLng, maxLng, minLat, maxLat });
+  }
+
+  return masks;
+}
+
+function isInsideDisabledFootprint(
+  lng: number,
+  lat: number,
+  masks: DisabledFootprintMask[]
+) {
+  for (const mask of masks) {
+    if (
+      lng < mask.minLng ||
+      lng > mask.maxLng ||
+      lat < mask.minLat ||
+      lat > mask.maxLat
+    ) {
+      continue;
+    }
+    if (pointInGeometry(lng, lat, mask.geometry)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function computeDiskLayout(
   centerLat: number,
@@ -73,6 +137,7 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
   }, 0);
   const peoplePerDot = Math.max(1, Math.ceil(totalPeople / MAX_PERSON_DOTS));
 
+  const disabledFootprintMasks = buildDisabledFootprintMasks(pois);
   const features: PeopleDotFeature[] = [];
   let reachedCap = false;
 
@@ -139,6 +204,10 @@ export function makePeopleDotGeoJSON(pois: MapPoi[], mode: string) {
         lng = poi.longitude + Math.cos(angle) * radius;
       }
 
+      if (isInsideDisabledFootprint(lng, lat, disabledFootprintMasks)) {
+        continue;
+      }
+
       features.push({
         type: 'Feature',
         properties: {
@@ -180,6 +249,7 @@ export function makePersonStatusDotGeoJSON(
     poiByKey.set(`${poi.type}:${poi.id}`, poi);
   }
 
+  const disabledFootprintMasks = buildDisabledFootprintMasks(pois);
   const features: PersonStatusDotFeature[] = [];
   for (const location of peopleMapData.locations) {
     const poi = poiByKey.get(`${location.type}:${location.id}`);
@@ -235,6 +305,15 @@ export function makePersonStatusDotGeoJSON(
       const person = sortedPeople[index];
       const slot = positions[index];
       const coordinates: Coordinate = slot ?? [poi.longitude, poi.latitude];
+      if (
+        isInsideDisabledFootprint(
+          coordinates[0],
+          coordinates[1],
+          disabledFootprintMasks
+        )
+      ) {
+        continue;
+      }
 
       features.push({
         type: 'Feature',

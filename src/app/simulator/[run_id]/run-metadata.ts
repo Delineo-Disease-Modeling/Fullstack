@@ -1,7 +1,12 @@
 // Pure helpers + types for the simulator run page: parsing the (untrusted) run
 // metadata blob, run-view labels, and date formatting. No React and no runtime
 // imports (types only), so this stays unit-testable in isolation via node:test.
-import type { PapData, PoiPeaks, SimData } from '@/stores/mapdata';
+import type {
+  PapData,
+  PoiPeaks,
+  RunIncidence,
+  SimData
+} from '@/stores/mapdata';
 import type { SimSettings as SimSettingsState } from '@/stores/simsettings';
 
 export interface SelectedLoc {
@@ -18,6 +23,7 @@ export interface SimRunData {
   hotspots: { [key: string]: number[] } | null;
   timesteps: number[] | null;
   poiPeaks: PoiPeaks | null;
+  incidence: RunIncidence | null;
   metadata?: unknown;
 }
 
@@ -128,6 +134,9 @@ export function getRunSettingsFromMetadata(
       typeof record.initial_infected_count === 'number'
         ? record.initial_infected_count
         : fallback.initial_infected_count,
+    initial_infected_ids:
+      getStringArray(record.initial_infected_ids) ??
+      fallback.initial_infected_ids,
     randseed:
       typeof record.randseed === 'boolean'
         ? record.randseed

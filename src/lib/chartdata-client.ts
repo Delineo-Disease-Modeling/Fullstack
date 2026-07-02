@@ -34,7 +34,10 @@ export async function fetchChartData(
   signal?: AbortSignal,
   onProcessing?: () => void
 ): Promise<ChartData> {
-  const url = new URL(`/api/simdata/${simId}/chartdata`, window.location.origin);
+  const url = new URL(
+    `/api/simdata/${simId}/chartdata`,
+    window.location.origin
+  );
   if (loc) {
     url.searchParams.append('loc_type', loc.type);
     url.searchParams.append('loc_id', loc.id);
@@ -49,7 +52,9 @@ export async function fetchChartData(
     }
     const json = await res.json();
     if (!res.ok) {
-      throw new Error(json?.message || `Failed to fetch chart data (${res.status})`);
+      throw new Error(
+        json?.message || `Failed to fetch chart data (${res.status})`
+      );
     }
     return json.data as ChartData;
   }
@@ -62,6 +67,10 @@ export type OutcomeStats = {
   peakTimeHours: number;
   /** Cumulative people ever infected (attack count) by the end of the run. */
   totalInfected: number;
+  /** Number of people infected at initialization. */
+  seededInfected: number;
+  /** Cumulative infections after subtracting the initial seed cohort. */
+  newInfections: number;
 };
 
 /** Active infected at a timestep = sum of the per-disease counts in `iot`. */
@@ -72,6 +81,25 @@ function activeInfected(point: DataPoint | undefined): number {
     if (key !== 'time' && typeof value === 'number') total += value;
   }
   return total;
+}
+
+function getMetadataRecord(metadata: unknown): Record<string, unknown> | null {
+  return metadata && typeof metadata === 'object'
+    ? (metadata as Record<string, unknown>)
+    : null;
+}
+
+function getSeededInfectedCount(metadata: unknown) {
+  const record = getMetadataRecord(metadata);
+  if (!record) return 0;
+
+  const ids = record.initial_infected_ids;
+  if (Array.isArray(ids)) {
+    return ids.map((id) => String(id).trim()).filter(Boolean).length;
+  }
+
+  const count = Number(record.initial_infected_count);
+  return Number.isFinite(count) ? Math.max(0, count) : 0;
 }
 
 /**
@@ -105,5 +133,14 @@ export function computeOutcomeStats(stats: ChartData): OutcomeStats {
     totalInfected = Math.max(0, population - lastSusceptible);
   }
 
-  return { peakInfected, peakTimeHours, totalInfected };
+  const seededInfected = getSeededInfectedCount(stats.metadata);
+  const newInfections = Math.max(0, totalInfected - seededInfected);
+
+  return {
+    peakInfected,
+    peakTimeHours,
+    totalInfected,
+    seededInfected,
+    newInfections
+  };
 }

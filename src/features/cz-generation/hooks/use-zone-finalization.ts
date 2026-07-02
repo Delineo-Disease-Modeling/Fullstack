@@ -9,7 +9,10 @@ import {
   GUIDED_HARD_EXPLICIT_POPULATION,
   type ClusterAlgorithm
 } from '@/features/cz-generation/constants';
-import { getLengthHours } from '@/features/cz-generation/helpers';
+import {
+  dateOnlyToUtcIso,
+  getLengthHours
+} from '@/features/cz-generation/helpers';
 import type {
   GuidedDestinationCandidate,
   GuidedSecondOrderMetadata,
@@ -293,7 +296,7 @@ export function useZoneFinalization({
         name: cityName,
         description: descriptionToSave,
         cbg_list: selectedCBGs,
-        start_date: new Date(`${startDate}T00:00:00`).toISOString(),
+        start_date: dateOnlyToUtcIso(startDate),
         length: lengthHours,
         latitude: mapCenter?.[0] || 0,
         longitude: mapCenter?.[1] || 0,
