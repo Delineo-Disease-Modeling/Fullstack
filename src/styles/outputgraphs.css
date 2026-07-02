@@ -52,6 +52,21 @@ div.outputgraph_chart {
   white-space: nowrap;
 }
 
+.outputgraph_header_actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.outputgraph_back_button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
 .outputgraph_segmented {
   display: inline-flex;
   flex: 0 0 auto;
@@ -196,12 +211,6 @@ div.outputgraph_chart {
   text-align: center;
 }
 
-.outputgraph_reset {
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
-
 @media (max-width: 768px) {
   div.outputgraphs_container {
     width: 100%;
@@ -216,8 +225,18 @@ div.outputgraph_chart {
     gap: 12px;
   }
 
-  .outputgraph_segmented {
+  .outputgraph_header_actions {
     width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .outputgraph_back_button {
+    flex: 1 1 180px;
+    justify-content: center;
+  }
+
+  .outputgraph_segmented {
+    flex: 1 1 220px;
     overflow-x: auto;
   }
 

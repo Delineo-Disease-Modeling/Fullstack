@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
-import { resolveDbDataPath } from '@/lib/db-files';
+import { DB_FOLDER, resolveDbDataPath } from '@/lib/db-files';
 import { streamJsonObjectEntries } from '@/lib/json-stream';
+import { loadPlaceIncidenceSeries } from '@/lib/map-cache';
 import { getCachedPapdata } from '@/lib/papdata-cache';
 import { loadDots } from '@/lib/people-map-cache';
 import { prisma } from '@/lib/prisma';
@@ -20,6 +21,7 @@ import { jsonMessage } from '@/server/api/responses';
 import { parseNonNegativeRouteNumber } from '@/server/api/route-params';
 
 const LOC_CACHE_MAX = 30;
+const POI_INCIDENCE_SERIES_KEY = 'New infections';
 interface LocCacheEntry {
   data: ChartData;
   lastAccess: number;
@@ -198,7 +200,8 @@ function buildChartFromDots(
     sortedTimes: number[];
   },
   locId: string,
-  diseaseKey: string
+  diseaseKey: string,
+  incidenceSeries?: DataPoint[] | null
 ): ChartData | null {
   const idx = dots.placeIds.indexOf(locId);
   if (idx < 0) {
@@ -226,6 +229,9 @@ function buildChartFromDots(
       Infected: infected,
       Recovered: recovered
     });
+  }
+  if (incidenceSeries && incidenceSeries.length > 0) {
+    chartData.incidence = incidenceSeries;
   }
   return chartData;
 }
@@ -289,16 +295,40 @@ export async function GET(
     // numeric SoA runs the slow streamer returns empty for). Fall back to the
     // full stream for a homes scope or runs baked without a dots file.
     if (loc_type === 'places') {
+      let incidenceSeries: DataPoint[] | null = null;
+      try {
+        incidenceSeries = await loadPlaceIncidenceSeries(
+          `${DB_FOLDER}${simdata.file_id}.map.json`,
+          loc_id,
+          POI_INCIDENCE_SERIES_KEY
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+          console.error('POI incidence chart series failed:', error);
+        }
+      }
+
       const dots = await loadDots(simdata.file_id);
       const fast = dots
         ? buildChartFromDots(
             dots,
             loc_id,
-            diseaseKeyFromStats(simdata.global_stats)
+            diseaseKeyFromStats(simdata.global_stats),
+            incidenceSeries
           )
         : null;
       if (fast) {
         return Response.json({ data: fast });
+      }
+      if (incidenceSeries && incidenceSeries.length > 0) {
+        const chartData: ChartData = {
+          iot: [],
+          ages: [],
+          sexes: [],
+          states: [],
+          incidence: incidenceSeries
+        };
+        return Response.json({ data: chartData });
       }
     }
 

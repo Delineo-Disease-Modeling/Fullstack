@@ -16,9 +16,11 @@ import {
 } from '@/features/model-map/map-constants';
 import {
   type GeoJSONData,
+  getFeatureCbgId,
   iconLookup,
   makePeopleDotGeoJSON,
   makePersonStatusDotGeoJSON,
+  normalizeCbgId,
   type PeopleDotFeatureCollection,
   type PeopleMapData,
   type PersonStatusDotFeatureCollection,
@@ -52,10 +54,22 @@ const EMPTY_HOTSPOTS: Record<string, number[]> = {};
 // ~4.5s.
 const MAX_BUFFER_HOLDS = 6;
 
+function getSeedCbgIdsKey(seedCbgIds: readonly string[] | undefined) {
+  const normalized = new Set<string>();
+  for (const cbgId of seedCbgIds ?? []) {
+    const normalizedCbgId = normalizeCbgId(cbgId);
+    if (normalizedCbgId) {
+      normalized.add(normalizedCbgId);
+    }
+  }
+  return [...normalized].sort().join(',');
+}
+
 interface ModelMapProps {
   onMarkerClick: (info: { id: string; label: string; type: string }) => void;
   simId?: number | null;
   disabledPoiIds?: ReadonlySet<string>;
+  seedCbgIds?: string[];
   // A POI to fly the Cases map to (e.g. clicked in the hotspot rankings). The
   // `nonce` changes on every request so repeat clicks on the same POI re-fly.
   focusPoi?: { id: string; nonce: number } | null;
@@ -73,6 +87,7 @@ export default function ModelMap({
   disabledPoiIds,
   focusPoi,
   simId,
+  seedCbgIds,
   selectedZone
 }: ModelMapProps) {
   const sim_data = useMapData((state) => state.simdata);
@@ -80,7 +95,9 @@ export default function ModelMap({
   const hotspots = useMapData((state) => state.hotspots) ?? EMPTY_HOTSPOTS;
   const timesteps = useMapData((state) => state.timesteps);
   const setSimData = useMapData((state) => state.setSimData);
-  const [zoneGeoJSON, setZoneGeoJSON] = useState<GeoJSONData | null>(null);
+  const [baseZoneGeoJSON, setBaseZoneGeoJSON] = useState<GeoJSONData | null>(
+    null
+  );
 
   const [maxHours, setMaxHours] = useState(1);
   const [currentTime, setCurrentTime] = useState(() =>
@@ -110,6 +127,34 @@ export default function ModelMap({
   const [dotsBundleReady, setDotsBundleReady] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [mapFrameError, setMapFrameError] = useState<string | null>(null);
+  const seedCbgIdsKey = useMemo(
+    () => getSeedCbgIdsKey(seedCbgIds),
+    [seedCbgIds]
+  );
+  const seedCbgSet = useMemo(
+    () => new Set(seedCbgIdsKey ? seedCbgIdsKey.split(',') : []),
+    [seedCbgIdsKey]
+  );
+  const zoneGeoJSON = useMemo(() => {
+    if (!baseZoneGeoJSON?.features?.length) {
+      return null;
+    }
+
+    return {
+      ...baseZoneGeoJSON,
+      features: baseZoneGeoJSON.features.map((feature) => {
+        const cbgId = getFeatureCbgId(feature);
+        return {
+          ...feature,
+          properties: {
+            ...feature.properties,
+            _cbg_id: cbgId,
+            _is_seed_cbg: seedCbgSet.has(cbgId)
+          }
+        };
+      })
+    } satisfies GeoJSONData;
+  }, [baseZoneGeoJSON, seedCbgSet]);
 
   useEffect(() => {
     resetModelMapLayoutCaches();
@@ -156,7 +201,7 @@ export default function ModelMap({
   useEffect(() => {
     const cbgList = selectedZone?.cbg_list?.filter(Boolean) ?? [];
     if (cbgList.length === 0) {
-      setZoneGeoJSON(null);
+      setBaseZoneGeoJSON(null);
       return;
     }
 
@@ -170,7 +215,7 @@ export default function ModelMap({
       .then((resp) => (resp.ok ? resp.json() : null))
       .then((data) => {
         if (!controller.signal.aborted) {
-          setZoneGeoJSON(data?.features?.length ? data : null);
+          setBaseZoneGeoJSON(data?.features?.length ? data : null);
         }
       })
       .catch((err) => {

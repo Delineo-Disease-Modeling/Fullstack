@@ -37,6 +37,10 @@ import type {
 } from '@/features/model-map/map-types';
 
 const DISABLED_POI_COLOR = '#111827';
+const ZONE_CBG_FILL_COLOR = '#2563eb';
+const ZONE_CBG_LINE_COLOR = '#1d4ed8';
+const SEED_CBG_FILL_COLOR = '#10b981';
+const SEED_CBG_LINE_COLOR = '#065f46';
 
 interface ClusteredMapProps {
   currentTime: number;
@@ -417,15 +421,30 @@ export default function ClusteredMap({
               id="zone-cbgs-fill"
               type="fill"
               paint={{
-                'fill-color': '#2563eb',
-                'fill-opacity': 0.08
+                'fill-color': [
+                  'case',
+                  ['boolean', ['get', '_is_seed_cbg'], false],
+                  SEED_CBG_FILL_COLOR,
+                  ZONE_CBG_FILL_COLOR
+                ] as const,
+                'fill-opacity': [
+                  'case',
+                  ['boolean', ['get', '_is_seed_cbg'], false],
+                  0.16,
+                  0.08
+                ] as const
               }}
             />
             <Layer
               id="zone-cbgs-outline"
               type="line"
               paint={{
-                'line-color': '#1d4ed8',
+                'line-color': [
+                  'case',
+                  ['boolean', ['get', '_is_seed_cbg'], false],
+                  SEED_CBG_LINE_COLOR,
+                  ZONE_CBG_LINE_COLOR
+                ] as const,
                 'line-width': [
                   'interpolate',
                   ['linear'],
@@ -801,7 +820,12 @@ export default function ClusteredMap({
               id="zone-cbgs-top-outline"
               type="line"
               paint={{
-                'line-color': '#1d4ed8',
+                'line-color': [
+                  'case',
+                  ['boolean', ['get', '_is_seed_cbg'], false],
+                  SEED_CBG_LINE_COLOR,
+                  ZONE_CBG_LINE_COLOR
+                ] as const,
                 'line-width': [
                   'interpolate',
                   ['linear'],

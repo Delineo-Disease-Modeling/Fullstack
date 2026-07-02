@@ -22,11 +22,9 @@ import {
 } from '@/features/cz-generation/constants';
 import {
   clampIndex,
+  coerceDateRangeToAvailableMonths,
   dedupeCbgList,
-  endDateFromMonth,
-  monthFromDate,
-  monthFromEndDate,
-  startDateFromMonth
+  getMapSeedCbgIds
 } from '@/features/cz-generation/helpers';
 import { useCandidatePois } from '@/features/cz-generation/hooks/use-candidate-pois';
 import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
@@ -161,18 +159,23 @@ export default function CZGeneration() {
     algorithmMetadata?.bounded_envelope
       ? algorithmMetadata
       : null;
-  const mapSeedCbgIds = useMemo(() => {
-    const source = algorithmMetadata?.seed_cbgs?.length
-      ? algorithmMetadata.seed_cbgs
-      : guidedSeedCbgs.length
-        ? guidedSeedCbgs
-        : seedCBG
-          ? [seedCBG]
-          : [];
-    return Array.from(
-      new Set(source.map((cbg) => normalizeCbgId(cbg)).filter(Boolean))
-    );
-  }, [algorithmMetadata, guidedSeedCbgs, seedCBG]);
+  const mapSeedCbgIds = useMemo(
+    () =>
+      getMapSeedCbgIds({
+        algorithmSeedCbgs: algorithmMetadata?.seed_cbgs,
+        guidedSeedCbgs,
+        resolvedSeedCbgs: resolvedSeedLookup?.seedCbgs,
+        seedCbg: seedCBG,
+        setupSeedCbgs
+      }),
+    [
+      algorithmMetadata?.seed_cbgs,
+      guidedSeedCbgs,
+      resolvedSeedLookup?.seedCbgs,
+      seedCBG,
+      setupSeedCbgs
+    ]
+  );
   const maxTraceStep = traceSteps.length > 0 ? traceSteps.length - 1 : 0;
   const activeTraceStep =
     traceSteps[clampIndex(traceStepIndex, 0, maxTraceStep)] ?? null;
@@ -441,23 +444,25 @@ export default function CZGeneration() {
   const detectedStateAbbr = getStateFromCBG(
     seedStateCbg ? [seedStateCbg] : null
   );
-  const { availableMonths, availableMonthsLoading, monthOptions } =
+  const { availableMonthsLoading, monthOptions } =
     usePatternAvailability(detectedStateAbbr);
+  const availableDateRange = useMemo(
+    () =>
+      coerceDateRangeToAvailableMonths(startDate, endDate, monthOptions),
+    [endDate, monthOptions, startDate]
+  );
 
   useEffect(() => {
-    if (availableMonths.length === 0) return;
-    const currentStart = monthFromDate(startDate);
-    const currentEnd = monthFromEndDate(endDate);
-    if (!availableMonths.includes(currentStart)) {
-      const nextStart = availableMonths[0];
-      setStartDate(startDateFromMonth(nextStart));
-      if (!availableMonths.includes(currentEnd) || currentEnd < nextStart) {
-        setEndDate(endDateFromMonth(nextStart));
-      }
-    } else if (!availableMonths.includes(currentEnd)) {
-      setEndDate(endDateFromMonth(currentStart));
+    if (!availableDateRange.changed) {
+      return;
     }
-  }, [availableMonths, startDate, endDate]);
+    setStartDate(availableDateRange.startDate);
+    setEndDate(availableDateRange.endDate);
+  }, [
+    availableDateRange.changed,
+    availableDateRange.endDate,
+    availableDateRange.startDate
+  ]);
 
   useEffect(() => {
     if (phase !== 'input') {
@@ -738,7 +743,12 @@ export default function CZGeneration() {
     setGuidedDestinationError,
     isGuidedSecondOrderAlgorithm,
     setGuidedDestinationLoading,
-    startDate,
+    startDate: availableDateRange.startDate,
+    endDate: availableDateRange.endDate,
+    availableMonths: monthOptions,
+    detectedStateAbbr,
+    setStartDate,
+    setEndDate,
     setupSeedGeoJSON,
     loadSeedGeoJson,
     setSetupSeedGeoJSON,
@@ -773,8 +783,8 @@ export default function CZGeneration() {
     saveCZHtmlMap
   } = useZoneFinalization({
     selectedCBGs,
-    startDate,
-    endDate,
+    startDate: availableDateRange.startDate,
+    endDate: availableDateRange.endDate,
     guidedSelectionMode,
     guidedSelectionSummary,
     description,
@@ -782,6 +792,7 @@ export default function CZGeneration() {
     cityName,
     location,
     seedCBG,
+    seedCbgIds: mapSeedCbgIds,
     clusterAlgorithm,
     mobilityPruneMinSeedCapturePct,
     isGuidedSecondOrderAlgorithm,
@@ -951,8 +962,8 @@ export default function CZGeneration() {
               monthOptions={monthOptions}
               availableMonthsLoading={availableMonthsLoading}
               detectedStateAbbr={detectedStateAbbr}
-              startDate={startDate}
-              endDate={endDate}
+              startDate={availableDateRange.startDate}
+              endDate={availableDateRange.endDate}
               onStartDateChange={setStartDate}
               onEndDateChange={setEndDate}
               description={description}

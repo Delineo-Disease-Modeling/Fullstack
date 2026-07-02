@@ -1,15 +1,22 @@
 import { useCallback, type FormEvent } from 'react';
 import {
+  fetchPatternAvailability,
   fetchSecondOrderDestinations,
   getClusteringProgressUrl,
   lookupLocation,
   startClusteringPreview
 } from '@/features/cz-generation/api';
-import type { ClusterAlgorithm } from '@/features/cz-generation/constants';
 import {
+  PATTERN_AVAILABILITY_END_DATE,
+  PATTERN_AVAILABILITY_START_DATE,
+  type ClusterAlgorithm
+} from '@/features/cz-generation/constants';
+import {
+  coerceDateRangeToAvailableMonths,
   dedupeCbgList,
   getPayloadErrorMessage,
   isClusterAlgorithm,
+  normalizeAvailableMonths,
   isRecord
 } from '@/features/cz-generation/helpers';
 import type {
@@ -25,6 +32,7 @@ import {
   getBoundsForGeoJson,
   mergeGeoJsonFeatures
 } from '@/lib/cz-geo';
+import { getStateFromCBG } from '@/lib/simulation-zone';
 
 type Phase = 'input' | 'edit' | 'finalizing';
 
@@ -50,6 +58,11 @@ type UseGenerationPreviewSubmitParams = {
   isGuidedSecondOrderAlgorithm: boolean;
   setGuidedDestinationLoading: (value: boolean) => void;
   startDate: string;
+  endDate: string;
+  availableMonths: string[];
+  detectedStateAbbr: string | null;
+  setStartDate: (value: string) => void;
+  setEndDate: (value: string) => void;
   setupSeedGeoJSON: GeoJSONData | null;
   loadSeedGeoJson: (
     seedCbgs: string[],
@@ -100,6 +113,11 @@ export function useGenerationPreviewSubmit({
   isGuidedSecondOrderAlgorithm,
   setGuidedDestinationLoading,
   startDate,
+  endDate,
+  availableMonths,
+  detectedStateAbbr,
+  setStartDate,
+  setEndDate,
   setupSeedGeoJSON,
   loadSeedGeoJson,
   setSetupSeedGeoJSON,
@@ -219,6 +237,20 @@ export function useGenerationPreviewSubmit({
     []
   );
 
+  const loadAvailableMonthsForState = useCallback(async (stateAbbr: string) => {
+    const resp = await fetchPatternAvailability({
+      state: stateAbbr,
+      startDate: PATTERN_AVAILABILITY_START_DATE,
+      endDate: PATTERN_AVAILABILITY_END_DATE
+    });
+    const months = Array.isArray(resp?.data?.available_months)
+      ? resp.data.available_months.filter(
+          (month): month is string => typeof month === 'string'
+        )
+      : [];
+    return normalizeAvailableMonths(months);
+  }, []);
+
   return useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -302,13 +334,38 @@ export function useGenerationPreviewSubmit({
       setSelectedGuidedDestinationIds([]);
       setGuidedDestinationError('');
 
+      let submissionStartDate = startDate;
+
       try {
+        if (!isTestMode && coreCbg) {
+          const seedStateAbbr = getStateFromCBG([coreCbg]);
+          let monthsForSeed =
+            seedStateAbbr && seedStateAbbr === detectedStateAbbr
+              ? availableMonths
+              : [];
+
+          if (seedStateAbbr && monthsForSeed.length === 0) {
+            monthsForSeed = await loadAvailableMonthsForState(seedStateAbbr);
+          }
+
+          const coercedRange = coerceDateRangeToAvailableMonths(
+            startDate,
+            endDate,
+            monthsForSeed
+          );
+          submissionStartDate = coercedRange.startDate;
+          if (coercedRange.changed) {
+            setStartDate(coercedRange.startDate);
+            setEndDate(coercedRange.endDate);
+          }
+        }
+
         if (isGuidedSecondOrderAlgorithm) {
           setGuidedDestinationLoading(true);
           const data = await fetchSecondOrderDestinations({
             cbg: coreCbg,
             seed_cbgs: resolvedSeedCbgs,
-            start_date: startDate,
+            start_date: submissionStartDate,
             use_test_data: isTestMode,
             limit: 12
           });
@@ -401,7 +458,7 @@ export function useGenerationPreviewSubmit({
         const clusterReq: Record<string, unknown> = {
           min_pop: Number(minPop),
           algorithm: clusterAlgorithm,
-          start_date: startDate,
+          start_date: submissionStartDate,
           use_test_data: isTestMode,
           include_trace: true
         };
@@ -529,8 +586,12 @@ export function useGenerationPreviewSubmit({
       }
     },
     [
+      availableMonths,
       clusterAlgorithm,
+      detectedStateAbbr,
+      endDate,
       isGuidedSecondOrderAlgorithm,
+      loadAvailableMonthsForState,
       loadSeedGeoJson,
       loading,
       location,
@@ -558,11 +619,13 @@ export function useGenerationPreviewSubmit({
       setResolvedSeedLookup,
       setSeedCBG,
       setSeedEditMode,
+      setEndDate,
       setSeedGuardDistanceKm,
       setSelectedCBGs,
       setSelectedGuidedDestinationIds,
       setSelectedTraceCandidateCbg,
       setSetupSeedGeoJSON,
+      setStartDate,
       setTotalPopulation,
       setTraceEnabled,
       setTraceStepIndex,

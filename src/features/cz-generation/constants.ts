@@ -43,6 +43,8 @@ export const EMPTY_LIST: TraceCandidate[] = [];
 
 export const CBG_GEOJSON_REQUEST_CHUNK_SIZE = 75;
 export const INITIAL_SEED_EDIT_NEIGHBOR_RINGS = 2;
+export const PATTERN_AVAILABILITY_START_DATE = '2018-01-01';
+export const PATTERN_AVAILABILITY_END_DATE = '2025-12-31';
 
 export const GUIDED_REGION_PALETTE: GuidedSelectionStyle[] = [
   { fillColor: '#f59e0b', lineColor: '#b45309' },
