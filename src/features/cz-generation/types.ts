@@ -212,7 +212,7 @@ export type GuidedSelectionStyle = {
   lineColor: string;
 };
 
-export type SeedEditAction = 'add' | 'remove';
+export type SeedEditAction = 'observe' | 'add' | 'remove';
 
 export type ClusteringPreviewResponse = {
   cluster?: string[];
