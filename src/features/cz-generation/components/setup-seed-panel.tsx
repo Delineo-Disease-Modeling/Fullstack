@@ -567,6 +567,26 @@ function SeedPreviewStatus({
                 >
                   <button
                     type="button"
+                    onClick={() => onSeedEditActionChange('observe')}
+                    disabled={loading || seedEditLoading}
+                    className={`px-3 py-1.5 text-xs font-semibold font-[inherit] cursor-pointer disabled:opacity-40 ${
+                      seedEditAction === 'observe'
+                        ? 'bg-[#e0f2fe] text-[#075985]'
+                        : ''
+                    }`}
+                    style={
+                      seedEditAction !== 'observe'
+                        ? {
+                            color: 'var(--color-text-main)',
+                            background: 'var(--color-bg-surface)'
+                          }
+                        : undefined
+                    }
+                  >
+                    Observe
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onSeedEditActionChange('add')}
                     disabled={loading || seedEditLoading}
                     className={`px-3 py-1.5 text-xs font-semibold font-[inherit] cursor-pointer disabled:opacity-40 ${
@@ -574,14 +594,15 @@ function SeedPreviewStatus({
                         ? 'bg-[#dcfce7] text-[#166534]'
                         : ''
                     }`}
-                    style={
-                      seedEditAction !== 'add'
+                    style={{
+                      borderLeft: '1px solid rgba(61,136,173,0.3)',
+                      ...(seedEditAction !== 'add'
                         ? {
                             color: 'var(--color-text-main)',
                             background: 'var(--color-bg-surface)'
                           }
-                        : undefined
-                    }
+                        : {})
+                    }}
                   >
                     Add
                   </button>
@@ -658,7 +679,11 @@ function SeedPreviewStatus({
               className="mt-2 text-xs czgen_info"
               style={{ padding: '4px 8px' }}
             >
-              {seedEditAction === 'add' ? 'Add mode active' : 'Remove mode active'}
+              {seedEditAction === 'observe'
+                ? 'Observe mode active'
+                : seedEditAction === 'add'
+                  ? 'Add mode active'
+                  : 'Remove mode active'}
               {seedEditLoading ? ' | Updating map...' : ''}
             </div>
           )}

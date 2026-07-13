@@ -43,7 +43,8 @@ export function useSeedEditing() {
   const [seedEditGeoJSON, setSeedEditGeoJSON] =
     useState<GeoJSONData | null>(null);
   const [seedEditMode, setSeedEditMode] = useState(false);
-  const [seedEditAction, setSeedEditAction] = useState<SeedEditAction>('add');
+  const [seedEditAction, setSeedEditAction] =
+    useState<SeedEditAction>('observe');
   const [seedEditLoading, setSeedEditLoading] = useState(false);
   const [seedEditError, setSeedEditError] = useState('');
   const [seedEditStartCbgs, setSeedEditStartCbgs] = useState<string[]>([]);
@@ -83,7 +84,7 @@ export function useSeedEditing() {
     setSetupSeedGeoJSON(null);
     setSeedEditGeoJSON(null);
     setSeedEditMode(false);
-    setSeedEditAction('add');
+    setSeedEditAction('observe');
     setSeedEditLoading(false);
     setSeedEditError('');
     setSeedEditStartCbgs([]);
@@ -175,6 +176,32 @@ export function useSeedEditing() {
     [loadSeedEditGeoJson]
   );
 
+  const expandSeedEditGeoJsonForAddedCbgs = useCallback(
+    async (cbgIds: string[]) => {
+      const normalizedCbgs = dedupeCbgList(cbgIds);
+      if (!normalizedCbgs.length) {
+        return;
+      }
+
+      try {
+        const nearbyGeoJson = await loadSeedGeoJson(normalizedCbgs, true);
+        setSeedEditGeoJSON((currentGeoJson) =>
+          mergeGeoJsonFeatures(
+            currentGeoJson || setupSeedGeoJSON,
+            nearbyGeoJson
+          )
+        );
+      } catch (err) {
+        setSeedEditError(
+          err instanceof Error
+            ? err.message
+            : 'Seed updated, but nearby CBGs could not be loaded.'
+        );
+      }
+    },
+    [loadSeedGeoJson, setupSeedGeoJSON]
+  );
+
   const commitSetupSeedCbgs = useCallback(
     (nextSeedCbgs: string[]) => {
       const normalizedSeedCbgs = dedupeCbgList(nextSeedCbgs);
@@ -221,7 +248,7 @@ export function useSeedEditing() {
     }
 
     setSeedEditMode(true);
-    setSeedEditAction('add');
+    setSeedEditAction('observe');
     setSeedEditStartCbgs(setupSeedCbgs);
     setSeedEditError('');
     setSeedEditLoading(true);
@@ -250,6 +277,15 @@ export function useSeedEditing() {
 
       const clickedSet = new Set(normalizedClickedCbgs);
       const currentSet = new Set(setupSeedCbgs);
+      if (seedEditAction === 'observe') {
+        return;
+      }
+
+      const addedCbgs =
+        seedEditAction === 'add'
+          ? normalizedClickedCbgs.filter((cbg) => !currentSet.has(cbg))
+          : [];
+
       const nextSeedCbgs =
         seedEditAction === 'add'
           ? dedupeCbgList([...setupSeedCbgs, ...normalizedClickedCbgs])
@@ -272,27 +308,14 @@ export function useSeedEditing() {
         return;
       }
 
-      setSeedEditLoading(true);
-      try {
-        await refreshSeedEditGeoJson(
-          committedSeedCbgs,
-          seedEditNeighborRings || INITIAL_SEED_EDIT_NEIGHBOR_RINGS
-        );
-      } catch (err) {
-        setSeedEditError(
-          err instanceof Error
-            ? err.message
-            : 'Could not refresh nearby CBGs after updating the seed area.'
-        );
-      } finally {
-        setSeedEditLoading(false);
+      if (addedCbgs.length) {
+        void expandSeedEditGeoJsonForAddedCbgs(addedCbgs);
       }
     },
     [
       commitSetupSeedCbgs,
-      refreshSeedEditGeoJson,
+      expandSeedEditGeoJsonForAddedCbgs,
       seedEditAction,
-      seedEditNeighborRings,
       setupSeedCbgs
     ]
   );
@@ -398,7 +421,7 @@ export function useSeedEditing() {
       setSetupSeedGeoJSON(seedGeoJson);
       setSeedEditGeoJSON(null);
       setSeedEditMode(false);
-      setSeedEditAction('add');
+      setSeedEditAction('observe');
       setSeedEditError('');
       setSeedEditStartCbgs([]);
       setSeedEditNeighborRings(0);
@@ -424,7 +447,7 @@ export function useSeedEditing() {
     setSetupSeedGeoJSON(null);
     setSeedEditGeoJSON(null);
     setSeedEditMode(false);
-    setSeedEditAction('add');
+    setSeedEditAction('observe');
     setSeedEditError('');
     setSeedEditStartCbgs([]);
     setSeedEditNeighborRings(0);

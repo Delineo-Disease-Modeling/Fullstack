@@ -11,6 +11,7 @@ import {
   Source
 } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import type { SeedEditAction } from '@/features/cz-generation/types';
 import {
   createCircleGeoJson,
   type GeoJSONData,
@@ -19,8 +20,6 @@ import {
   getFeatureCenterFromGeoJson,
   normalizeCbgId
 } from '@/lib/cz-geo';
-
-type SeedEditAction = 'add' | 'remove';
 
 type ScreenPoint = {
   x: number;
@@ -44,7 +43,7 @@ export default function InteractiveMap({
   seedGuardRadiusKm = 0,
   showSeedGuardCircle = false,
   seedEditMode = false,
-  seedEditAction = 'add',
+  seedEditAction = 'observe',
   onSeedCbgSelect = null
 }: {
   onLocationSelect: (coords: string) => void;
@@ -60,19 +59,32 @@ export default function InteractiveMap({
   onSeedCbgSelect?: ((cbgIds: string[]) => void) | null;
 }) {
   const mapRef = useRef<MapRef>(null);
-  const hasFittedRef = useRef(false);
+  const fittedSeedKeyRef = useRef('');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
     null
   );
   const [hoverCbgId, setHoverCbgId] = useState<string | null>(null);
   const [dragBox, setDragBox] = useState<DragBox | null>(null);
+  const isSeedSelectionActive =
+    seedEditMode && seedEditAction !== 'observe' && !disabled;
 
   const seedCbgSet = useMemo(
     () =>
       new Set(seedCbgIds.map((cbgId) => normalizeCbgId(cbgId)).filter(Boolean)),
     [seedCbgIds]
   );
+  const seedFitKey = useMemo(() => {
+    const resolvedSeedCbgs = originalSeedCbgIds
+      .map((cbgId) => normalizeCbgId(cbgId))
+      .filter(Boolean);
+
+    if (resolvedSeedCbgs.length) {
+      return [...resolvedSeedCbgs].sort().join(',');
+    }
+
+    return normalizeCbgId(seedCbgId) || '';
+  }, [originalSeedCbgIds, seedCbgId]);
   const originalSeedCbgSet = useMemo(
     () =>
       new Set(
@@ -112,8 +124,6 @@ export default function InteractiveMap({
         const cbgId = getFeatureCbgId(feature);
         const isSelected = seedCbgSet.has(cbgId);
         const wasOriginal = originalSeedCbgSet.has(cbgId);
-        const isAdded =
-          isSelected && originalSeedCbgSet.size > 0 && !wasOriginal;
         const isRemoved = !isSelected && wasOriginal;
         const isCandidate = !isSelected && !wasOriginal;
 
@@ -122,15 +132,17 @@ export default function InteractiveMap({
           properties: {
             ...feature.properties,
             _cbg_id: cbgId,
+            _hover_fill_color:
+              seedEditAction === 'remove' ? '#ef4444' : '#22c55e',
+            _hover_line_color:
+              seedEditAction === 'remove' ? '#991b1b' : '#166534',
             _fill_color: seedEditMode
-              ? isAdded
+              ? isSelected
                 ? '#22c55e'
                 : isRemoved
                   ? '#ef4444'
-                  : isSelected
-                    ? '#2563eb'
-                    : '#d1d5db'
-              : '#93c5fd',
+                  : '#d1d5db'
+              : '#86efac',
             _fill_opacity: seedEditMode
               ? isSelected
                 ? 0.54
@@ -138,17 +150,15 @@ export default function InteractiveMap({
                   ? 0.28
                   : isCandidate
                     ? 0.16
-                    : 0.2
-              : 0.22,
+                  : 0.2
+              : 0.28,
             _line_color: seedEditMode
-              ? isAdded
+              ? isSelected
                 ? '#15803d'
                 : isRemoved
                   ? '#b91c1c'
-                  : isSelected
-                    ? '#1d4ed8'
-                    : '#6b7280'
-              : '#2563eb',
+                  : '#6b7280'
+              : '#15803d',
             _line_width: seedEditMode
               ? isSelected || isRemoved
                 ? 2.5
@@ -158,7 +168,13 @@ export default function InteractiveMap({
         };
       })
     } as FeatureCollection<Geometry, GeoJsonProperties>;
-  }, [originalSeedCbgSet, seedCbgSet, seedEditMode, seedGeoJSON]);
+  }, [
+    originalSeedCbgSet,
+    seedCbgSet,
+    seedEditAction,
+    seedEditMode,
+    seedGeoJSON
+  ]);
   const seedGuardPreviewData = seedCircleGeoJSON as FeatureCollection<
     Geometry,
     GeoJsonProperties
@@ -200,7 +216,11 @@ export default function InteractiveMap({
 
   const fitToSeedBounds = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (!map || !seedBounds || hasFittedRef.current) {
+    if (!map || !seedBounds || !seedFitKey) {
+      return;
+    }
+
+    if (fittedSeedKeyRef.current === seedFitKey) {
       return;
     }
 
@@ -209,11 +229,10 @@ export default function InteractiveMap({
       maxZoom: 13,
       duration: 0
     });
-    hasFittedRef.current = true;
-  }, [seedBounds]);
+    fittedSeedKeyRef.current = seedFitKey;
+  }, [seedBounds, seedFitKey]);
 
   useEffect(() => {
-    hasFittedRef.current = false;
     fitToSeedBounds();
   }, [fitToSeedBounds]);
 
@@ -234,7 +253,7 @@ export default function InteractiveMap({
 
   const handleMouseDown = useCallback(
     (e: MapLayerMouseEvent) => {
-      if (!seedEditMode || disabled) {
+      if (!isSeedSelectionActive) {
         return;
       }
 
@@ -244,7 +263,7 @@ export default function InteractiveMap({
       const point = { x: e.point.x, y: e.point.y };
       setDragBox({ start: point, current: point });
     },
-    [disabled, seedEditMode]
+    [isSeedSelectionActive]
   );
 
   const handleMouseMove = useCallback(
@@ -255,9 +274,9 @@ export default function InteractiveMap({
           feature?.properties?.GEOID ??
           feature?.properties?.CensusBlockGroup
       );
-      setHoverCbgId(seedEditMode ? nextHover || null : null);
+      setHoverCbgId(isSeedSelectionActive ? nextHover || null : null);
 
-      if (!dragBox || !seedEditMode) {
+      if (!dragBox || !isSeedSelectionActive) {
         return;
       }
 
@@ -270,12 +289,12 @@ export default function InteractiveMap({
           : null
       );
     },
-    [dragBox, seedEditMode]
+    [dragBox, isSeedSelectionActive]
   );
 
   const handleMouseUp = useCallback(
     (e: MapLayerMouseEvent) => {
-      if (!dragBox || !seedEditMode) {
+      if (!dragBox || !isSeedSelectionActive) {
         return;
       }
 
@@ -315,7 +334,12 @@ export default function InteractiveMap({
         onSeedCbgSelect(selectedIds);
       }
     },
-    [dragBox, getCbgIdsFromRenderedFeatures, onSeedCbgSelect, seedEditMode]
+    [
+      dragBox,
+      getCbgIdsFromRenderedFeatures,
+      isSeedSelectionActive,
+      onSeedCbgSelect
+    ]
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -336,12 +360,12 @@ export default function InteractiveMap({
   }, [dragBox]);
 
   useEffect(() => {
-    if (!seedEditMode) {
+    if (!isSeedSelectionActive) {
       setDragBox(null);
       setHoverCbgId(null);
       mapRef.current?.getMap().dragPan.enable();
     }
-  }, [seedEditMode]);
+  }, [isSeedSelectionActive]);
 
   useEffect(
     () => () => {
@@ -367,14 +391,14 @@ export default function InteractiveMap({
         }}
         style={{ width: '100%', height: '100%' }}
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-        interactiveLayerIds={seedEditMode ? ['seed-preview-fill'] : []}
+        interactiveLayerIds={isSeedSelectionActive ? ['seed-preview-fill'] : []}
         onLoad={() => { fitToSeedBounds(); setMapLoaded(true); }}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        cursor={seedEditMode ? 'crosshair' : ''}
+        cursor={isSeedSelectionActive ? 'crosshair' : ''}
       >
         {seedPreviewData && (
           <Source id="seed-preview" type="geojson" data={seedPreviewData}>
@@ -394,29 +418,27 @@ export default function InteractiveMap({
                 'line-width': ['get', '_line_width']
               }}
             />
-            {seedEditMode && (
-              <>
-                <Layer
-                  id="seed-preview-hover"
-                  type="fill"
-                  filter={hoverFilter}
-                  paint={{
-                    'fill-color':
-                      seedEditAction === 'remove' ? '#ef4444' : '#22c55e',
-                    'fill-opacity': 0.42
-                  }}
-                />
-                <Layer
-                  id="seed-preview-hover-outline"
-                  type="line"
-                  filter={hoverFilter}
-                  paint={{
-                    'line-color':
-                      seedEditAction === 'remove' ? '#991b1b' : '#166534',
-                    'line-width': 3
-                  }}
-                />
-              </>
+            {isSeedSelectionActive && (
+              <Layer
+                id="seed-preview-hover"
+                type="fill"
+                filter={hoverFilter}
+                paint={{
+                  'fill-color': ['get', '_hover_fill_color'],
+                  'fill-opacity': 0.42
+                }}
+              />
+            )}
+            {isSeedSelectionActive && (
+              <Layer
+                id="seed-preview-hover-outline"
+                type="line"
+                filter={hoverFilter}
+                paint={{
+                  'line-color': ['get', '_hover_line_color'],
+                  'line-width': 3
+                }}
+              />
             )}
           </Source>
         )}
@@ -460,16 +482,16 @@ export default function InteractiveMap({
       {seedEditMode && (
         <div className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-gray-200 bg-white/95 px-3 py-2 text-xs font-medium text-gray-700 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm border border-[#1d4ed8] bg-[#2563eb]" />
-            <span>Seed area</span>
-          </div>
-          <div className="mt-1 flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm border border-[#15803d] bg-[#22c55e]" />
-            <span>Added</span>
+            <span>Selected seed CBGs</span>
           </div>
           <div className="mt-1 flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm border border-[#b91c1c] bg-[#ef4444]" />
-            <span>Removed</span>
+            <span>Removed original CBGs</span>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="h-3 w-3 rounded-sm border border-[#6b7280] bg-[#d1d5db]" />
+            <span>Available CBGs</span>
           </div>
         </div>
       )}
