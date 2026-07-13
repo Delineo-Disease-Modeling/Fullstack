@@ -58,6 +58,9 @@ export const CLUSTER_COLOR_EXPRESSION = [
 
 export type HeatmapMode = 'markers' | 'people' | 'population' | 'infection';
 
+// The user-facing label for the internal "people" mode is "Cases".
+export const DEFAULT_HEATMAP_MODE: HeatmapMode = 'people';
+
 // Only modes still surfaced in the toggle UI are restored from sessionStorage.
 // 'population' and 'infection' modes are intentionally hidden but kept as
 // HeatmapMode values so the rendering paths remain available if reintroduced.

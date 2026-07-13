@@ -10,6 +10,7 @@ import Button from '@/components/ui/button';
 import Slider from '@/components/ui/slider';
 import ClusteredMap from '@/features/model-map/clustered-map';
 import {
+  DEFAULT_HEATMAP_MODE,
   type HeatmapMode,
   PEOPLE_MAP_PREFETCH_STEPS,
   PLAYBACK_INTERVAL_MS
@@ -105,7 +106,7 @@ export default function ModelMap({
   );
   const [isPlaying, setIsPlaying] = useState(false);
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>(() =>
-    getStoredHeatmapMode(simId, 'markers')
+    getStoredHeatmapMode(simId, DEFAULT_HEATMAP_MODE)
   );
   const [peopleMapData, setPeopleMapData] = useState<PeopleMapData | null>(
     null
@@ -162,7 +163,7 @@ export default function ModelMap({
 
   useEffect(() => {
     setCurrentTime(getStoredCurrentTime(simId, 1));
-    setHeatmapMode(getStoredHeatmapMode(simId, 'markers'));
+    setHeatmapMode(getStoredHeatmapMode(simId, DEFAULT_HEATMAP_MODE));
     peopleMapDataSimId.current = null;
     setPeopleMapData(null);
     setPeopleMapError(null);

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   applyAlpha,
+  DEFAULT_HEATMAP_MODE,
   HEATMAP_MODES,
   PEOPLE_MAP_PREFETCH_STEPS,
   PERSON_STATUS_DOT_RADIUS,
@@ -17,6 +18,10 @@ test('applyAlpha converts a hex color to an rgba string', () => {
 
 test('HEATMAP_MODES only exposes the modes surfaced in the toggle UI', () => {
   assert.deepEqual(HEATMAP_MODES, ['markers', 'people']);
+});
+
+test('Cases is the default map mode', () => {
+  assert.equal(DEFAULT_HEATMAP_MODE, 'people');
 });
 
 test('playback/prefetch tuning constants keep their expected values', () => {
