@@ -9,7 +9,6 @@ import {
 import {
   endDateFromMonth,
   formatMonthLabel,
-  isSeedCapturePruneAlgorithm,
   monthFromDate,
   monthFromEndDate,
   startDateFromMonth
@@ -220,7 +219,7 @@ export function SetupSeedPanel({
               ))}
             </select>
           </div>
-          {isSeedCapturePruneAlgorithm(clusterAlgorithm) ? (
+          {clusterAlgorithm === 'mobility_prune' ? (
             <div className="w-full sm:col-span-2">
               <FormField
                 label="Minimum Seed Movement Captured (%)"
@@ -351,13 +350,6 @@ export function SetupSeedPanel({
         )}
 
         {clusterAlgorithm === 'mobility_prune' && (
-          <div className="czgen_info text-xs">
-            This mode grows a large mobility envelope, then prunes low
-            seed-capture CBGs while preserving the seed CBGs' movement field.
-          </div>
-        )}
-
-        {clusterAlgorithm === 'seed_prune' && (
           <div className="czgen_info text-xs">
             This mode starts from every CBG with direct travel to or from the
             seed, then prunes the CBGs with the least seed movement per resident

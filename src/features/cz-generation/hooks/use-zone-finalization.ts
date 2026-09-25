@@ -11,8 +11,7 @@ import {
 } from '@/features/cz-generation/constants';
 import {
   dateOnlyToUtcIso,
-  getLengthHours,
-  isSeedCapturePruneAlgorithm
+  getLengthHours
 } from '@/features/cz-generation/helpers';
 import type {
   GuidedDestinationCandidate,
@@ -236,7 +235,7 @@ export function useZoneFinalization({
           ? [`Seed CBGs: ${normalizedSeedCbgIds.join(', ')}`]
           : []),
         `Algorithm: ${algorithmLabel}`,
-        isSeedCapturePruneAlgorithm(clusterAlgorithm)
+        clusterAlgorithm === 'mobility_prune'
           ? `Minimum seed movement captured: ${Number(
               mobilityPruneMinSeedCapturePct || 0
             ).toFixed(0)}%`

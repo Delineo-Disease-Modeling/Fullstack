@@ -14,11 +14,6 @@ export function isClusterAlgorithm(
   return CLUSTER_ALGORITHM_OPTIONS.some((option) => option.value === value);
 }
 
-// Algorithms that take the shared mobility_prune_min_seed_capture floor.
-export function isSeedCapturePruneAlgorithm(value: unknown): boolean {
-  return value === 'mobility_prune' || value === 'seed_prune';
-}
-
 export function clampIndex(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }

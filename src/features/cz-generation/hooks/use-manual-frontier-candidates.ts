@@ -4,7 +4,6 @@ import {
   type FrontierCandidatesResponse
 } from '@/features/cz-generation/api';
 import type { ClusterAlgorithm } from '@/features/cz-generation/constants';
-import { isSeedCapturePruneAlgorithm } from '@/features/cz-generation/helpers';
 import type { TraceCandidate } from '@/features/cz-generation/types';
 import { normalizeCbgId } from '@/lib/cz-geo';
 
@@ -66,7 +65,7 @@ export function useManualFrontierCandidates({
         req.seed_guard_distance_km = Number(seedGuardDistanceKm);
       }
     }
-    if (isSeedCapturePruneAlgorithm(clusterAlgorithm)) {
+    if (clusterAlgorithm === 'mobility_prune') {
       const minSeedCapture = Number(mobilityPruneMinSeedCapturePct) / 100;
       if (Number.isFinite(minSeedCapture)) {
         req.mobility_prune_min_seed_capture = Math.min(

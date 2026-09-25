@@ -24,8 +24,7 @@ import {
   clampIndex,
   coerceDateRangeToAvailableMonths,
   dedupeCbgList,
-  getMapSeedCbgIds,
-  isSeedCapturePruneAlgorithm
+  getMapSeedCbgIds
 } from '@/features/cz-generation/helpers';
 import { useCandidatePois } from '@/features/cz-generation/hooks/use-candidate-pois';
 import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
@@ -147,7 +146,7 @@ export default function CZGeneration() {
   const isFinalizing = phase === 'finalizing';
   const isGuidedSecondOrderAlgorithm =
     clusterAlgorithm === 'guided_second_order_regions';
-  const isSeedCapturePrune = isSeedCapturePruneAlgorithm(clusterAlgorithm);
+  const isMobilityPruneAlgorithm = clusterAlgorithm === 'mobility_prune';
   const guidedSelectionMode = hasGenerated && isGuidedSecondOrderAlgorithm;
   const isTestLocationInput =
     String(location ?? '')
@@ -156,9 +155,8 @@ export default function CZGeneration() {
   const traceSteps = growthTrace?.steps ?? [];
   const mobilityPruneMetadata =
     hasGenerated &&
-    isSeedCapturePrune &&
-    (algorithmMetadata?.bounded_envelope ||
-      algorithmMetadata?.universe_rule === 'seed_neighbors')
+    isMobilityPruneAlgorithm &&
+    algorithmMetadata?.bounded_envelope
       ? algorithmMetadata
       : null;
   const mapSeedCbgIds = useMemo(

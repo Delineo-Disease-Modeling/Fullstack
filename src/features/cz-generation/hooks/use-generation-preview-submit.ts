@@ -16,7 +16,6 @@ import {
   dedupeCbgList,
   getPayloadErrorMessage,
   isClusterAlgorithm,
-  isSeedCapturePruneAlgorithm,
   normalizeAvailableMonths,
   isRecord
 } from '@/features/cz-generation/helpers';
@@ -469,7 +468,7 @@ export function useGenerationPreviewSubmit({
             clusterReq.seed_guard_distance_km = Number(seedGuardDistanceKm);
           }
         }
-        if (isSeedCapturePruneAlgorithm(clusterAlgorithm)) {
+        if (clusterAlgorithm === 'mobility_prune') {
           const minSeedCapture = Number(mobilityPruneMinSeedCapturePct) / 100;
           if (Number.isFinite(minSeedCapture)) {
             clusterReq.mobility_prune_min_seed_capture = Math.min(
@@ -535,10 +534,7 @@ export function useGenerationPreviewSubmit({
             setSeedGuardDistanceKm(rawThreshold);
           }
         }
-        if (
-          data.clustering_params &&
-          isSeedCapturePruneAlgorithm(data.algorithm)
-        ) {
+        if (data.clustering_params && data.algorithm === 'mobility_prune') {
           const rawMinSeedCapture = Number(
             data.clustering_params.min_seed_capture
           );
@@ -553,7 +549,7 @@ export function useGenerationPreviewSubmit({
         setTraceStepIndex(0);
         setTraceEnabled(
           Boolean(data.trace?.steps?.length) &&
-            !isSeedCapturePruneAlgorithm(responseAlgorithm)
+            responseAlgorithm !== 'mobility_prune'
         );
         setZoneEditMode(false);
 
