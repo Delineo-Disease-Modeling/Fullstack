@@ -327,12 +327,14 @@ function MobilityPruneSummary({
           {Number(metadata.initial_cbg_count ?? 0).toLocaleString()} CBGs, pop{' '}
           {Number(metadata.initial_population ?? 0).toLocaleString()}
         </div>
-        <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-          <span className="font-semibold text-[#1f2937]">
-            Envelope Target:
-          </span>{' '}
-          {Number(metadata.envelope_population_target ?? 0).toLocaleString()}
-        </div>
+        {metadata.envelope_population_target != null && (
+          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+            <span className="font-semibold text-[#1f2937]">
+              Envelope Target:
+            </span>{' '}
+            {Number(metadata.envelope_population_target).toLocaleString()}
+          </div>
+        )}
         <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
           <span className="font-semibold text-[#1f2937]">Pruned:</span>{' '}
           {Number(metadata.removed_cbg_count ?? 0).toLocaleString()} CBGs, pop{' '}

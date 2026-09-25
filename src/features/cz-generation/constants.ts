@@ -22,7 +22,7 @@ export const CLUSTER_ALGORITHM_MANUAL: Record<
 > = {
   mobility_prune: {
     summary:
-      'Recommended default. Builds a broad mobility zone from the seed, then prunes lower-value CBGs while keeping seed movement capture.',
+      'Recommended default. Starts from every CBG with direct travel to or from the seed, then prunes the CBGs with the least seed movement per resident while keeping seed movement capture.',
     recommended: true
   },
   guided_second_order_regions: {

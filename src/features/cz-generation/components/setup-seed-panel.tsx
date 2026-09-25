@@ -351,8 +351,9 @@ export function SetupSeedPanel({
 
         {clusterAlgorithm === 'mobility_prune' && (
           <div className="czgen_info text-xs">
-            This mode grows a large mobility envelope, then prunes low
-            seed-capture CBGs while preserving the seed CBGs' movement field.
+            This mode starts from every CBG with direct travel to or from the
+            seed, then prunes the CBGs with the least seed movement per resident
+            while preserving the seed CBGs' movement field.
           </div>
         )}
 
