@@ -2,6 +2,7 @@ import type { GuidedSelectionStyle, TraceCandidate } from './types';
 
 export const CLUSTER_ALGORITHM_OPTIONS = [
   { value: 'mobility_prune', label: 'Mobility Prune (Recommended)' },
+  { value: 'seed_prune', label: 'Seed Prune' },
   {
     value: 'guided_second_order_regions',
     label: 'Guided Connected Cities'
@@ -24,6 +25,10 @@ export const CLUSTER_ALGORITHM_MANUAL: Record<
     summary:
       'Recommended default. Builds a broad mobility zone from the seed, then prunes lower-value CBGs while keeping seed movement capture.',
     recommended: true
+  },
+  seed_prune: {
+    summary:
+      'Starts from every CBG with direct travel to or from the seed, then removes the CBGs that send the least seed movement per resident while keeping seed movement capture. Usually a smaller zone than Mobility Prune.'
   },
   guided_second_order_regions: {
     summary:

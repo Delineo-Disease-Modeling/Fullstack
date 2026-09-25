@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getMapSeedCbgIds } from './helpers.ts';
+import {
+  getMapSeedCbgIds,
+  isClusterAlgorithm,
+  isSeedCapturePruneAlgorithm
+} from './helpers.ts';
 
 test('getMapSeedCbgIds uses resolved seed region before single core seed', () => {
   assert.deepEqual(
@@ -32,4 +36,12 @@ test('getMapSeedCbgIds uses guided seed region before setup seed region', () => 
     }),
     ['401139400085', '401139400086']
   );
+});
+
+test('seed_prune is a selectable algorithm that takes the seed-capture floor', () => {
+  assert.equal(isClusterAlgorithm('seed_prune'), true);
+  assert.equal(isSeedCapturePruneAlgorithm('seed_prune'), true);
+  assert.equal(isSeedCapturePruneAlgorithm('mobility_prune'), true);
+  assert.equal(isSeedCapturePruneAlgorithm('greedy_fast'), false);
+  assert.equal(isSeedCapturePruneAlgorithm(undefined), false);
 });

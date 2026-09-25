@@ -107,6 +107,7 @@ export type MobilityPruneAlgorithmMetadata = {
   missing_seed_cbgs?: string[];
   seed_population?: number;
   bounded_envelope?: boolean;
+  universe_rule?: string;
   envelope_population_target?: number;
   envelope_population_multiplier?: number;
   envelope_population_floor?: number;

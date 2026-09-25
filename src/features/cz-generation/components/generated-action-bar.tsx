@@ -162,9 +162,11 @@ export function GeneratedActionBar({
               </div>
             )}
 
-          {algorithmMetadata && !algorithmMetadata.bounded_envelope && (
-            <HierarchySummary metadata={algorithmMetadata} />
-          )}
+          {algorithmMetadata &&
+            !algorithmMetadata.bounded_envelope &&
+            algorithmMetadata.universe_rule !== 'seed_neighbors' && (
+              <HierarchySummary metadata={algorithmMetadata} />
+            )}
         </>
       )}
 
@@ -309,9 +311,12 @@ function MobilityPruneSummary({
   onTraceEnabledChange,
   onJumpTraceStep
 }: MobilityPruneSummaryProps) {
+  const isSeedPrune = metadata.universe_rule === 'seed_neighbors';
   return (
     <>
-      <div className="text-sm font-semibold mb-2">Mobility Prune Summary</div>
+      <div className="text-sm font-semibold mb-2">
+        {isSeedPrune ? 'Seed Prune Summary' : 'Mobility Prune Summary'}
+      </div>
       <div className="flex flex-wrap gap-2 text-xs text-gray-700">
         <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
           <span className="font-semibold text-[#1f2937]">Final Zone:</span>{' '}
@@ -323,16 +328,20 @@ function MobilityPruneSummary({
           {Number(metadata.seed_population ?? 0).toLocaleString()}
         </div>
         <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-          <span className="font-semibold text-[#1f2937]">Envelope:</span>{' '}
+          <span className="font-semibold text-[#1f2937]">
+            {isSeedPrune ? 'Seed-Linked CBGs:' : 'Envelope:'}
+          </span>{' '}
           {Number(metadata.initial_cbg_count ?? 0).toLocaleString()} CBGs, pop{' '}
           {Number(metadata.initial_population ?? 0).toLocaleString()}
         </div>
-        <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
-          <span className="font-semibold text-[#1f2937]">
-            Envelope Target:
-          </span>{' '}
-          {Number(metadata.envelope_population_target ?? 0).toLocaleString()}
-        </div>
+        {!isSeedPrune && (
+          <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
+            <span className="font-semibold text-[#1f2937]">
+              Envelope Target:
+            </span>{' '}
+            {Number(metadata.envelope_population_target ?? 0).toLocaleString()}
+          </div>
+        )}
         <div className="rounded-full border border-[#dbeafe] bg-white px-3 py-1">
           <span className="font-semibold text-[#1f2937]">Pruned:</span>{' '}
           {Number(metadata.removed_cbg_count ?? 0).toLocaleString()} CBGs, pop{' '}
