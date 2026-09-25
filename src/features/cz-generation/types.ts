@@ -16,9 +16,16 @@ export type TraceCandidate = {
   [key: string]: unknown;
 };
 
+export type TraceClusterDelta = {
+  added?: string[];
+  removed?: string[];
+};
+
 export type TraceStep = {
   cluster_before?: string[];
   cluster_after?: string[];
+  cluster_before_delta?: TraceClusterDelta;
+  cluster_after_delta?: TraceClusterDelta;
   selected_cbg?: string;
   candidates?: TraceCandidate[];
 };
@@ -27,6 +34,7 @@ export type TracePayload = {
   algorithm?: string;
   algorithm_metadata?: ClusterAlgorithmMetadata | null;
   supports_stepwise?: boolean;
+  step_encoding?: string;
   steps?: TraceStep[];
   note?: string;
 };
