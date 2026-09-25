@@ -65,6 +65,19 @@ export function expandTracePayload(
   return { ...payload, steps };
 }
 
+export function isDeferredTrace(trace: TracePayload | null | undefined) {
+  return Boolean(trace?.deferred) && !Array.isArray(trace?.steps);
+}
+
+// Step count of a loaded trace, or the count a deferred trace announced.
+export function getTraceStepCount(trace: TracePayload | null | undefined) {
+  if (Array.isArray(trace?.steps)) {
+    return trace.steps.length;
+  }
+  const declared = Number(trace?.step_count ?? 0);
+  return Number.isFinite(declared) && declared > 0 ? declared : 0;
+}
+
 export function clampIndex(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }

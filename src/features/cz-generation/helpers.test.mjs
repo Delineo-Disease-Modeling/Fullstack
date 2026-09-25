@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { expandTracePayload, getMapSeedCbgIds } from './helpers.ts';
+import {
+  expandTracePayload,
+  getMapSeedCbgIds,
+  getTraceStepCount,
+  isDeferredTrace
+} from './helpers.ts';
 
 test('getMapSeedCbgIds uses resolved seed region before single core seed', () => {
   assert.deepEqual(
@@ -104,4 +109,24 @@ test('expandTracePayload leaves full-list traces untouched', () => {
   assert.equal(expandTracePayload(full), full);
   assert.equal(expandTracePayload(null), null);
   assert.equal(expandTracePayload(undefined), null);
+});
+
+test('deferred trace summaries report their announced step count', () => {
+  const summary = {
+    algorithm: 'mobility_prune',
+    supports_stepwise: true,
+    deferred: true,
+    step_count: 94,
+    clustering_id: 3
+  };
+  const loaded = { deferred: true, steps: [{}, {}] };
+
+  assert.equal(isDeferredTrace(summary), true);
+  assert.equal(getTraceStepCount(summary), 94);
+  assert.equal(isDeferredTrace(loaded), false);
+  assert.equal(getTraceStepCount(loaded), 2);
+  assert.equal(isDeferredTrace({ steps: [] }), false);
+  assert.equal(getTraceStepCount({ steps: [] }), 0);
+  assert.equal(getTraceStepCount(null), 0);
+  assert.equal(expandTracePayload(summary), summary);
 });

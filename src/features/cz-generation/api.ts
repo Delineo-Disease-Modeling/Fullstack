@@ -2,6 +2,7 @@ import type { GeoJSONData, LatLng } from '@/lib/cz-geo';
 import { getResponseErrorMessage, readJsonObject } from './helpers';
 import type {
   ClusteringPreviewResponse,
+  ClusteringTraceResponse,
   GuidedSecondOrderMetadata,
   LookupLocationResult,
   PoiAnalysis,
@@ -232,6 +233,20 @@ export async function startClusteringPreview(body: JsonObject) {
     body,
     errorMessage: 'Failed to cluster CBGs. Please try again.'
   });
+}
+
+export async function fetchClusteringTrace(
+  clusteringId: number,
+  signal?: AbortSignal
+) {
+  return requestAlgorithmsJson<ClusteringTraceResponse>(
+    `clustering-trace/${clusteringId}`,
+    {
+      query: { trace_encoding: 'delta' },
+      signal,
+      errorMessage: 'Failed to load the clustering trace.'
+    }
+  );
 }
 
 export async function finalizeConvenienceZone(body: JsonObject) {
