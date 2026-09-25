@@ -7,11 +7,75 @@ import {
   CLUSTER_ALGORITHM_OPTIONS,
   type ClusterAlgorithm
 } from './constants.ts';
+import type {
+  TraceClusterDelta,
+  TracePayload,
+  TraceStep
+} from './types.ts';
 
 export function isClusterAlgorithm(
   value: unknown
 ): value is ClusterAlgorithm {
   return CLUSTER_ALGORITHM_OPTIONS.some((option) => option.value === value);
+}
+
+function applyClusterDelta(reference: string[], delta: TraceClusterDelta) {
+  const removed = new Set(delta.removed ?? []);
+  return [
+    ...reference.filter((cbg) => !removed.has(cbg)),
+    ...(delta.added ?? [])
+  ];
+}
+
+// With step_encoding 'delta' the Algorithms server sends each step's
+// cluster_before as a change against the previous step's cluster_after ([] for
+// the first step) and cluster_after as a change against cluster_before. This
+// rebuilds the full lists; see Algorithms czcode_modules/trace_encoding.py.
+export function expandTracePayload(
+  trace: TracePayload | null | undefined
+): TracePayload | null {
+  if (!trace) {
+    return null;
+  }
+  if (trace.step_encoding !== 'delta' || !Array.isArray(trace.steps)) {
+    return trace;
+  }
+
+  let previousAfter: string[] = [];
+  const steps = trace.steps.map((step) => {
+    const { cluster_before_delta, cluster_after_delta, ...rest } = step;
+    const expanded: TraceStep = { ...rest };
+    if (cluster_before_delta) {
+      expanded.cluster_before = applyClusterDelta(
+        previousAfter,
+        cluster_before_delta
+      );
+    }
+    if (cluster_after_delta) {
+      expanded.cluster_after = applyClusterDelta(
+        expanded.cluster_before ?? [],
+        cluster_after_delta
+      );
+    }
+    previousAfter = expanded.cluster_after ?? [];
+    return expanded;
+  });
+
+  const { step_encoding: _stepEncoding, ...payload } = trace;
+  return { ...payload, steps };
+}
+
+export function isDeferredTrace(trace: TracePayload | null | undefined) {
+  return Boolean(trace?.deferred) && !Array.isArray(trace?.steps);
+}
+
+// Step count of a loaded trace, or the count a deferred trace announced.
+export function getTraceStepCount(trace: TracePayload | null | undefined) {
+  if (Array.isArray(trace?.steps)) {
+    return trace.steps.length;
+  }
+  const declared = Number(trace?.step_count ?? 0);
+  return Number.isFinite(declared) && declared > 0 ? declared : 0;
 }
 
 export function clampIndex(value: number, min: number, max: number) {

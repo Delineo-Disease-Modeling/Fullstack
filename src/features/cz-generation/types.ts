@@ -16,9 +16,16 @@ export type TraceCandidate = {
   [key: string]: unknown;
 };
 
+export type TraceClusterDelta = {
+  added?: string[];
+  removed?: string[];
+};
+
 export type TraceStep = {
   cluster_before?: string[];
   cluster_after?: string[];
+  cluster_before_delta?: TraceClusterDelta;
+  cluster_after_delta?: TraceClusterDelta;
   selected_cbg?: string;
   candidates?: TraceCandidate[];
 };
@@ -27,8 +34,21 @@ export type TracePayload = {
   algorithm?: string;
   algorithm_metadata?: ClusterAlgorithmMetadata | null;
   supports_stepwise?: boolean;
+  step_encoding?: string;
   steps?: TraceStep[];
   note?: string;
+  // Set on a deferred preview trace: steps are fetched on demand from
+  // /clustering-trace/<clustering_id>.
+  deferred?: boolean;
+  step_count?: number;
+  clustering_id?: number | string;
+  // Set by the UI when fetching a deferred trace fails.
+  load_error?: string;
+};
+
+export type ClusteringTraceResponse = {
+  trace?: TracePayload | null;
+  trace_geojson?: GeoJSONData | null;
 };
 
 export type TraceLayerData = {

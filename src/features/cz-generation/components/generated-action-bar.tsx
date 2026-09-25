@@ -423,7 +423,12 @@ function TraceControls({
         />
         {checkboxLabel}
       </label>
-      {traceEnabled && !requireTraceEnabledForStepButtons && (
+      {growthTrace.load_error && !traceEnabled && (
+        <div className="text-xs text-red-700">{growthTrace.load_error}</div>
+      )}
+      {traceEnabled && growthTrace.deferred && !growthTrace.steps ? (
+        <div className="text-xs text-gray-600">Loading trace steps...</div>
+      ) : traceEnabled && !requireTraceEnabledForStepButtons && (
         <>
           <TraceStepIndicator
             traceStepIndex={traceStepIndex}

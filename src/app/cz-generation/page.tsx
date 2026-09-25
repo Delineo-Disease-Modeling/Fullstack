@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchCbgAtPoint,
   fetchCbgGeoJson,
+  fetchClusteringTrace,
   lookupLocation
 } from '@/features/cz-generation/api';
 import { AlgorithmGuideModal } from '@/features/cz-generation/components/algorithm-guide-modal';
@@ -24,7 +25,10 @@ import {
   clampIndex,
   coerceDateRangeToAvailableMonths,
   dedupeCbgList,
-  getMapSeedCbgIds
+  expandTracePayload,
+  getMapSeedCbgIds,
+  getTraceStepCount,
+  isDeferredTrace
 } from '@/features/cz-generation/helpers';
 import { useCandidatePois } from '@/features/cz-generation/hooks/use-candidate-pois';
 import { useCzMetrics } from '@/features/cz-generation/hooks/use-cz-metrics';
@@ -153,6 +157,10 @@ export default function CZGeneration() {
       .trim()
       .toUpperCase() === 'TEST';
   const traceSteps = growthTrace?.steps ?? [];
+  const traceStepCount = getTraceStepCount(growthTrace);
+  const deferredTraceId = isDeferredTrace(growthTrace)
+    ? Number(growthTrace?.clustering_id)
+    : null;
   const mobilityPruneMetadata =
     hasGenerated &&
     isMobilityPruneAlgorithm &&
@@ -515,10 +523,50 @@ export default function CZGeneration() {
   }, [maxTraceStep, traceStepIndex]);
 
   useEffect(() => {
-    if (!traceSteps.length) {
+    if (!traceStepCount) {
       setTraceEnabled(false);
     }
-  }, [traceSteps.length]);
+  }, [traceStepCount]);
+
+  useEffect(() => {
+    if (!traceEnabled || deferredTraceId === null) {
+      return;
+    }
+    const controller = new AbortController();
+    fetchClusteringTrace(deferredTraceId, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const trace = expandTracePayload(data.trace);
+        if (!Array.isArray(trace?.steps)) {
+          throw new Error('The Algorithms service returned no trace steps.');
+        }
+        setGrowthTrace(trace);
+        const traceGeoJson = data.trace_geojson;
+        if (traceGeoJson) {
+          setCbgGeoJSON((prev) => mergeGeoJsonFeatures(prev, traceGeoJson));
+        }
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setTraceEnabled(false);
+        setGrowthTrace((prev) =>
+          prev
+            ? {
+                ...prev,
+                load_error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to load the clustering trace.'
+              }
+            : prev
+        );
+      });
+    return () => controller.abort();
+  }, [deferredTraceId, traceEnabled]);
 
   useEffect(() => {
     if (!traceEnabled || !activeTraceStep) {
@@ -888,7 +936,7 @@ export default function CZGeneration() {
             totalPopulation={totalPopulation}
             showTraceControls={showTraceControls}
             growthTrace={growthTrace}
-            traceStepCount={traceSteps.length}
+            traceStepCount={traceStepCount}
             traceEnabled={traceEnabled}
             traceStepIndex={traceStepIndex}
             maxTraceStep={maxTraceStep}
@@ -906,7 +954,7 @@ export default function CZGeneration() {
             }}
             onEnterTraceView={() => {
               setZoneEditMode(false);
-              setTraceEnabled(Boolean(growthTrace?.steps?.length));
+              setTraceEnabled(traceStepCount > 0);
             }}
             onSaveHtmlMap={saveCZHtmlMap}
             savingHtmlMap={savingHtmlMap}

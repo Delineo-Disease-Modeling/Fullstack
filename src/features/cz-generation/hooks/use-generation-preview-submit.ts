@@ -14,7 +14,9 @@ import {
 import {
   coerceDateRangeToAvailableMonths,
   dedupeCbgList,
+  expandTracePayload,
   getPayloadErrorMessage,
+  getTraceStepCount,
   isClusterAlgorithm,
   normalizeAvailableMonths,
   isRecord
@@ -460,7 +462,10 @@ export function useGenerationPreviewSubmit({
           algorithm: clusterAlgorithm,
           start_date: submissionStartDate,
           use_test_data: isTestMode,
-          include_trace: true
+          include_trace: true,
+          trace_encoding: 'delta',
+          // Steps load from /clustering-trace only when the heat map opens.
+          defer_trace: true
         };
 
         if (clusterAlgorithm === 'greedy_weight_seed_guard') {
@@ -545,10 +550,10 @@ export function useGenerationPreviewSubmit({
           }
         }
 
-        setGrowthTrace(data.trace || null);
+        setGrowthTrace(expandTracePayload(data.trace));
         setTraceStepIndex(0);
         setTraceEnabled(
-          Boolean(data.trace?.steps?.length) &&
+          getTraceStepCount(data.trace) > 0 &&
             responseAlgorithm !== 'mobility_prune'
         );
         setZoneEditMode(false);
