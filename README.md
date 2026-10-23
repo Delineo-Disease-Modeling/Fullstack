@@ -6,14 +6,14 @@ and users go in PostgreSQL, and the large files go on disk. It runs on port
 **3000**.
 
 > **New to Delineo?** Read
-> [Start Here](https://github.com/Delineo-Disease-Modeling/Deploy/blob/main/docs/START_HERE.md)
+> [Start Here](https://github.com/Delineo-Disease-Modeling/.github/blob/main/docs/START_HERE.md)
 > first, and keep the
-> [Glossary](https://github.com/Delineo-Disease-Modeling/Deploy/blob/main/docs/GLOSSARY.md)
+> [Glossary](https://github.com/Delineo-Disease-Modeling/.github/blob/main/docs/GLOSSARY.md)
 > handy.
 
 **`main` is production and deploys automatically.** Do all work on a short-lived
 branch. See
-[How We Work](https://github.com/Delineo-Disease-Modeling/Deploy/blob/main/docs/HOW_WE_WORK.md).
+[How We Work](https://github.com/Delineo-Disease-Modeling/.github/blob/main/docs/HOW_WE_WORK.md).
 
 ## Pages
 
@@ -28,7 +28,7 @@ branch. See
 ## Running it
 
 The easiest way to run Fullstack together with the other services is
-[Setup](https://github.com/Delineo-Disease-Modeling/Deploy/blob/main/docs/SETUP.md),
+[Setup](https://github.com/Delineo-Disease-Modeling/.github/blob/main/docs/SETUP.md),
 which starts everything with `Deploy/run_servers.sh`. To run Fullstack on its
 own, from this folder:
 
@@ -132,7 +132,7 @@ ID:
 Everything is under `src/app/api/`. Some routes serve the browser, and some are
 called by the other services. The exact data the service-to-service routes
 send and receive is in
-[Data formats](https://github.com/Delineo-Disease-Modeling/Deploy/blob/main/docs/DATA_FORMATS.md).
+[Data formats](https://github.com/Delineo-Disease-Modeling/.github/blob/main/docs/DATA_FORMATS.md).
 
 | Route | Methods | Used by | What it does |
 | --- | --- | --- | --- |
