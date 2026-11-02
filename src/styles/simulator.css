@@ -1882,6 +1882,19 @@ div.sim_output {
   border-left: 1px solid rgba(31, 41, 55, 0.12);
 }
 
+/* "Neighborhoods over time" is the same table with one column per day, wider
+   cells (a rate of up to four digits) and two plain columns at the end. */
+.hotspot_heatmap_table .neighborhood_rates_head,
+.hotspot_heatmap_table .neighborhood_rates_cell {
+  min-width: 2.2rem;
+}
+
+.hotspot_heatmap_table .neighborhood_rates_side {
+  min-width: 4.2rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .poi_comparison_action {
   display: flex;
   flex-direction: column;

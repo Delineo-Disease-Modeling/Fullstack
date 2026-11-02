@@ -19,6 +19,7 @@ import useMapData, { type RunIncidence } from '@/stores/mapdata';
 import FacilityHours from './facility-hours';
 import { ComparisonBody } from './hotspot-comparison';
 import HotspotHeatmap from './hotspot-heatmap';
+import NeighborhoodRates from './neighborhood-rates';
 import NoSpreadNotice from './no-spread-notice';
 import SeedCheck from './seed-check';
 
@@ -863,6 +864,12 @@ export default function PoiRankings({
               simId={simId ?? null}
               timesteps={timesteps}
               place={facilityPlace}
+              wholeRun={incidence}
+            />
+            <NeighborhoodRates
+              simId={simId ?? null}
+              timesteps={timesteps}
+              homes={papdata?.homes ?? null}
               wholeRun={incidence}
             />
             <SeedCheck simId={simId ?? null} places={papdata?.places ?? null} />
