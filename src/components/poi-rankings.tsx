@@ -12,6 +12,7 @@ import {
   incidenceFor,
   type WindowFrameKeys
 } from '@/lib/hotspot-window';
+import { totalResidents } from '@/lib/no-spread';
 import { useComparisonRuns } from '@/lib/use-comparison-runs';
 import { useComparisonWindow } from '@/lib/use-comparison-window';
 import { useWindowIncidence } from '@/lib/use-window-incidence';
@@ -496,6 +497,11 @@ export default function PoiRankings({
     () => papdata?.places?.map((place) => String(place.id)) ?? null,
     [papdata]
   );
+  // People who live in the zone, for the note about runs with very few cases.
+  const residents = useMemo(
+    () => totalResidents(papdata?.homes),
+    [papdata?.homes]
+  );
   const hourRange = useMemo(() => hourlyGridRange(timesteps), [timesteps]);
 
   // Windows need per-place incidence from the engine, the run id to load frames
@@ -761,7 +767,13 @@ export default function PoiRankings({
         />
       </div>
       <div className="poi_rankings_body">
-        {!compareActive && <NoSpreadNotice incidence={incidence} />}
+        {!compareActive && (
+          <NoSpreadNotice
+            incidence={incidence}
+            residents={residents}
+            seedCheckBelow={windowSupported}
+          />
+        )}
         {comparisonAvailable && (
           <CompareToggle active={compareOn} onChange={setCompareOn} />
         )}
