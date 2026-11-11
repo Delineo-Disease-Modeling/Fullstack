@@ -1263,6 +1263,69 @@ div.sim_output {
   opacity: 0.72;
 }
 
+.hotspot_window_controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hotspot_window_row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hotspot_results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 120ms ease;
+}
+
+.hotspot_results.is-refreshing {
+  opacity: 0.65;
+}
+
+.hotspot_window_fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.hotspot_window_label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hotspot_window_slider {
+  flex: 1 1 160px;
+  min-width: 120px;
+  accent-color: var(--color-primary-blue);
+}
+
+.hotspot_window_status {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.hotspot_window_error {
+  color: var(--color-accent-red);
+}
+
+.hotspot_window_retry {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-blue);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .hotspot_table {
   overflow: hidden;
   border: 1px solid rgba(31, 41, 55, 0.08);
@@ -1304,6 +1367,62 @@ div.sim_output {
   border-top: 1px solid rgba(31, 41, 55, 0.08);
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+.seed_check_body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.seed_check_progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.seed_check_line {
+  margin: 0;
+  color: var(--color-text-main);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.seed_check_table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.seed_check_table th,
+.seed_check_table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-align: left;
+}
+
+.seed_check_table thead th {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.seed_check_table .seed_check_number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hotspot_notice {
+  padding: 8px 10px;
+  border-left: 3px solid var(--color-primary-blue);
+  background: var(--color-bg-surface);
+  color: var(--color-text-main);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .hotspot_table_body {
@@ -1407,6 +1526,373 @@ div.sim_output {
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: right;
+}
+
+/* Baseline-versus-intervention comparison in the hotspot panel. */
+.hotspot_compare_summary {
+  width: 100%;
+  border: 1px solid rgba(61, 136, 173, 0.18);
+  border-radius: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: rgba(61, 136, 173, 0.05);
+  font-size: 13px;
+}
+
+.hotspot_compare_summary th,
+.hotspot_compare_summary td {
+  padding: 8px 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hotspot_compare_summary th:first-child,
+.hotspot_compare_summary td:first-child {
+  text-align: left;
+}
+
+.hotspot_compare_summary thead th {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.hotspot_compare_summary tbody th {
+  font-weight: 700;
+}
+
+.hotspot_compare_note,
+.hotspot_compare_hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.hotspot_compare_scroll {
+  overflow-x: auto;
+}
+
+.hotspot_compare_table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.hotspot_compare_table thead th {
+  padding: 9px 12px;
+  background: rgba(47, 53, 64, 0.025);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.hotspot_compare_table thead th:nth-child(2) {
+  text-align: left;
+}
+
+.hotspot_compare_table tbody tr {
+  border-top: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.hotspot_compare_table td,
+.hotspot_compare_table tbody th {
+  padding: 10px 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.hotspot_compare_table tbody th.hotspot_compare_name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+  font-weight: 700;
+}
+
+.hotspot_compare_table .hotspot_compare_rank {
+  width: 2.5rem;
+  color: var(--color-text-muted);
+  font-weight: 800;
+  text-align: center;
+}
+
+.hotspot_compare_change {
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.hotspot_compare_change.is-down {
+  color: #2c6e91;
+}
+
+.hotspot_compare_change.is-up {
+  color: #b4532a;
+}
+
+.hotspot_compare_percent {
+  margin-left: 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* By-day heatmap (hotspot panel). Colours of the cells are set inline from the
+   palette in daily-incidence.ts, so their contrast can be tested. */
+.hotspot_heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.hotspot_heatmap_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hotspot_heatmap_toggle {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 12px;
+  /* A darker blue than the brand colour: #3d88ad on white is 3.9:1, too little
+     for 13px text. This is 5.5:1 on white and 5.0:1 on the hover colour. */
+  border: 1px solid #2b6f92;
+  border-radius: 8px;
+  background: #fff;
+  color: #2b6f92;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hotspot_heatmap_toggle:hover {
+  background: rgba(61, 136, 173, 0.08);
+}
+
+.hotspot_heatmap_body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hotspot_heatmap_note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.hotspot_heatmap_scroll {
+  /* The screen-reader-only texts inside the table are absolutely positioned.
+     Without this they would be placed against a box outside the scroller and
+     push the whole page wider than the screen. */
+  position: relative;
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hotspot_heatmap_scroll:focus-visible {
+  outline: 2px solid var(--color-primary-blue);
+  outline-offset: 2px;
+}
+
+.hotspot_heatmap_table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hotspot_heatmap_table th,
+.hotspot_heatmap_table td {
+  padding: 5px 6px;
+  white-space: nowrap;
+}
+
+/* The name column stays in view while the days scroll under it, so its cells
+   need an opaque background. */
+.hotspot_heatmap_corner,
+.hotspot_heatmap_name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding-left: 10px;
+  background-color: #fff;
+  box-shadow: 1px 0 0 rgba(31, 41, 55, 0.08);
+  text-align: left;
+}
+
+.hotspot_heatmap_corner {
+  z-index: 2;
+}
+
+.hotspot_heatmap_name {
+  font-weight: 700;
+}
+
+.hotspot_heatmap_label {
+  display: block;
+  max-width: 13rem;
+  /* Long names wrap instead of being cut off, so what tells two places with the
+     same name apart (an id after the name) is never hidden. */
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.hotspot_heatmap_corner,
+.hotspot_heatmap_day {
+  background-image: linear-gradient(
+    rgba(47, 53, 64, 0.025),
+    rgba(47, 53, 64, 0.025)
+  );
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.hotspot_heatmap_day {
+  min-width: 2.4rem;
+  background-color: #fff;
+  text-align: center;
+}
+
+.hotspot_heatmap_daynote {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.hotspot_heatmap_cell {
+  min-width: 2.4rem;
+  border-right: 1px solid #fff;
+  border-bottom: 1px solid #fff;
+  font-weight: 600;
+  text-align: center;
+}
+
+.hotspot_heatmap_total {
+  border-top: 1px solid rgba(31, 41, 55, 0.12);
+  background: #fff;
+  font-weight: 700;
+  text-align: center;
+}
+
+.hotspot_heatmap_table tfoot th {
+  border-top: 1px solid rgba(31, 41, 55, 0.12);
+}
+
+.hotspot_heatmap_legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hotspot_heatmap_legend_scale {
+  display: inline-flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid rgba(31, 41, 55, 0.12);
+  border-radius: 4px;
+}
+
+.hotspot_heatmap_swatch {
+  width: 16px;
+  height: 12px;
+}
+
+.hotspot_heatmap_legend_text {
+  flex: 1 1 14rem;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* "Busy hours at a place" reuses the by-day table above: 24 narrow hour
+   columns, a scroll area of its own for long runs, and a header row that stays
+   in view while the days scroll. The selectors repeat the table class so they
+   win over the by-day table's cell rules. */
+.facility_hours_scroll {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+/* A long place name with no spaces must wrap instead of widening the section. */
+.facility_hours_place {
+  overflow-wrap: anywhere;
+}
+
+.hotspot_heatmap_table .facility_hours_head,
+.hotspot_heatmap_table .facility_hours_corner {
+  position: sticky;
+  top: 0;
+}
+
+.hotspot_heatmap_table .facility_hours_head {
+  z-index: 1;
+  min-width: 0;
+  padding-right: 2px;
+  padding-left: 2px;
+}
+
+/* The top-left corner is sticky both ways, so it sits above both. */
+.hotspot_heatmap_table .facility_hours_corner {
+  z-index: 3;
+}
+
+.hotspot_heatmap_table .facility_hours_cell {
+  min-width: 1.7rem;
+  padding: 4px 1px;
+  font-size: 11px;
+  text-align: center;
+}
+
+.hotspot_heatmap_table .facility_hours_cell_empty {
+  background: #fff;
+}
+
+.hotspot_heatmap_table .facility_hours_infections {
+  min-width: 5.5rem;
+  white-space: normal;
+}
+
+.hotspot_heatmap_table .facility_hours_total {
+  border-left: 1px solid rgba(31, 41, 55, 0.12);
+}
+
+/* "Neighborhoods over time" is the same table with one column per day, wider
+   cells (a rate of up to four digits) and two plain columns at the end. */
+.hotspot_heatmap_table .neighborhood_rates_head,
+.hotspot_heatmap_table .neighborhood_rates_cell {
+  min-width: 2.2rem;
+}
+
+.hotspot_heatmap_table .neighborhood_rates_side {
+  min-width: 4.2rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .poi_comparison_action {
@@ -1540,5 +2026,63 @@ div.sim_output {
   .hotspot_table_header,
   .hotspot_row {
     grid-template-columns: 2rem 2.25rem minmax(0, 1fr) 4.75rem;
+  }
+
+  .hotspot_compare_table .hotspot_compare_rank,
+  .hotspot_compare_table thead th:first-child {
+    display: none;
+  }
+
+  .hotspot_compare_summary th,
+  .hotspot_compare_summary td,
+  .hotspot_compare_table thead th,
+  .hotspot_compare_table td,
+  .hotspot_compare_table tbody th {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  /* A name column that can shrink to one letter is unreadable; give it a floor
+     and let .hotspot_compare_scroll scroll sideways instead. */
+  .hotspot_compare_table tbody th.hotspot_compare_name {
+    min-width: 8rem;
+  }
+
+  /* Change is the number a reader came for, so it stays in view while the other
+     columns scroll under it. The cells need an opaque background, or the
+     scrolled cells would show through. */
+  .hotspot_compare_table thead th:last-child,
+  .hotspot_compare_table td.hotspot_compare_change {
+    position: sticky;
+    right: 0;
+    background-color: #fff;
+    box-shadow: -1px 0 0 rgba(31, 41, 55, 0.08);
+  }
+
+  .hotspot_compare_table thead th:last-child {
+    background-image: linear-gradient(
+      rgba(47, 53, 64, 0.025),
+      rgba(47, 53, 64, 0.025)
+    );
+  }
+
+  .hotspot_compare_percent {
+    display: block;
+    margin-left: 0;
+  }
+
+  .hotspot_heatmap_label {
+    max-width: 7.5rem;
+  }
+
+  .hotspot_heatmap_table th,
+  .hotspot_heatmap_table td {
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+  .hotspot_heatmap_corner,
+  .hotspot_heatmap_name {
+    padding-left: 8px;
   }
 }

@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { ArrowLeft } from 'lucide-react';
 import {
+  canOfferBreakdownChart,
   currentInfectionsAtPoint,
   fetchChartData
 } from '@/lib/chartdata-client';
@@ -67,7 +68,17 @@ const CHART_TYPE_OPTIONS = [
     label: 'Infectiousness',
     heading: 'Infectiousness over time'
   },
-  { value: 'states', label: 'States', heading: 'Disease states' }
+  { value: 'states', label: 'States', heading: 'Disease states' },
+  {
+    value: 'ages',
+    label: 'Age',
+    heading: 'Cumulative infections by age band'
+  },
+  {
+    value: 'sexes',
+    label: 'Sex',
+    heading: 'Cumulative infections by sex'
+  }
 ] as const;
 
 const POI_CHART_TYPE_OPTIONS = [
@@ -97,6 +108,16 @@ const STATE_SERIES_LABELS: Record<string, string> = {
 };
 
 type ChartType = (typeof CHART_TYPE_OPTIONS)[number]['value'];
+type ChartTypeOption = {
+  readonly value: ChartType;
+  readonly label: string;
+  readonly heading: string;
+};
+// Breakdown tabs exist only for zone-wide data and only when the run has them.
+const BREAKDOWN_CHART_TYPES: ReadonlySet<ChartType> = new Set<ChartType>([
+  'ages',
+  'sexes'
+]);
 type ScenarioKey = 'selected' | 'baseline' | 'disabledPoi';
 
 type SeriesDef = {
@@ -424,7 +445,8 @@ export default function OutputGraphs({
   selected_loc,
   onReset
 }: OutputGraphsProps) {
-  const [chartType, setChartType] = useState<ChartType>('iot');
+  const [requestedChartType, setRequestedChartType] =
+    useState<ChartType>('iot');
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [baselineData, setBaselineData] = useState<ChartData | null>(null);
   const [disabledPoiData, setDisabledPoiData] = useState<ChartData | null>(
@@ -511,9 +533,39 @@ export default function OutputGraphs({
   const hasDisabledPoi = disabledPoiSimId != null && disabledPoiData != null;
   const hasComparisons = hasBaseline || hasDisabledPoi;
   const selectedPoi = selected_loc?.type === 'places';
-  const chartTypeOptions = selectedPoi
-    ? POI_CHART_TYPE_OPTIONS
-    : CHART_TYPE_OPTIONS;
+  const chartTypeOptions = useMemo<readonly ChartTypeOption[]>(
+    () =>
+      selectedPoi
+        ? POI_CHART_TYPE_OPTIONS
+        : CHART_TYPE_OPTIONS.filter(
+            (option) =>
+              !BREAKDOWN_CHART_TYPES.has(option.value) ||
+              canOfferBreakdownChart(
+                chartData,
+                [
+                  hasBaseline ? baselineData : null,
+                  hasDisabledPoi ? disabledPoiData : null
+                ],
+                option.value
+              )
+          ),
+    [
+      chartData,
+      baselineData,
+      disabledPoiData,
+      hasBaseline,
+      hasDisabledPoi,
+      selectedPoi
+    ]
+  );
+  // The tab the user asked for, unless it is not offered right now (for example
+  // Age while a POI is selected, or on a run without age data). Derived rather
+  // than stored so the request survives and returns when the tab comes back.
+  const chartType: ChartType = chartTypeOptions.some(
+    (option) => option.value === requestedChartType
+  )
+    ? requestedChartType
+    : 'iot';
   const prefersIncidenceSeries = selectedPoi && chartType === 'iot';
   const yAxisLabel = prefersIncidenceSeries ? 'New infections' : 'People';
   const activeChart = chartTypeOptions.find(
@@ -556,10 +608,10 @@ export default function OutputGraphs({
       strokeWidth: SCENARIOS.selected.strokeWidth
     }));
 
-    if (chartType === 'states' && hasComparisons) {
+    if ((chartType === 'states' || chartType === 'ages') && hasComparisons) {
       const splitCharts: SplitChart[] = [];
 
-      if (hasBaseline) {
+      if (hasBaseline && baselineSeries.length > 0) {
         splitCharts.push({
           key: 'baseline',
           title: SCENARIOS.baseline.label,
@@ -573,7 +625,7 @@ export default function OutputGraphs({
         data: primarySeries
       });
 
-      if (hasDisabledPoi) {
+      if (hasDisabledPoi && disabledPoiSeries.length > 0) {
         splitCharts.push({
           key: 'disabledPoi',
           title: SCENARIOS.disabledPoi.label,
@@ -753,7 +805,7 @@ export default function OutputGraphs({
                   }
                   key={option.value}
                   onClick={() => {
-                    setChartType(option.value);
+                    setRequestedChartType(option.value);
                     setLineVisibilityOverrides(new Map());
                   }}
                 >

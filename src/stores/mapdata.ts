@@ -27,6 +27,11 @@ export type SimData = {
   [time: string]: {
     h: number[];
     p: number[];
+    // Cumulative transmission events, present on engine runs only: a home
+    // total and one count per place in papdata order. The server already
+    // sends them; they were just not declared here.
+    hinc?: number;
+    pinc?: number[];
   };
 };
 

@@ -60,6 +60,56 @@ export async function fetchChartData(
   }
 }
 
+// A point that is not an object (null, a number, a hole in the array) breaks
+// the chart as soon as it reads the point's keys.
+function hasMalformedPoint(series: readonly unknown[]): boolean {
+  for (const point of series) {
+    if (!point || typeof point !== 'object') return true;
+  }
+  return false;
+}
+
+/**
+ * Whether `data[key]` is a series that would actually draw something: an array
+ * with at least one point holding a finite number under a key other than
+ * `time`. Used to offer a chart tab only when the run has that data (older runs
+ * and per-place data have empty `ages` / `sexes`).
+ */
+export function hasMeaningfulSeries(
+  data: ChartData | null | undefined,
+  key: string
+): boolean {
+  const series = data?.[key];
+  if (!Array.isArray(series)) return false;
+  // One malformed point makes the whole series unsafe to plot.
+  if (hasMalformedPoint(series)) return false;
+  return series.some((point: object) =>
+    Object.entries(point).some(
+      ([field, value]) =>
+        field !== 'time' && typeof value === 'number' && Number.isFinite(value)
+    )
+  );
+}
+
+/**
+ * Whether the Age or Sex chart (`key`) can be offered. The selected run must
+ * have the series, and no run drawn next to it (baseline, disabled-POI run) may
+ * hold a malformed one: the chart reads every shown run's points, so one bad
+ * point in a comparison run would crash the page. A comparison run that has no
+ * such series at all is fine, there is just nothing to draw for it.
+ */
+export function canOfferBreakdownChart(
+  data: ChartData | null | undefined,
+  comparisons: ReadonlyArray<ChartData | null | undefined>,
+  key: string
+): boolean {
+  if (!hasMeaningfulSeries(data, key)) return false;
+  return !comparisons.some((comparison) => {
+    const series = comparison?.[key];
+    return Array.isArray(series) && hasMalformedPoint(series);
+  });
+}
+
 export type OutcomeStats = {
   /** Peak number of people simultaneously infected. */
   peakInfected: number;

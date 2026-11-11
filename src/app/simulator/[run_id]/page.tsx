@@ -823,6 +823,8 @@ export default function SimulatorRun() {
         <PersonPathPanel simId={activeSimId} />
 
         <PoiRankings
+          simId={activeSimId}
+          selectedLoc={selectedLoc}
           onSelectPoi={handleSelectPoiFromRankings}
           disabledPoiIds={effectiveDisabledPoiIds}
           disabledCategories={disabledCategories}
