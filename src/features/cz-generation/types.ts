@@ -251,3 +251,79 @@ export type ClusteringPreviewResponse = {
   geojson?: GeoJSONData | null;
   trace_geojson?: GeoJSONData | null;
 };
+
+export type V2RegionMetadata = {
+  method: 'v2';
+  zip_code: string;
+  core_cbgs: string[];
+  added_cbgs: string[];
+  coverage: {
+    target: number;
+    inbound_achieved: number | null;
+    outbound_achieved: number | null;
+    inbound_external_jobs: number;
+    outbound_external_jobs: number;
+  };
+  sources: {
+    geography_vintage: number;
+    tiger_release: number;
+    lodes_release: string;
+    lodes_year: number;
+    job_type: string;
+    population_year: number;
+    coverage_complete: boolean;
+    workplace_states: string[];
+    requested_workplace_states: string[];
+    unavailable_workplace_states?: string[];
+    coverage_scope: string;
+  };
+};
+
+export type V2RegionPreview = {
+  population_by_cbg: Record<string, number>;
+  cluster: string[];
+  size: number;
+  center: [number, number];
+  geojson: GeoJSONData;
+  algorithm: 'lodes_commuting';
+  region_metadata: V2RegionMetadata;
+};
+
+export type V2CensusPreparation = {
+  stage: 'census_inputs';
+  preview_id: number;
+  seed: number;
+  cluster: string[];
+  summary: {
+    cbg_count: number;
+    county_count: number;
+    population: number;
+    household_count: number | null;
+    household_population: number | null;
+    group_quarters_population: number | null;
+  };
+  census: {
+    missing_fields: {
+      cbg?: string;
+      county?: string;
+      field: string;
+      census_variable: string | null;
+      reason: 'not_available' | 'suppressed';
+    }[];
+    block_groups: Record<string, {
+      population: number;
+      county_geoid: string;
+      sex_age: { sex: string; min_age: number; max_age: number; count: number }[];
+      households: Record<string, number | null>;
+      residence: { household_population: number | null; group_quarters_population: number | null };
+      employment: Record<string, number | null>;
+      enrollment: Record<string, number | null>;
+      commuting: { workers: number | null; worked_from_home: number | null };
+    }>;
+    distributions_by_county: Record<string, {
+      employment_by_sex_age: Record<string, number | null>;
+      enrollment_by_sex_age: Record<string, number | null>;
+    }>;
+    sources: { dataset: string; year: number; tables: string[]; county_distribution_tables: string[] };
+  };
+};

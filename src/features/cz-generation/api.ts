@@ -290,3 +290,21 @@ export async function exportCzMapHtml(body: {
     filename: filenameMatch?.[1] || `${safeName}.html`
   };
 }
+
+export async function startV2RegionPreview(zipCode: string, coveragePercent: number, signal?: AbortSignal) {
+  return requestAlgorithmsJson<{ clustering_id: number }>('v2/region', {
+    method: 'POST',
+    body: { zip_code: zipCode, coverage_percent: coveragePercent },
+    signal,
+    errorMessage: 'Failed to generate the ZIP commuting region.'
+  });
+}
+
+export async function startV2PopulationPreparation(previewId: number, seed: number, signal?: AbortSignal) {
+  return requestAlgorithmsJson<{ clustering_id: number }>('v2/population', {
+    method: 'POST',
+    body: { preview_id: previewId, seed },
+    signal,
+    errorMessage: 'Failed to prepare Census inputs.',
+  });
+}

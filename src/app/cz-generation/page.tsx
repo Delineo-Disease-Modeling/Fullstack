@@ -8,6 +8,7 @@ import {
   fetchClusteringTrace,
   lookupLocation
 } from '@/features/cz-generation/api';
+import { V2RegionPreviewPanel } from '@/features/cz-generation/components/v2-region-preview';
 import { AlgorithmGuideModal } from '@/features/cz-generation/components/algorithm-guide-modal';
 import { FinalizingProgressModal } from '@/features/cz-generation/components/finalizing-progress-modal';
 import {
@@ -64,6 +65,26 @@ const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
 const EMPTY_CBG_LIST: string[] = [];
 
 export default function CZGeneration() {
+  const [method, setMethod] = useState<'legacy' | 'v2'>('legacy');
+  const creationMethod = (
+    <div className="flex flex-col gap-2">
+      <label htmlFor="creation-method" className="czgen_field_label">Creation method</label>
+      <select id="creation-method" className="formfield w-full" value={method}
+        onChange={(event) => setMethod(event.target.value === 'v2' ? 'v2' : 'legacy')}>
+        <option value="legacy">Clustering</option>
+        <option value="v2">Agent-Based Movement Model (Beta)</option>
+      </select>
+    </div>
+  );
+  return (
+    <>
+      <div className="mx-auto max-w-7xl px-6 pt-6">{creationMethod}</div>
+      {method === 'v2' ? <V2RegionPreviewPanel /> : <LegacyCZGeneration />}
+    </>
+  );
+}
+
+function LegacyCZGeneration() {
   const isResolvingMapClickRef = useRef(false);
   const attemptedTraceGeoJsonFetchRef = useRef(new Set<string>());
 

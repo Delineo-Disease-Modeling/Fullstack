@@ -342,3 +342,145 @@ h1.czgen_title {
   margin-bottom: 5px;
   display: block;
 }
+
+/* V2: fixed-width configuration beside a flexible results workspace. */
+.v2-region-workspace {
+  width: 100%;
+  max-width: 1600px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 24px;
+}
+
+.v2-region-settings {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: grid;
+  grid-template-rows: subgrid;
+  align-items: start;
+  min-width: 0;
+}
+
+.v2-region-results {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  display: grid;
+  grid-template-rows: subgrid;
+  align-items: start;
+  min-width: 0;
+}
+
+.v2-region-heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.v2-region-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.v2-region-map {
+  width: 100%;
+  height: clamp(360px, 60vh, 720px);
+  min-width: 0;
+}
+
+.v2-region-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.v2-region-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.v2-population-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--color-text-main);
+}
+
+.v2-population-table th,
+.v2-population-table td {
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.v2-population-table thead {
+  background: rgba(112, 180, 212, 0.08);
+  color: var(--color-primary-blue);
+}
+
+.v2-population-table tbody {
+  border-top: 1px solid rgba(61, 136, 173, 0.2);
+}
+
+.v2-population-table th[scope='row'] {
+  font-weight: 400;
+}
+
+.v2-population-table td,
+.v2-population-table thead th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.v2-population-sources {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.v2-population-sources summary {
+  cursor: pointer;
+  color: var(--color-primary-blue);
+}
+
+.v2-population-sources p {
+  margin-top: 8px;
+}
+
+.v2-region-settings p,
+.v2-region-summary p {
+  margin: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .v2-region-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .v2-region-settings,
+  .v2-region-results {
+    grid-column: 1;
+    grid-row: auto;
+    grid-template-rows: none;
+    gap: 16px;
+  }
+}
+
+.v2-population-availability {
+  display: block;
+  white-space: normal;
+  color: var(--color-text-muted);
+}
